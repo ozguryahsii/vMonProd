@@ -112,6 +112,9 @@ public static class DbSchemaHelper
             // v14: kullanıcı bazlı tema + dil tercihi (sonraki girişte hatırlanır)
             "ALTER TABLE AppUsers ADD COLUMN Theme TEXT NOT NULL DEFAULT 'light'",
             "ALTER TABLE AppUsers ADD COLUMN Language TEXT NOT NULL DEFAULT 'tr'",
+            // v17: yerel (LDAP olmayan) admin kullanıcı — kurulum sihirbazında oluşturulur
+            "ALTER TABLE AppUsers ADD COLUMN IsLocal INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE AppUsers ADD COLUMN PasswordHash TEXT NULL",
             // v15: WhatsApp entegrasyonuna onaylı şablon (Content SID) — butonlu interaktif alarm
             "ALTER TABLE SmsProviders ADD COLUMN TemplateSid TEXT NULL",
             // v16: "Voice" ve "Ivr" türleri birleştirildi → mevcut Voice kayıtlarını Ivr'a taşı (idempotent)

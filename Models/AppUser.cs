@@ -26,6 +26,12 @@ public class AppUser
     /// <summary>Arayüz dili: "tr" veya "en". Sonraki girişlerde hatırlanır.</summary>
     public string Language { get; set; } = "tr";
 
+    /// <summary>Yerel (LDAP olmayan) kullanıcı mı? İlk kurulumda oluşturulan admin yereldir; LDAP senkronundan sonra silinebilir.</summary>
+    public bool IsLocal { get; set; } = false;
+
+    /// <summary>Yerel kullanıcı için PBKDF2 şifre hash'i (LDAP kullanıcılarında boş).</summary>
+    public string? PasswordHash { get; set; }
+
     public HashSet<string> Permissions() =>
         (PermissionsCsv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
