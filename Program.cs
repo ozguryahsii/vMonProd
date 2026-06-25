@@ -150,10 +150,13 @@ using (var scope = app.Services.CreateScope())
         try
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.EnsureCreated();   // tüm sağlayıcılarda model'den (yoksa) şema kurar
+            db.Database.EnsureCreated();   // sıfır kurulum: model'den tam şema (tüm sağlayıcılar)
+
+            // GÜVENLİ yükseltme: model'de olup DB'de eksik olan kolonları ekle (tüm sağlayıcılar; yalnız EKLEME → veri kaybı yok)
+            SchemaSync.EnsureColumnsAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
 
             if (bcfg.Provider == DbProviderKind.Sqlite)
-                DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları için artımlı şema + veri-fix
+                DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları: legacy CREATE/ALTER + veri-fix (idempotent)
 
             try
             {
