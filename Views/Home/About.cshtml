@@ -29,12 +29,19 @@
                 <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-tag text-brand-500"></i> @T("Versiyon", "Version")</div>
                 <div class="text-slate-700 flex-1">
                     <button type="button" @@click="open=!open" class="inline-flex items-center gap-2 group">
-                        <span class="badge pill-info">v2.5.4</span>
+                        <span class="badge pill-info">v2.6.0</span>
                         <span class="text-xs text-brand-600 group-hover:underline">@T("Sürüm notları", "Release notes") <i class="bi" :class="open ? 'bi-chevron-up' : 'bi-chevron-down'"></i></span>
                     </button>
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
                         @if (en)
                         {
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.6.0 — Multi-database & setup wizard</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.6.0) Multiple databases:</strong> SQLite, SQL Server, PostgreSQL, MySQL and Oracle are supported. The provider is chosen at install time; the DB can be local or on a separate server.</li>
+                                <li><strong>(2.6.0) First-run setup wizard:</strong> on a fresh install the app asks for the database (with a connection test), company name, an admin account and SMTP (optional, with a test send).</li>
+                                <li><strong>(2.6.0) Local admin login:</strong> a password-protected local admin is created during setup, so the app requires sign-in from the start. LDAP can be configured later and the local account removed.</li>
+                                <li class="text-slate-500">Under the hood: a DB-external bootstrap layer, a secret-protection abstraction (DPAPI today, cloud/AES-ready) and a hardened startup that never errors on first run.</li>
+                            </ul>
                             <p class="font-semibold text-slate-700 mb-2">Version 2.5.4 — Translation pass 2</p>
                             <ul class="list-disc ml-5 space-y-1.5 mb-3">
                                 <li><strong>(2.5.4) More English coverage:</strong> Dashboard edit, Service edit, Credential edit, Integration edit and Edit Permissions screens, the Reports table (types, durations, detail) and recurring Audit descriptions are now translated. The "(soon)" tag was removed from WhatsApp/Call (now live).</li>
@@ -101,6 +108,13 @@
                         }
                         else
                         {
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.6.0 — Çoklu veritabanı & kurulum sihirbazı</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.6.0) Çoklu veritabanı:</strong> SQLite, SQL Server, PostgreSQL, MySQL ve Oracle desteklenir. Sağlayıcı kurulumda seçilir; veritabanı yerelde veya ayrı bir sunucuda olabilir.</li>
+                                <li><strong>(2.6.0) İlk kurulum sihirbazı:</strong> sıfır kurulumda uygulama veritabanını (bağlantı testiyle), şirket adını, yönetici hesabını ve SMTP'yi (opsiyonel, test gönderimiyle) sorar.</li>
+                                <li><strong>(2.6.0) Yerel admin girişi:</strong> kurulumda şifreli bir yerel admin oluşturulur; uygulama baştan itibaren giriş ister. LDAP sonradan bağlanıp yerel hesap silinebilir.</li>
+                                <li class="text-slate-500">Altyapı: DB-dışı bootstrap katmanı, sır şifreleme soyutlaması (bugün DPAPI, cloud/AES'e hazır) ve ilk açılışta asla hata vermeyen sertleştirilmiş başlangıç.</li>
+                            </ul>
                             <p class="font-semibold text-slate-700 mb-2">Sürüm 2.5.4 — Çeviri turu 2</p>
                             <ul class="list-disc ml-5 space-y-1.5 mb-3">
                                 <li><strong>(2.5.4) Daha geniş İngilizce:</strong> Dashboard düzenle, Servis düzenle, Kimlik düzenle, Entegrasyon düzenle ve Yetki düzenle ekranları, Raporlar tablosu (tipler, süreler, detay) ve sık geçen Denetim açıklamaları çevrildi. WhatsApp/Arama yanındaki "(yakında)" etiketi kaldırıldı (artık yayında).</li>
