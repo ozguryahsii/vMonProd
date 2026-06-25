@@ -46,8 +46,10 @@ public static class DbProviderConfig
                     Database = c.Database,
                     Username = c.Username,
                     Password = password,
-                    SslMode = c.UseSsl ? Npgsql.SslMode.Require : Npgsql.SslMode.Prefer,
-                    TrustServerCertificate = c.TrustServerCertificate
+                    // Npgsql 8: sertifika doğrulamasını gevşetmek için SslMode kullanılır (TrustServerCertificate kaldırıldı/işlevsiz)
+                    SslMode = c.UseSsl
+                        ? (c.TrustServerCertificate ? Npgsql.SslMode.Require : Npgsql.SslMode.VerifyFull)
+                        : Npgsql.SslMode.Prefer
                 };
                 return nb.ConnectionString;
 
