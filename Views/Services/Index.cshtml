@@ -1,0 +1,333 @@
+@model List<MonitoredService>
+@{
+    ViewData["Title"] = "Servisler";
+    var typeNames = new Dictionary<ServiceType, string>
+    {
+        [ServiceType.Http] = "HTTP / URL",
+        [ServiceType.Tcp] = "TCP Port",
+        [ServiceType.MySql] = "MySQL",
+        [ServiceType.MsSql] = "MSSQL",
+        [ServiceType.Oracle] = "Oracle",
+        [ServiceType.Ldap] = "AD / LDAP(S)",
+        [ServiceType.Dns] = "DNS",
+        [ServiceType.Sftp] = "SFTP",
+        [ServiceType.DhcpWindowsService] = "DHCP (Win Servis)",
+        [ServiceType.Smtp] = "SMTP",
+        [ServiceType.Imap] = "IMAP",
+        [ServiceType.Ping] = "Ping (ICMP)",
+        [ServiceType.WindowsHealth] = "Win Sağlık",
+        [ServiceType.LinuxHealth] = "Linux Sağlık",
+        [ServiceType.WindowsServiceControl] = "Win Servis",
+        [ServiceType.LinuxServiceControl] = "Linux Servis"
+    };
+}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2"><i class="bi bi-hdd-network text-brand-500"></i> Servisler</h1>
+        <p class="text-sm text-slate-500 mt-0.5">İzlenen servisleri yönetin, CSV ile toplu ekleyin</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a class="btn btn-outline btn-sm" asp-action="ExportCsv"><i class="bi bi-download"></i> CSV Dışa Aktar (Yedek)</a>
+        <a class="btn btn-success btn-sm" asp-action="SampleCsv"><i class="bi bi-filetype-csv"></i> Örnek CSV İndir</a>
+        <button type="button" class="btn btn-outline btn-sm" data-modal-open="importModal"><i class="bi bi-upload"></i> CSV İçe Aktar</button>
+        <a class="btn btn-primary btn-sm" asp-action="Create"><i class="bi bi-plus-lg"></i> Yeni Servis</a>
+    </div>
+</div>
+
+<!-- CSV içe aktarma modalı -->
+<div class="modal-overlay" id="importModal" hidden>
+    <div class="modal-card max-w-xl fade-in">
+        <form method="post" asp-action="ImportCsv" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h5 class="font-semibold text-slate-700"><i class="bi bi-upload text-brand-500"></i> CSV ile Toplu Servis Ekleme</h5>
+                <button type="button" class="text-slate-400 hover:text-slate-700" data-modal-close><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="label">CSV Dosyası</label>
+                    <input type="file" name="csvFile" class="input" accept=".csv,.txt" required />
+                </div>
+                <div class="alert-info text-sm">
+                    <i class="bi bi-info-circle"></i> Format için <strong>"Örnek CSV İndir"</strong> butonunu kullanın — her izleme tipi için doldurulmuş örnek satırlar içerir.
+                    <ul class="list-disc ml-5 mt-2 space-y-1">
+                        <li>İlk satır başlıktır; ayraç <code>;</code>, <code>,</code> veya sekme olabilir.</li>
+                        <li><code>KimlikAdi</code> sütunu, Kimlik Bilgileri'ndeki <strong>tanım adıyla</strong> eşleşmelidir (şifreler CSV'de taşınmaz).</li>
+                        <li>Aynı ada sahip servisler atlanır; hatalı satırlar raporlanır, geçerliler eklenir.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
+                <button type="button" class="btn btn-outline" data-modal-close>İptal</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-upload"></i> İçe Aktar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@{
+    var allKeywords = Model.SelectMany(s => MonitoredService.SplitKeywords(s.Keyword))
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
+    var usedTypes = Model.Select(s => s.Type).Distinct().OrderBy(t => t.ToString()).ToList();
+}
+
+<div class="card mb-4">
+    <div class="card-body flex flex-wrap items-center gap-2">
+        <input type="text" id="fText" class="input !w-56 !py-1.5" placeholder="Ad / hedef ara..." />
+        <select id="fType" class="input !w-auto !py-1.5">
+            <option value="">Tüm Tipler</option>
+            @foreach (var t in usedTypes) { <option value="@t">@(typeNames.GetValueOrDefault(t, t.ToString()))</option> }
+        </select>
+        <select id="fKeyword" class="input !w-auto !py-1.5">
+            <option value="">Tüm Keyword'ler</option>
+            @foreach (var k in allKeywords) { <option value="@k.ToLowerInvariant()">@k</option> }
+        </select>
+        <span id="fCount" class="text-slate-400 text-xs"></span>
+        <button type="button" id="btnEditSel" class="btn btn-outline btn-sm ml-auto" disabled>
+            <i class="bi bi-pencil-square"></i> Seçilenleri Düzenle (<span id="selCountE">0</span>)
+        </button>
+        <button type="button" id="btnDeleteSel" class="btn btn-danger btn-sm" disabled>
+            <i class="bi bi-trash"></i> Seçilenleri Sil (<span id="selCount">0</span>)
+        </button>
+    </div>
+</div>
+
+<!-- Toplu düzenleme modalı -->
+<div class="modal-overlay" id="bulkEditModal" hidden>
+    <div class="modal-card max-w-2xl fade-in">
+        <form method="post" asp-action="EditMany" id="bulkEditForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ids" id="bulkEditIds" />
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h5 class="font-semibold text-slate-700"><i class="bi bi-pencil-square text-brand-500"></i> Seçilenleri Düzenle (<span id="bulkEditCount">0</span> servis)</h5>
+                <button type="button" class="text-slate-400 hover:text-slate-700" data-modal-close><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                <p class="text-sm text-slate-500">Yalnızca değiştirmek istediğiniz alanlara dokunun. Aç/Kapat alanlarında <strong>"Dokunma"</strong> seçili kalanlar değişmez; sayısal alanlarda soldaki anahtarı açmadan değer uygulanmaz.</p>
+
+                <div>
+                    <h6 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Alarm kanalları & durum</h6>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @{
+                            var triFields = new (string name, string label)[] {
+                                ("alertMail", "E-posta alarmı"), ("alertSms", "SMS alarmı"),
+                                ("alertWhatsapp", "WhatsApp alarmı"), ("alertCall", "Arama alarmı"),
+                                ("enabled", "Aktif/Pasif")
+                            };
+                        }
+                        @foreach (var f in triFields)
+                        {
+                            <div>
+                                <label class="label">@f.label</label>
+                                <div class="seg" data-seg="@f.name">
+                                    <button type="button" class="on-keep active" data-v="">Dokunma</button>
+                                    <button type="button" class="on-yes" data-v="on">Aç</button>
+                                    <button type="button" class="on-no" data-v="off">Kapat</button>
+                                </div>
+                                <input type="hidden" name="@f.name" value="" />
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <h6 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Eşikler & aralık (anahtarı açıp değer girin)</h6>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @{
+                            var numFields = new (string set, string val, string label, string ph)[] {
+                                ("setInterval", "interval", "Kontrol aralığı (dk)", "boş = global"),
+                                ("setSlow", "slow", "Yavaşlık eşiği (ms)", "boş = kapalı"),
+                                ("setCpu", "cpu", "CPU eşiği (%)", "boş = kapalı"),
+                                ("setRam", "ram", "RAM eşiği (%)", "boş = kapalı"),
+                                ("setDisk", "disk", "Disk eşiği (%)", "boş = kapalı")
+                            };
+                        }
+                        @foreach (var f in numFields)
+                        {
+                            <div>
+                                <label class="label flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" class="switch field-toggle" data-target="@f.val" name="@f.set" value="true" />
+                                    @f.label
+                                </label>
+                                <input type="number" min="1" name="@f.val" id="bf_@f.val" class="input" placeholder="@f.ph" disabled />
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <h6 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Keyword</h6>
+                    <label class="label">Keyword ekle (mevcuda eklenir, virgülle ayırın)</label>
+                    <input type="text" name="addKeywords" class="input" placeholder="örn. kritik, prod" />
+                    <div class="hint">Mevcut keyword'ler korunur; yazılanlar listeye eklenir (tekrarlar atlanır).</div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
+                <button type="button" class="btn btn-outline" data-modal-close>İptal</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Uygula</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="bulkDeleteForm" method="post" asp-action="DeleteMany" class="hidden">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="ids" id="bulkIds" />
+</form>
+
+<div class="card">
+    <div class="overflow-x-auto">
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th class="w-8"><input type="checkbox" class="cbx" id="selAll" /></th>
+                    <th>Ad</th><th>Tip</th><th>Hedef</th><th>Keyword</th><th>Kimlik</th><th>Aralık</th><th>Durum</th><th></th>
+                </tr>
+            </thead>
+            <tbody id="svcRows">
+            @if (Model.Count == 0)
+            {
+                <tr><td colspan="9" class="text-center text-slate-400 py-6">Henüz servis yok.</td></tr>
+            }
+            @foreach (var s in Model)
+            {
+                var kws = MonitoredService.SplitKeywords(s.Keyword);
+                <tr class="svc-row cursor-pointer"
+                    data-search="@($"{s.Name} {s.Target} {s.Description}".ToLowerInvariant())"
+                    data-type="@s.Type"
+                    data-keyword="@(string.Join(",", kws.Select(k => k.ToLowerInvariant())))">
+                    <td><input type="checkbox" class="cbx svc-cb" value="@s.Id" /></td>
+                    <td>
+                        <span class="font-semibold text-slate-800">@s.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(s.Description))
+                        {
+                            <div class="text-xs text-slate-500 truncate max-w-[18rem]" title="@s.Description"><i class="bi bi-card-text text-slate-400"></i> @s.Description</div>
+                        }
+                    </td>
+                    <td><span class="badge pill-type">@(typeNames.GetValueOrDefault(s.Type, s.Type.ToString()))</span></td>
+                    <td class="mono text-slate-500">@s.Target@(s.Port.HasValue ? $":{s.Port}" : "")</td>
+                    <td>
+                        @if (kws.Count > 0) { foreach (var kw in kws) { <span class="badge pill-info mr-1">@kw</span> } } else { <span class="text-slate-400">-</span> }
+                    </td>
+                    <td>@(s.Credential?.Name ?? "-")</td>
+                    <td>@(s.IntervalMinutesOverride.HasValue ? $"{s.IntervalMinutesOverride} dk" : "global")</td>
+                    <td>
+                        @if (!s.Enabled) { <span class="badge pill-muted">Pasif</span> }
+                        else if (s.LastIsUp == true) { <span class="badge pill-up">UP</span> }
+                        else if (s.LastIsUp == false) { <span class="badge pill-down">DOWN</span> }
+                        else { <span class="badge pill-muted">Bekliyor</span> }
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                        <a class="btn btn-outline btn-sm" asp-action="Edit" asp-route-id="@s.Id"><i class="bi bi-pencil"></i></a>
+                        <form method="post" asp-action="Delete" asp-route-id="@s.Id" class="inline"
+                              onsubmit="return confirm('@s.Name silinsin mi? Tüm geçmişi de silinir.');">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const rows = Array.from(document.querySelectorAll(".svc-row"));
+const fText = document.getElementById("fText"), fType = document.getElementById("fType"), fKeyword = document.getElementById("fKeyword");
+const selAll = document.getElementById("selAll"), btnDel = document.getElementById("btnDeleteSel"), btnEdit = document.getElementById("btnEditSel");
+
+function visibleRows() { return rows.filter(r => !r.classList.contains("hidden")); }
+
+function applyFilter() {
+    const q = fText.value.trim().toLowerCase(), ty = fType.value, kw = fKeyword.value;
+    rows.forEach(r => {
+        const ok = (!q || r.dataset.search.includes(q))
+            && (!ty || r.dataset.type === ty)
+            && (!kw || r.dataset.keyword.split(",").includes(kw));
+        r.classList.toggle("hidden", !ok);
+        if (!ok) r.querySelector(".svc-cb").checked = false; // gizlenen satırın seçimi kalkar
+    });
+    document.getElementById("fCount").textContent = `${visibleRows().length} / ${rows.length} servis`;
+    syncSel();
+}
+
+function syncSel() {
+    const vis = visibleRows(), checked = vis.filter(r => r.querySelector(".svc-cb").checked);
+    selAll.checked = vis.length > 0 && checked.length === vis.length;
+    selAll.indeterminate = checked.length > 0 && checked.length < vis.length;
+    const n = rows.filter(r => r.querySelector(".svc-cb").checked).length;
+    document.getElementById("selCount").textContent = n;
+    document.getElementById("selCountE").textContent = n;
+    btnDel.disabled = n === 0;
+    btnEdit.disabled = n === 0;
+    rows.forEach(r => r.classList.toggle("bg-brand-50", r.querySelector(".svc-cb").checked));
+}
+
+fText.addEventListener("input", applyFilter);
+fType.addEventListener("change", applyFilter);
+fKeyword.addEventListener("change", applyFilter);
+selAll.addEventListener("change", () => { visibleRows().forEach(r => r.querySelector(".svc-cb").checked = selAll.checked); syncSel(); });
+rows.forEach(r => r.querySelector(".svc-cb").addEventListener("change", syncSel));
+
+// Satırın herhangi bir yerine tıklayınca seç/kaldır.
+// Muaf: en sağdaki düzenle/sil tuşları (a, button) ve onların formu — kendi görevlerini yapsın.
+rows.forEach(r => r.addEventListener("click", (e) => {
+    if (e.target.closest("a, button")) return;     // aksiyon tuşları muaf
+    const cb = r.querySelector(".svc-cb");
+    if (e.target !== cb) cb.checked = !cb.checked;  // kutuya direkt tıklandıysa native toggle yeterli
+    syncSel();
+}));
+
+// Segmentli üçlü butonlar (Dokunma / Aç / Kapat) → gizli input
+document.querySelectorAll(".seg[data-seg]").forEach(seg => {
+    const hidden = seg.parentElement.querySelector('input[type=hidden]');
+    seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+        seg.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+        b.classList.add("active");
+        hidden.value = b.dataset.v;
+    }));
+});
+// Sayısal alan anahtarları: kapalıyken input devre dışı
+document.querySelectorAll(".field-toggle").forEach(t => {
+    t.addEventListener("change", () => {
+        const inp = document.getElementById("bf_" + t.dataset.target);
+        inp.disabled = !t.checked;
+        if (t.checked) inp.focus();
+    });
+});
+function resetBulkForm() {
+    document.querySelectorAll(".seg[data-seg]").forEach(seg => {
+        seg.querySelectorAll("button").forEach((x,i) => x.classList.toggle("active", i === 0));
+        seg.parentElement.querySelector('input[type=hidden]').value = "";
+    });
+    document.querySelectorAll(".field-toggle").forEach(t => {
+        t.checked = false;
+        const inp = document.getElementById("bf_" + t.dataset.target);
+        inp.disabled = true; inp.value = "";
+    });
+    const akw = document.querySelector('input[name=addKeywords]'); if (akw) akw.value = "";
+}
+
+btnEdit.addEventListener("click", () => {
+    const ids = rows.filter(r => r.querySelector(".svc-cb").checked).map(r => r.querySelector(".svc-cb").value);
+    if (ids.length === 0) return;
+    resetBulkForm();
+    document.getElementById("bulkEditIds").value = ids.join(",");
+    document.getElementById("bulkEditCount").textContent = ids.length;
+    openModal("bulkEditModal");
+});
+
+btnDel.addEventListener("click", () => {
+    const ids = rows.filter(r => r.querySelector(".svc-cb").checked).map(r => r.querySelector(".svc-cb").value);
+    if (ids.length === 0) return;
+    if (!confirm(ids.length + " servis ve tüm geçmişleri kalıcı olarak silinsin mi?")) return;
+    document.getElementById("bulkIds").value = ids.join(",");
+    document.getElementById("bulkDeleteForm").submit();
+});
+
+applyFilter();
+</script>
+}

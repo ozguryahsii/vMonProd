@@ -1,0 +1,284 @@
+/* vMon — Tailwind tabanlı tema yardımcıları (Play CDN @apply ile çözülemeyen ham CSS). */
+
+/* Yumuşak sayfa arka planı */
+body {
+    background:
+        radial-gradient(1200px 500px at 100% -10%, rgba(237, 28, 36, .06), transparent 60%),
+        radial-gradient(900px 500px at -10% 0%, rgba(2, 132, 199, .05), transparent 55%),
+        #f1f5f9;
+    min-height: 100vh;
+}
+
+/* DOWN durumunda nabız animasyonu */
+.pulse-down { animation: pulse-red 1.6s ease-in-out infinite; }
+@keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+}
+
+/* Kartlar belirirken hafif geçiş */
+.fade-in { animation: fadeIn .25s ease-out; }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Raporlar — günlük erişilebilirlik şeridi */
+.uptime-strip { display: flex; gap: 3px; flex-wrap: wrap; }
+.uptime-cell {
+    width: 15px; height: 30px; border-radius: 4px; cursor: default;
+    transition: transform .1s ease;
+}
+.uptime-cell:hover { transform: scaleY(1.12); }
+.legend-dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: middle; }
+
+/* İnce kaydırma çubuğu */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+
+/* vMon logosu — kalp atışı: hem kırmızı kutu hem ikon hareket eder */
+.logo-box {
+    transform-origin: center;
+    will-change: transform, box-shadow;
+    animation: logoBeat 2.2s ease-in-out infinite, logoGlow 2.2s ease-in-out infinite;
+}
+.logo-anim {
+    display: inline-block;
+    transform-origin: center;
+    will-change: transform;
+    animation: logoBeatInner 2.2s ease-in-out infinite;
+}
+@keyframes logoBeat {
+    0%, 100% { transform: scale(1); }
+    8%  { transform: scale(1.14); }
+    16% { transform: scale(0.97); }
+    26% { transform: scale(1.08); }
+    40% { transform: scale(1); }
+}
+@keyframes logoBeatInner {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    8%  { transform: scale(1.18) rotate(-4deg); }
+    20% { transform: scale(0.94) rotate(3deg); }
+    32% { transform: scale(1.1) rotate(0deg); }
+    45% { transform: scale(1); }
+}
+@keyframes logoGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(237, 28, 36, .5); }
+    50% { box-shadow: 0 0 0 9px rgba(237, 28, 36, 0); }
+}
+
+/* Sayfa başlığı ikonu — her sekmede sürekli hafif hareket */
+main h1 i.bi {
+    display: inline-block;
+    transform-origin: center;
+    animation: pageIcon 2.8s ease-in-out infinite;
+}
+@keyframes pageIcon {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-3px) scale(1.12); }
+}
+
+/* Nav sekme ikonları — üzerine gelince canlansın */
+.navlink i { display: inline-block; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+.navlink:hover i { transform: scale(1.3) translateY(-2px); }
+
+/* ---- Genel canlılık (butonlar + simgeler) ---- */
+
+/* Butonlar: hover'da hafifçe yüksel, basınca otur, ikon zıplasın */
+.btn { transition: transform .15s ease, box-shadow .18s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease; }
+.btn:hover { transform: translateY(-1.5px); }
+.btn:active { transform: translateY(0) scale(.96); }
+.btn i { display: inline-block; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+.btn:hover i { transform: scale(1.18) rotate(-4deg); }
+.btn-primary:hover { box-shadow: 0 9px 22px rgba(237, 28, 36, .35); }
+.btn-danger:hover { box-shadow: 0 9px 22px rgba(244, 63, 94, .32); }
+.btn-success:hover { box-shadow: 0 9px 22px rgba(16, 185, 129, .3); }
+
+/* Kart başlık ikonları — yumuşak, sürekli nabız (ortam canlılığı) */
+.card-head i.bi { display: inline-block; transform-origin: center; animation: softPulse 3.2s ease-in-out infinite; }
+@keyframes softPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+
+/* Durum kutucukları (UP/DOWN...) — sayı hover'da büyür */
+.stat .stat-num { transition: transform .15s ease; }
+.stat:hover .stat-num { transform: scale(1.08); }
+
+/* Rozet ikonları hover'da kıpırdar */
+.badge i { display: inline-block; transition: transform .2s ease; }
+.badge:hover i { transform: scale(1.25); }
+
+/* Tablo içi link/ikon hover */
+.tbl a i, .tbl button i { display: inline-block; transition: transform .2s ease; }
+.tbl a:hover i, .tbl button:hover i { transform: scale(1.2) rotate(-4deg); }
+
+/* Durum kartı (dashboard) hover'da tip ikonu canlansın */
+.status-card .bi { transition: transform .2s ease; }
+.status-card:hover .bi { transform: scale(1.12); }
+
+/* Hareketi kapatmak isteyen kullanıcılar için */
+@media (prefers-reduced-motion: reduce) {
+    .logo-anim, .logo-box, .pulse-down, .card-head i.bi { animation: none; }
+    main h1 i.bi { animation: none; }
+    .navlink i, .btn, .btn i, .stat .stat-num, .badge i, .tbl a i, .tbl button i, .status-card .bi { transition: none; }
+}
+
+/* Raporlar hızlı aralık seçili buton */
+#quickRange button.active { background: #ed1c24; color: #fff; }
+
+/* ---- Aç/Kapa anahtarı (toggle) — kapalı gri, açık yeşil ----
+   Tüm .switch checkbox'ları görsel olarak iOS tarzı toggle'a dönüşür.
+   _Layout'taki @apply tanımını ezmek için input.switch (daha yüksek özgüllük). */
+input.switch {
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 2.5rem;
+    height: 1.4rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 9999px;
+    background: #cbd5e1;            /* kapalı: gri */
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background-color .2s ease;
+}
+input.switch:checked { background: #10b981; }   /* açık: yeşil */
+input.switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+    transition: transform .2s ease;
+}
+input.switch:checked::after { transform: translateX(1.1rem); }
+input.switch:focus { outline: none; box-shadow: 0 0 0 3px rgba(16,185,129,.25); }
+input.switch:disabled { opacity: .5; cursor: not-allowed; }
+input.switch:indeterminate { background: #fbbf24; }   /* karışık (toplu seçim) */
+input.switch:indeterminate::after { transform: translateX(.55rem); }
+
+/* Klasik tikli checkbox (toggle istenmeyen yerler için, örn. Servisler toplu seçim) */
+input.cbx {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 2px solid #cbd5e1;
+    border-radius: .35rem;
+    background: #fff;
+    cursor: pointer;
+    vertical-align: middle;
+    position: relative;
+    flex: none;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+input.cbx:checked { background: #ed1c24; border-color: #ed1c24; }
+input.cbx:checked::after {
+    content: "";
+    position: absolute;
+    left: 5px; top: 1px;
+    width: 5px; height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+input.cbx:indeterminate { background: #ed1c24; border-color: #ed1c24; }
+input.cbx:indeterminate::after {
+    content: "";
+    position: absolute;
+    left: 3px; top: 7px;
+    width: 9px; height: 0;
+    border-top: 2px solid #fff;
+}
+input.cbx:focus { outline: none; box-shadow: 0 0 0 3px rgba(237,28,36,.2); }
+
+/* Segmentli üçlü buton (toplu düzenleme: Dokunma / Aç / Kapat) */
+.seg { display: inline-flex; border: 1px solid #cbd5e1; border-radius: .6rem; overflow: hidden; }
+.seg button {
+    appearance: none; border: none; background: #fff; color: #64748b;
+    font-size: .75rem; font-weight: 600; padding: .35rem .7rem; cursor: pointer;
+    transition: background-color .15s ease, color .15s ease;
+}
+.seg button + button { border-left: 1px solid #e2e8f0; }
+.seg button:hover { background: #f1f5f9; }
+.seg button.on-keep.active   { background: #64748b; color: #fff; }
+.seg button.on-yes.active    { background: #10b981; color: #fff; }
+.seg button.on-no.active     { background: #ef4444; color: #fff; }
+
+/* ============================================================
+   KOYU TEMA — html.dark (Tailwind darkMode:'class')
+   Uygulama çoğunlukla bileşen sınıfları (.card/.input/.tbl...) ve satır-içi
+   Tailwind utility'leri kullandığından, hem bileşenleri hem yaygın utility'leri eşliyoruz.
+   ============================================================ */
+html.dark body {
+    background:
+        radial-gradient(1200px 500px at 100% -10%, rgba(237, 28, 36, .10), transparent 60%),
+        radial-gradient(900px 500px at -10% 0%, rgba(2, 132, 199, .08), transparent 55%),
+        #0b1220;
+    color: #e2e8f0;
+}
+
+/* Bileşenler */
+html.dark .card { background: #1e293b; border-color: #334155; }
+/* UP/DOWN/ERROR/YAVAŞ/TOPLAM kutuları (.stat = .card; ayrı eşlenir) — açık gri panel, okunur yazı */
+html.dark .stat { background: #334155; border-color: #475569; }
+html.dark .stat-label { color: #e2e8f0; }
+/* Servis durum kartları (.status-card = .card; ayrı eşlenir) — koyu temada beyaz kalmasın */
+html.dark .status-card { background: #1e293b; }
+html.dark .status-card.disabled { background: #1e293b; }
+html.dark .card-head { border-color: #334155; color: #e2e8f0; }
+html.dark .modal-card { background: #1e293b; color: #e2e8f0; }
+html.dark .input { background: #0f172a; border-color: #475569; color: #e2e8f0; }
+html.dark .input::placeholder { color: #64748b; }
+html.dark .label { color: #cbd5e1; }
+html.dark .hint, html.dark .muted { color: #94a3b8; }
+html.dark .btn-outline { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+html.dark .btn-outline:hover { background: #334155; }
+html.dark .btn-ghost { color: #cbd5e1; }
+html.dark .btn-ghost:hover { background: #334155; }
+
+/* Tablo */
+html.dark .tbl thead th { background: rgba(15, 23, 42, .5); color: #94a3b8; border-color: #334155; }
+html.dark .tbl tbody td { color: #e2e8f0; border-color: #334155; }
+html.dark .tbl tbody tr:hover { background: #334155; }
+
+/* Satır-içi utility eşlemeleri */
+html.dark .bg-white { background-color: #1e293b !important; }
+html.dark .bg-slate-50, html.dark .bg-slate-50\/50, html.dark .bg-slate-50\/30 { background-color: #0f172a !important; }
+html.dark .bg-slate-100 { background-color: #334155 !important; }
+html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700 { color: #e2e8f0 !important; }
+html.dark .text-slate-600, html.dark .text-slate-500 { color: #cbd5e1 !important; }
+html.dark .text-slate-400, html.dark .text-slate-300 { color: #94a3b8 !important; }
+html.dark .border-slate-200, html.dark .border-slate-200\/80, html.dark .border-slate-300,
+html.dark .border-slate-100, html.dark .border-slate-50 { border-color: #334155 !important; }
+html.dark .hover\:bg-slate-100:hover, html.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
+html.dark .divide-slate-100 > * + * { border-color: #334155 !important; }
+
+/* Rozet nötrleri */
+html.dark .pill-type { background: #334155; color: #cbd5e1; border-color: #475569; }
+html.dark .pill-muted { background: #334155; color: #94a3b8; }
+
+/* Uyarı kutuları */
+html.dark .alert-info { background: rgba(2, 132, 199, .15); color: #bae6fd; border-color: #0c4a6e; }
+html.dark .alert-warn { background: rgba(245, 158, 11, .12); color: #fde68a; border-color: #78350f; }
+html.dark .alert-ok { background: rgba(16, 185, 129, .12); color: #a7f3d0; border-color: #065f46; }
+html.dark .alert-err { background: rgba(244, 63, 94, .12); color: #fecaca; border-color: #7f1d1d; }
+
+/* Kaydırma çubuğu */
+html.dark ::-webkit-scrollbar-thumb { background: #475569; background-clip: content-box; }
+
+/* Modal (Bootstrap JS olmadan, basit göster/gizle) */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(15, 23, 42, .55); backdrop-filter: blur(2px);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 4vh 1rem; overflow-y: auto;
+}
+.modal-overlay[hidden] { display: none; }

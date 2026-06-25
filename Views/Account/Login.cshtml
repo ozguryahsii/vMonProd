@@ -1,0 +1,98 @@
+@{
+    Layout = null;
+    ViewData["Title"] = "Giriş";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Giriş — vMon</title>
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" asp-append-version="true" />
+    <script src="~/lib/tailwind/tailwind.js" asp-append-version="true"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { brand: { 400:'#f87171',500:'#ed1c24',600:'#d4151c' } } } } };
+    </script>
+    <style>
+        body{background:radial-gradient(1200px 600px at 50% -10%, rgba(237,28,36,.12), transparent 60%), linear-gradient(160deg,#0f172a,#1e293b);}
+
+        /* vMon logosu — kalp atışı + parıltı halkası */
+        .login-logo{transform-origin:center;will-change:transform,box-shadow;
+            animation:lbBeat 2s ease-in-out infinite, lbGlow 2s ease-in-out infinite;}
+        .login-logo-icon{display:inline-block;transform-origin:center;will-change:transform;
+            animation:lbBeatInner 2s ease-in-out infinite;}
+        @@keyframes lbBeat{0%,100%{transform:scale(1)}7%{transform:scale(1.16)}15%{transform:scale(.96)}24%{transform:scale(1.1)}38%{transform:scale(1)}}
+        @@keyframes lbBeatInner{0%,100%{transform:scale(1) rotate(0)}7%{transform:scale(1.22) rotate(-5deg)}19%{transform:scale(.92) rotate(4deg)}31%{transform:scale(1.12) rotate(0)}44%{transform:scale(1)}}
+        @@keyframes lbGlow{0%,100%{box-shadow:0 8px 24px rgba(237,28,36,.45), 0 0 0 0 rgba(237,28,36,.55)}50%{box-shadow:0 8px 24px rgba(237,28,36,.45), 0 0 0 14px rgba(237,28,36,0)}}
+
+        /* Başlık ve giriş butonu hafif canlı */
+        .login-title{animation:lbFloat 3.5s ease-in-out infinite;}
+        @@keyframes lbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+        .login-btn{transition:transform .15s ease, box-shadow .15s ease, background-color .15s ease;}
+        .login-btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(237,28,36,.4);}
+        .login-btn:active{transform:translateY(0) scale(.98);}
+        .login-btn i{display:inline-block;transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
+        .login-btn:hover i{transform:translateX(3px);}
+        @@media (prefers-reduced-motion: reduce){
+            .login-logo,.login-logo-icon,.login-title{animation:none}
+            .login-btn,.login-btn i{transition:none}
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 font-sans">
+    <div class="w-full max-w-md">
+        <div class="text-center mb-6">
+            <div class="login-logo inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-brand-500 shadow-lg shadow-brand-500/40 mb-3">
+                <i class="bi bi-activity text-white text-3xl login-logo-icon"></i>
+            </div>
+            <h1 class="login-title text-3xl font-bold text-white">vMon</h1>
+            <p class="text-slate-400 mt-1">Servis İzleme Platformu</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            @if (ViewBag.Error != null)
+            {
+                <div class="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl px-4 py-3 mb-4 text-sm flex items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i> @ViewBag.Error
+                </div>
+            }
+            <form method="post" asp-action="Login" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Kullanıcı Adı</label>
+                    <div class="relative">
+                        <i class="bi bi-person absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" name="username" autofocus value="@ViewBag.Username"
+                               placeholder="kullanici veya kullanici@domain"
+                               class="w-full rounded-xl border border-slate-300 pl-10 pr-3 py-2.5 text-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Şifre</label>
+                    <div class="relative">
+                        <i class="bi bi-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="password" name="password" autocomplete="current-password"
+                               class="w-full rounded-xl border border-slate-300 pl-10 pr-3 py-2.5 text-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none" />
+                    </div>
+                </div>
+                <button class="login-btn w-full bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-xl py-2.5 shadow-sm shadow-brand-500/30">
+                    <i class="bi bi-box-arrow-in-right"></i> Giriş Yap
+                </button>
+            </form>
+            <p class="text-center text-slate-400 text-xs mt-5">Active Directory hesabınızla giriş yapın.</p>
+            <div class="mt-4 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-[11px] leading-relaxed text-slate-500">
+                <i class="bi bi-shield-exclamation text-slate-400"></i>
+                <strong>Yetkili erişim.</strong> Bu sistem yalnızca yetkili kullanımına açıktır. Tüm erişim ve işlemler
+                güvenlik amacıyla kaydedilir ve izlenir. Yetkisiz erişim girişimleri yasaklanmıştır ve yasal işlem gerektirebilir.
+            </div>
+            @if (ViewBag.HasLogo == true)
+            {
+                <div class="flex justify-center mt-5 pt-5 border-t border-slate-100">
+                    <img src="~/Account/Logo" alt="Logo" class="max-h-12 opacity-90" />
+                </div>
+            }
+        </div>
+    </div>
+</body>
+</html>

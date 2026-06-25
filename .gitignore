@@ -1,0 +1,16 @@
+# ---- Build çıktıları ----
+bin/
+obj/
+publish/
+*.user
+.vs/
+
+# ---- Çalışma zamanı veritabanı ve SIRLAR — ASLA commit etme ----
+Data/*.db
+Data/*.db-wal
+Data/*.db-shm
+Data/login-logo.*
+
+# ---- Deploy / geçici ----
+app_offline.htm
+*.log

@@ -1,0 +1,80 @@
+@model List<AppUser>
+@{
+    ViewData["Title"] = "Kullanıcılar";
+    var adminUsers = ((string)ViewBag.AdminUsers ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2"><i class="bi bi-people text-brand-500"></i> Kullanıcılar</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Güvenlik grubundaki kullanıcılar ve granüler yetkileri</p>
+    </div>
+    <form method="post" asp-action="Sync">
+        @Html.AntiForgeryToken()
+        <button class="btn btn-primary btn-sm"><i class="bi bi-arrow-repeat"></i> LDAP'tan Senkronize Et</button>
+    </form>
+</div>
+
+<div class="alert-info text-sm mb-5">
+    <i class="bi bi-info-circle"></i> Liste, Ayarlar'daki güvenlik grubunun üyelerinden oluşur. <strong>"LDAP'tan Senkronize Et"</strong> ile gruba yeni eklenenler
+    çekilir (kullanıcı giriş yaptığında da otomatik eklenir). Adminler (Ayarlar → Admin Kullanıcıları) tüm yetkilere sahiptir. Yeni kullanıcılara
+    varsayılan olarak yalnızca görüntüleme yetkisi verilir; yetki değişiklikleri kullanıcının <strong>bir sonraki girişinde</strong> geçerli olur.
+</div>
+
+<div class="card">
+    <div class="overflow-x-auto">
+        <table class="tbl">
+            <thead>
+                <tr><th>Kullanıcı</th><th>Ad</th><th>Rol / Yetkiler</th><th>Son Giriş</th><th></th></tr>
+            </thead>
+            <tbody>
+            @if (Model.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-slate-400 py-6">Henüz giriş yapmış kullanıcı yok.</td></tr>
+            }
+            @foreach (var u in Model)
+            {
+                var isAdmin = adminUsers.Contains(u.Sam);
+                <tr class="@(u.IsActive ? "" : "opacity-60")">
+                    <td class="mono font-semibold text-slate-800">
+                        @u.Sam
+                        @if (!u.IsActive)
+                        {
+                            <span class="badge pill-muted ml-1" title="AD güvenlik grubundan düşmüş — giriş yapamaz"><i class="bi bi-pause-circle"></i> PASİF</span>
+                        }
+                    </td>
+                    <td>@u.DisplayName</td>
+                    <td>
+                        @if (isAdmin)
+                        {
+                            <span class="badge pill-down"><i class="bi bi-shield-lock"></i> ADMIN (tüm yetkiler)</span>
+                        }
+                        else
+                        {
+                            var perms = u.Permissions();
+                            if (perms.Count == 0) { <span class="text-slate-400">Yetki yok</span> }
+                            foreach (var p in Perms.All.Where(x => perms.Contains(x.Key)))
+                            {
+                                <span class="badge pill-info mr-1 mb-1">@p.Key</span>
+                            }
+                        }
+                    </td>
+                    <td class="text-slate-500 text-sm">@(u.LastLogin?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
+                    <td class="text-right whitespace-nowrap">
+                        @if (!isAdmin)
+                        {
+                            <a class="btn btn-outline btn-sm" asp-action="Edit" asp-route-id="@u.Id"><i class="bi bi-pencil"></i> Yetkiler</a>
+                        }
+                        <form method="post" asp-action="Delete" asp-route-id="@u.Id" class="inline" onsubmit="return confirm('@u.Sam kaydı silinsin mi? (Tekrar giriş yaparsa yeniden eklenir.)');">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

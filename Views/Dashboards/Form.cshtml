@@ -1,0 +1,128 @@
+@model DashboardDef
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Yeni Dashboard" : "Dashboard Düzenle";
+    var allServices = (List<MonitoredService>)ViewBag.AllServices;
+    var selected = Model.GetServiceIds().ToHashSet();
+    var keywords = allServices
+        .SelectMany(s => MonitoredService.SplitKeywords(s.Keyword))
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
+}
+
+<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-5"><i class="bi bi-columns-gap text-brand-500"></i> @ViewData["Title"]</h1>
+
+<div class="card max-w-4xl">
+    <div class="card-body">
+        <form method="post" asp-action="Save" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="All" class="text-rose-600 text-sm"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-6">
+                    <label class="label">Dashboard Adı *</label>
+                    <input asp-for="Name" class="input" placeholder="örn. Ping İzleme, Kritik DB'ler" />
+                </div>
+                <div class="md:col-span-4">
+                    <label class="label">Tip Filtresi (otomatik dahil)</label>
+                    <select asp-for="TypeFilter" class="input">
+                        <option value="">— Yok —</option>
+                        <option value="Ping">Ping (ICMP)</option>
+                        <option value="Http">HTTP</option>
+                        <option value="MySql">MySQL</option>
+                        <option value="MsSql">MSSQL</option>
+                        <option value="Oracle">Oracle</option>
+                        <option value="Ldap">AD / LDAP</option>
+                        <option value="Dns">DNS</option>
+                        <option value="Sftp">SFTP</option>
+                        <option value="DhcpWindowsService">DHCP</option>
+                        <option value="Smtp">SMTP</option>
+                        <option value="Imap">IMAP</option>
+                        <option value="Tcp">TCP</option>
+                        <option value="WindowsHealth">Windows Sağlık</option>
+                        <option value="LinuxHealth">Linux Sağlık</option>
+                        <option value="WindowsServiceControl">Windows Servis</option>
+                        <option value="LinuxServiceControl">Linux Servis</option>
+                    </select>
+                    <div class="hint">Bu tipteki tüm servisler (yeni eklenenler dahil) otomatik girer.</div>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="label">Sıra</label>
+                    <input asp-for="SortOrder" type="number" class="input" />
+                </div>
+            </div>
+
+            <div>
+                <label class="label">Keyword Filtresi (otomatik dahil)</label>
+                <select asp-for="KeywordFilter" class="input max-w-xs">
+                    <option value="">— Yok —</option>
+                    @foreach (var k in keywords) { <option value="@k">@k</option> }
+                </select>
+                <div class="hint">Bu keyword'e sahip tüm servisler (yeni eklenenler dahil) otomatik girer.</div>
+            </div>
+
+            <div>
+                <label class="label">Seçili Servisler</label>
+                <div class="flex flex-wrap items-center gap-3 mb-2">
+                    <input type="text" id="svcSearch" class="input !w-60 !py-1.5" placeholder="Ad / hedef / tip / keyword ara..." />
+                    <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <input class="switch" type="checkbox" id="selectAllVisible" /> Görünenlerin hepsini seç
+                    </label>
+                    <span id="svcCount" class="text-slate-400 text-xs"></span>
+                </div>
+                <div class="border border-slate-200 rounded-xl p-3 max-h-80 overflow-y-auto" id="svcList">
+                    @if (allServices.Count == 0)
+                    {
+                        <span class="text-slate-400">Henüz servis tanımlı değil.</span>
+                    }
+                    @foreach (var s in allServices)
+                    {
+                        <label class="svc-row flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer"
+                               data-search="@($"{s.Name} {s.Target} {s.Type} {s.Keyword}".ToLowerInvariant())">
+                            <input class="switch svc-cb" type="checkbox" name="serviceIds" value="@s.Id" @(selected.Contains(s.Id) ? "checked" : "") />
+                            <span class="text-sm text-slate-700">
+                                @s.Name <span class="badge pill-type">@s.Type</span>
+                                @foreach (var kw in MonitoredService.SplitKeywords(s.Keyword)) { <span class="badge pill-info">@kw</span> }
+                                <span class="mono text-slate-400">@s.Target</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+                <div class="hint">Tip filtresi, keyword filtresi ve seçili servisler birleşir.</div>
+            </div>
+
+            <div class="flex gap-2">
+                <button class="btn btn-primary"><i class="bi bi-save"></i> Kaydet</button>
+                <a class="btn btn-outline" asp-action="Index">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const svcSearch = document.getElementById("svcSearch");
+const selectAll = document.getElementById("selectAllVisible");
+const rows = Array.from(document.querySelectorAll(".svc-row"));
+const countEl = document.getElementById("svcCount");
+
+function visibleRows() { return rows.filter(r => !r.classList.contains("hidden")); }
+
+function applySearch() {
+    const q = svcSearch.value.trim().toLowerCase();
+    rows.forEach(r => r.classList.toggle("hidden", !(!q || r.dataset.search.includes(q))));
+    syncSelectAll();
+    const vis = visibleRows().length;
+    countEl.textContent = q ? `${vis} / ${rows.length} servis görünüyor` : "";
+}
+function syncSelectAll() {
+    const vis = visibleRows();
+    const checkedVis = vis.filter(r => r.querySelector(".svc-cb").checked);
+    selectAll.checked = vis.length > 0 && checkedVis.length === vis.length;
+    selectAll.indeterminate = checkedVis.length > 0 && checkedVis.length < vis.length;
+}
+svcSearch.addEventListener("input", applySearch);
+selectAll.addEventListener("change", () => visibleRows().forEach(r => { r.querySelector(".svc-cb").checked = selectAll.checked; }));
+rows.forEach(r => r.querySelector(".svc-cb").addEventListener("change", syncSelectAll));
+applySearch();
+</script>
+}

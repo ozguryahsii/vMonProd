@@ -1,0 +1,200 @@
+@model MonitoredService
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Yeni Servis" : "Servis Düzenle";
+}
+
+<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-5"><i class="bi bi-hdd-network text-brand-500"></i> @ViewData["Title"]</h1>
+
+<div class="card max-w-5xl">
+    <div class="card-body">
+        <form method="post" asp-action="Save">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="All" class="text-rose-600 text-sm mb-3"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-4">
+                    <label class="label">Servis Adı *</label>
+                    <input asp-for="Name" class="input" placeholder="örn. Üretim Oracle DB" />
+                </div>
+                <div class="md:col-span-3">
+                    <label class="label">Keyword / Etiket</label>
+                    <input asp-for="Keyword" class="input" placeholder="örn. uretim, kritik" />
+                    <div class="hint">Virgülle birden çok eklenebilir.</div>
+                </div>
+                <div class="md:col-span-5">
+                    <label class="label">İzleme Türü *</label>
+                    <select asp-for="Type" class="input" id="typeSelect">
+                        <optgroup label="Veritabanı">
+                            <option value="@ServiceType.MySql">MySQL</option>
+                            <option value="@ServiceType.MsSql">MSSQL</option>
+                            <option value="@ServiceType.Oracle">Oracle</option>
+                        </optgroup>
+                        <optgroup label="Altyapı">
+                            <option value="@ServiceType.Ping">Ping (ICMP)</option>
+                            <option value="@ServiceType.Ldap">Active Directory / LDAP(S)</option>
+                            <option value="@ServiceType.Dns">DNS</option>
+                            <option value="@ServiceType.DhcpWindowsService">DHCP (Windows servis kontrolü)</option>
+                            <option value="@ServiceType.Sftp">SFTP</option>
+                        </optgroup>
+                        <optgroup label="Mail (Exchange / Exchange Online)">
+                            <option value="@ServiceType.Smtp">SMTP</option>
+                            <option value="@ServiceType.Imap">IMAP</option>
+                        </optgroup>
+                        <optgroup label="Sunucu Sağlığı">
+                            <option value="@ServiceType.WindowsHealth">Windows Sunucu (CPU/RAM/Disk)</option>
+                            <option value="@ServiceType.LinuxHealth">Linux Sunucu (CPU/RAM/Disk, SSH)</option>
+                        </optgroup>
+                        <optgroup label="Servis Durumu (Uzaktan Kontrol)">
+                            <option value="@ServiceType.WindowsServiceControl">Windows Servis (start/stop/restart)</option>
+                            <option value="@ServiceType.LinuxServiceControl">Linux Servis (systemd, SSH)</option>
+                        </optgroup>
+                        <optgroup label="Web / Genel">
+                            <option value="@ServiceType.Http">HTTP / Endpoint URL</option>
+                            <option value="@ServiceType.Tcp">Genel TCP Port</option>
+                        </optgroup>
+                    </select>
+                    <div class="hint" id="typeHint"></div>
+                </div>
+
+                <div class="md:col-span-12">
+                    <label class="label">Açıklama</label>
+                    <input asp-for="Description" class="input" placeholder="örn. Üretim e-fatura uygulama sunucusu — Tomcat + PostgreSQL" />
+                    <div class="hint">Sunucuda ne çalıştığı vb. Dashboard kartlarında ve raporlarda görünür; CSV'ye de yazılır.</div>
+                </div>
+
+                <div class="md:col-span-8">
+                    <label class="label" id="targetLabel">Hedef *</label>
+                    <input asp-for="Target" class="input mono" />
+                    <div class="hint" id="targetHint"></div>
+                </div>
+                <div class="md:col-span-4" id="colPort">
+                    <label class="label">Port</label>
+                    <input asp-for="Port" type="number" class="input" />
+                    <div class="hint" id="portHint"></div>
+                </div>
+
+                <div class="md:col-span-8" id="colExtra">
+                    <label class="label" id="extraLabel">Ekstra</label>
+                    <input asp-for="Extra" class="input mono" />
+                    <div class="hint" id="extraHint"></div>
+                </div>
+                <div class="md:col-span-4" id="colCred">
+                    <label class="label" id="credLabel">Kimlik Bilgisi</label>
+                    <select asp-for="CredentialId" class="input" asp-items="ViewBag.Credentials">
+                        <option value="">— Yok —</option>
+                    </select>
+                    <div class="hint" id="credHint"><a class="text-brand-600 hover:underline" asp-controller="Credentials" asp-action="Create">Yeni kimlik ekle</a></div>
+                </div>
+
+                <div class="md:col-span-12 hidden" id="colHealth">
+                    <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div><label class="label">CPU Eşiği (%)</label><input asp-for="CpuThresholdPercent" type="number" min="1" max="100" class="input" placeholder="örn. 90" /></div>
+                            <div><label class="label">RAM Eşiği (%)</label><input asp-for="RamThresholdPercent" type="number" min="1" max="100" class="input" placeholder="örn. 90" /></div>
+                            <div><label class="label">Disk Eşiği (%)</label><input asp-for="DiskThresholdPercent" type="number" min="1" max="100" class="input" placeholder="örn. 85" /></div>
+                        </div>
+                        <div class="hint">Eşik aşılırsa servis DOWN sayılır ve bildirim gider. Boş bırakılan metrik yalnızca ölçülür, alarm üretmez.</div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-12">
+                    <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                        <div class="font-medium text-slate-700 mb-2"><i class="bi bi-bell text-brand-500"></i> Alarm Yönetimi</div>
+                        <div class="flex flex-wrap gap-x-6 gap-y-2">
+                            <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="AlertMail" class="switch" /> E-posta</label>
+                            <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="AlertSms" class="switch" /> SMS</label>
+                            <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="AlertWhatsapp" class="switch" /> WhatsApp</label>
+                            <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="AlertCall" class="switch" /> Arama</label>
+                        </div>
+                        <div class="hint">Bu servis için hangi kanallardan alarm gönderileceğini seçin. Genel anahtarlar (SMTP/SMS) Ayarlar'dadır; burada servis bazında kapatabilirsiniz (ör. test/önemsiz sistemler alarm üretmesin).</div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <label class="label">Zaman Aşımı (sn)</label>
+                    <input asp-for="TimeoutSeconds" type="number" min="1" max="120" class="input" />
+                </div>
+                <div class="md:col-span-3">
+                    <label class="label">Kontrol Aralığı (dk)</label>
+                    <input asp-for="IntervalMinutesOverride" type="number" min="1" class="input" placeholder="global" />
+                    <div class="hint">Boşsa Ayarlar'daki global aralık geçerli.</div>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="label">Yavaşlık Eşiği (ms)</label>
+                    <input asp-for="ResponseTimeThresholdMs" type="number" min="1" class="input" placeholder="yok" />
+                    <div class="hint">Aşılırsa "YAVAŞ" işaretlenir.</div>
+                </div>
+                <div class="md:col-span-3 flex flex-col justify-end gap-2 pb-1">
+                    <label class="flex items-center gap-2 text-sm text-slate-700" id="colSsl">
+                        <input asp-for="UseSsl" class="switch" /> <span id="sslLabel">SSL kullan</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-700" id="colCert">
+                        <input asp-for="IgnoreCertErrors" class="switch" /> Sertifika hatalarını yoksay
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input asp-for="Enabled" class="switch" /> Aktif
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-2">
+                <button class="btn btn-primary"><i class="bi bi-save"></i> Kaydet</button>
+                <a class="btn btn-outline" asp-action="Index">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const typeConfig = {
+    "Http": { hint: "URL'e GET atılır; durum kodu ve yanıt süresi kontrol edilir. Exchange OWA için: https://mail.firma.local/owa/healthcheck.htm", target: { label: "Tam URL *", hint: "örn. https://intranet.firma.local/health" }, port: null, extra: { label: "Beklenen HTTP durum kodu", hint: "Boşsa 2xx/3xx başarılı sayılır. örn. 200" }, cred: { label: "Kimlik (Basic Auth)", hint: "Opsiyonel — korumalı endpoint'ler için." }, ssl: null, cert: true },
+    "Tcp": { hint: "Yalnızca TCP portunun açık olduğu doğrulanır.", target: { label: "Host / IP *", hint: "" }, port: { hint: "Zorunlu." }, extra: null, cred: null, ssl: null, cert: false },
+    "MySql": { hint: "İzleme kullanıcısıyla gerçek login + SELECT 1 çalıştırılır.", target: { label: "Host / IP *", hint: "" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "DB izleme kullanıcısı (read-only önerilir)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+    "MsSql": { hint: "İzleme kullanıcısıyla gerçek login + SELECT 1 çalıştırılır.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi", hint: "SQL kullanıcısı; boşsa Windows auth (app pool hesabı) denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+    "Oracle": { hint: "Read-only izleme kullanıcısıyla login + SELECT 1 FROM DUAL çalıştırılır.", target: { label: "Host / IP *", hint: "" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID kullanılacaksa: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "Oracle read-only izleme kullanıcısı." }, ssl: null, cert: false },
+    "Ldap": { hint: "Domain Controller'a yetkili kullanıcıyla gerçek bind yapılır. LDAPS için SSL işaretleyin (port 636).", target: { label: "Domain Controller / IP *", hint: "" }, port: { hint: "Boşsa 389 (LDAP) / 636 (SSL işaretliyse)." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "AD hesabı (Domain alanını doldurun) veya tam DN." }, ssl: "LDAPS kullan", cert: true },
+    "Dns": { hint: "Hedef DNS sunucusuna doğrudan A kaydı sorgusu atılır (OS resolver kullanılmaz).", target: { label: "DNS Sunucu IP *", hint: "" }, port: { hint: "Boşsa 53." }, extra: { label: "Test edilecek hostname *", hint: "örn. intranet.firma.local — bu kayıt çözülürse UP." }, cred: null, ssl: null, cert: false },
+    "Sftp": { hint: "Yetkili kullanıcıyla gerçek SSH/SFTP oturumu açılır ve dizin listelenir.", target: { label: "Host / IP *", hint: "" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SFTP kullanıcısı." }, ssl: null, cert: false },
+    "DhcpWindowsService": { hint: "Uzak Windows sunucusunda DHCP Server servisinin Running olduğu WMI ile doğrulanır.", target: { label: "DHCP Sunucusu (host/IP) *", hint: "" }, port: null, extra: { label: "Windows servis adı", hint: "Boşsa DHCPServer." }, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false },
+    "Smtp": { hint: "SMTP'ye bağlanır, 220 banner + EHLO/250 doğrular. On-prem Exchange: mail sunucu:25. Exchange Online: smtp.office365.com:25.", target: { label: "Mail Sunucusu (host/IP) *", hint: "örn. mail.firma.local veya smtp.office365.com" }, port: { hint: "Boşsa 25. Implicit TLS (465) için SSL işaretleyin." }, extra: null, cred: null, ssl: "Implicit TLS (465)", cert: true },
+    "Ping": { hint: "ICMP echo gönderilir; yanıt gelirse UP.", target: { label: "Host / IP *", hint: "" }, port: null, extra: { label: "Maks. RTT (ms)", hint: "Opsiyonel — yanıt bu süreden uzunsa DOWN sayılır." }, cred: null, ssl: null, cert: false },
+    "WindowsHealth": { hint: "WMI ile uzak Windows sunucusundan CPU yükü, RAM ve disk doluluk oranları okunur; eşikler aşılırsa alarm üretilir.", target: { label: "Sunucu (host/IP) *", hint: "" }, port: null, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI okuma yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false, health: true },
+    "LinuxHealth": { hint: "SSH ile bağlanıp /proc/stat, free ve df okunur (root gerekmez); eşikler aşılırsa alarm üretilir.", target: { label: "Sunucu (host/IP) *", hint: "" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (sıradan kullanıcı yeterli)." }, ssl: null, cert: false, health: true },
+    "Imap": { hint: "IMAP'a bağlanır, \"* OK\" greeting'i doğrular. Exchange Online: outlook.office365.com:993 + SSL.", target: { label: "Mail Sunucusu (host/IP) *", hint: "örn. mail.firma.local veya outlook.office365.com" }, port: { hint: "Boşsa 143 / 993 (SSL işaretliyse)." }, extra: null, cred: null, ssl: "IMAPS (993)", cert: true },
+    "WindowsServiceControl": { hint: "Uzak Windows sunucusunda belirtilen servis çalışıyor mu (WMI) kontrol edilir; dashboard'dan start/stop/restart yapılabilir.", target: { label: "Sunucu (host/IP) *", hint: "" }, port: null, extra: { label: "Windows Servis Adı *", hint: "örn. W3SVC (IIS), MSSQLSERVER, Spooler" }, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI + servis kontrol yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false },
+    "LinuxServiceControl": { hint: "Uzak Linux sunucusunda systemd servis durumu (SSH) kontrol edilir; dashboard'dan start/stop/restart yapılabilir (sudo gerekir).", target: { label: "Sunucu (host/IP) *", hint: "" }, port: { hint: "Boşsa 22." }, extra: { label: "systemd Unit Adı *", hint: "örn. nginx, httpd, docker" }, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (start/stop/restart için sudo -n yetkisi gerekir)." }, ssl: null, cert: false }
+};
+const enumMap = ["Http","Tcp","MySql","MsSql","Oracle","Ldap","Dns","Sftp","DhcpWindowsService","Smtp","Imap","Ping","WindowsHealth","LinuxHealth","WindowsServiceControl","LinuxServiceControl"];
+
+function applyTypeConfig() {
+    const sel = document.getElementById("typeSelect");
+    let key = sel.value;
+    if (!isNaN(parseInt(key)) && enumMap[parseInt(key)]) key = enumMap[parseInt(key)];
+    const c = typeConfig[key] || typeConfig["Tcp"];
+
+    document.getElementById("typeHint").textContent = c.hint;
+    document.getElementById("targetLabel").textContent = c.target.label;
+    document.getElementById("targetHint").textContent = c.target.hint;
+
+    const show = (id, visible) => document.getElementById(id).classList.toggle("hidden", !visible);
+
+    show("colPort", !!c.port);
+    if (c.port) document.getElementById("portHint").textContent = c.port.hint;
+    show("colExtra", !!c.extra);
+    if (c.extra) { document.getElementById("extraLabel").textContent = c.extra.label; document.getElementById("extraHint").textContent = c.extra.hint; }
+    show("colCred", !!c.cred);
+    if (c.cred) {
+        document.getElementById("credLabel").textContent = c.cred.label;
+        document.getElementById("credHint").innerHTML = c.cred.hint + ' <a class="text-brand-600 hover:underline" href="/Credentials/Create">Yeni kimlik ekle</a>';
+    }
+    show("colSsl", !!c.ssl);
+    if (c.ssl) document.getElementById("sslLabel").textContent = c.ssl;
+    show("colCert", !!c.cert);
+    show("colHealth", !!c.health);
+}
+document.getElementById("typeSelect").addEventListener("change", applyTypeConfig);
+applyTypeConfig();
+</script>
+}

@@ -1,0 +1,250 @@
+@{
+    ViewData["Title"] = "Hakkında";
+    // Dil çerezine göre sunucu-taraflı iki dillilik (About baştan sona seçilen dilde gösterilir)
+    var en = Context.Request.Cookies["vmon_lang"] == "en";
+    string T(string tr, string eng) => en ? eng : tr;
+}
+
+<div class="max-w-4xl mx-auto">
+    <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8 text-center mb-6 shadow-lg">
+        <div class="logo-box inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-brand-500 shadow-lg shadow-brand-500/40 mb-3">
+            <i class="bi bi-activity text-2xl logo-anim"></i>
+        </div>
+        <h1 class="text-3xl font-bold">vMon</h1>
+        <p class="text-slate-300 mt-1">@T("Servis İzleme ve Raporlama Platformu", "Service Monitoring & Reporting Platform")</p>
+    </div>
+
+    <div class="card mb-6">
+        <div class="card-head"><i class="bi bi-info-circle text-brand-500"></i> @T("Genel Bilgiler", "General Information")</div>
+        <div class="card-body space-y-4">
+            <div class="flex gap-3">
+                <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-person-badge text-brand-500"></i> @T("Geliştiren", "Developed by")</div>
+                <div class="text-slate-700">Özgür Adnan Yahşi</div>
+            </div>
+            <div class="flex gap-3">
+                <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-calendar3 text-brand-500"></i> @T("Yapım Tarihi", "Build Date")</div>
+                <div class="text-slate-700">@T("Haziran 2026", "June 2026")</div>
+            </div>
+            <div class="flex gap-3" x-data="{ open:false }">
+                <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-tag text-brand-500"></i> @T("Versiyon", "Version")</div>
+                <div class="text-slate-700 flex-1">
+                    <button type="button" @@click="open=!open" class="inline-flex items-center gap-2 group">
+                        <span class="badge pill-info">v2.5.4</span>
+                        <span class="text-xs text-brand-600 group-hover:underline">@T("Sürüm notları", "Release notes") <i class="bi" :class="open ? 'bi-chevron-up' : 'bi-chevron-down'"></i></span>
+                    </button>
+                    <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
+                        @if (en)
+                        {
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.5.4 — Translation pass 2</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.5.4) More English coverage:</strong> Dashboard edit, Service edit, Credential edit, Integration edit and Edit Permissions screens, the Reports table (types, durations, detail) and recurring Audit descriptions are now translated. The "(soon)" tag was removed from WhatsApp/Call (now live).</li>
+                                <li class="text-slate-500">Note: native browser controls (file picker "Choose file", the date-time picker popup) follow the browser's own language and can't be forced from the app.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.5.3 — Wider translation & Voice/IVR merge</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.5.3) Translation:</strong> The Reconciliation page is now fully bilingual (server-side); remaining Turkish labels in Audit and Settings (LDAP / Security & Compliance / Notification Channels / Login logo) were translated.</li>
+                                <li><strong>(2.5.3) Voice Call / IVR merged:</strong> The separate "Voice Call" channel type was merged into "IVR" as a single <b>"Voice Call / IVR"</b> option (both do the same job). Existing Voice integrations are migrated automatically.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.5.2 — About in English & fixes</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.5.2) About fully English:</strong> The About page is now rendered server-side in the selected language. From now on every change is written in both Turkish and English.</li>
+                                <li><strong>(2.5.2) Dark theme fix:</strong> The service status cards at the bottom of the dashboard are no longer white in dark mode.</li>
+                                <li><strong>(2.5.2) WhatsApp template restored:</strong> The approved template (Content SID) field was added to the WhatsApp integration (Notification Channels). When set, alarms are sent as interactive button templates again; the previous template is restored automatically and can be changed any time.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.5.x — Language (TR/EN) & theme</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Language selection:</strong> A <b>Language</b> option (Turkish 🇹🇷 / English 🇬🇧) was added to the user menu; the choice is remembered per user and the UI is translated.</li>
+                                <li><strong>Dark theme:</strong> Click your name (top right) → <b>Theme</b> → Light/Dark (a colour dot next to each). Remembered per user across logins and devices.</li>
+                                <li><strong>Chart theming:</strong> Chart axis/grid colours follow the theme; UP/DOWN/ERROR/SLOW/TOTAL boxes are readable in dark mode.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.3.0 — Dashboard tabs merged</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li>The separate "Dashboard" menu item was removed. The main (unfiltered) view is now a fixed <b>"All"</b> first sub-tab inside "Dashboards"; it cannot be deleted or reordered.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.2.x — Notification Channels (single box)</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>One "Notification Channels" box:</strong> SMS / WhatsApp / Voice / IVR integrations are added, edited, deleted and toggled from one place in Settings. Pick the type when adding; each integration can use its own recipient list. No code changes needed.</li>
+                                <li><strong>Flexible integration model:</strong> all channels use the same templated HTTP request (placeholders {to}/{from}/{message}/{user}/{password}/{apikey}). On an alarm, all active integrations matching the per-service switches (Mail/SMS/WhatsApp/Call) are triggered. The built-in Twilio settings were migrated into integrations automatically.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.1.x — Bulk edit & design</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>On/off switches:</strong> all active/passive checkboxes are now modern toggles (grey when off, green when on).</li>
+                                <li><strong>Extended bulk edit:</strong> on Services, "Edit Selected" can change check interval, slowness threshold and CPU/RAM/Disk thresholds in bulk, and bulk-add keywords. On/off fields use segmented buttons (Keep/On/Off).</li>
+                                <li><strong>Fix:</strong> when both Type and Keyword filters are chosen on a dashboard, their <b>intersection</b> is used.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.0.x — Interactive WhatsApp (Phase 4)</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Templated alarm + buttons:</strong> alarms via an approved WhatsApp template ({{1}}..{{4}}) with Start / Restart / Stop buttons.</li>
+                                <li><strong>Two-way control:</strong> pressing a button calls an inbound webhook that applies start/stop/restart to the related service; the result is replied over WhatsApp.</li>
+                                <li><strong>Authorization & mapping:</strong> the phone number is mapped to a user (Phone field under Users); only users with the <b>"Manage alarms"</b> permission can act, others get a "no permission" reply. All actions are written to the Audit log.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 1.8–1.9 — SMS & WhatsApp notifications</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>SMS / WhatsApp notifications (Twilio):</strong> a message is sent when a service goes DOWN/ERROR/RECOVERED. Per-service "Alarm Management" controls the channels. Custom HTTP SMS providers (e.g. NetGSM) can be added without code.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 1.6–1.7 — Reconciliation, descriptions & fixes</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Reconciliation module:</strong> cross-compares our inventory with the vendor's list (CSV/XLSX), highlighting missing/extra servers and CPU/RAM/Disk/IP/OS mismatches; fully independent and permission-gated.</li>
+                                <li><strong>Service description</strong> field shown on dashboard cards, reports and CSV; the chart "Select Service" filter now also applies to the cards.</li>
+                                <li><strong>Uptime fix:</strong> CPU/RAM/Disk threshold breaches (ERROR) no longer count as outages in availability reports.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Version 1.4–1.5 — Security hardening & authorization (PCI DSS / ISO 27001 / NIST)</p>
+                            <ul class="list-disc ml-5 space-y-1.5">
+                                <li><strong>Granular user authorization</strong> via the Users screen; CSRF protection, secure cookies, HTTPS/HSTS, security headers, login brute-force protection.</li>
+                                <li><strong>Audit log</strong> of all sensitive actions with a read-only Audit screen; ≥1 year retention; 15-minute idle timeout; account lockout policy; outbound TLS validation on by default.</li>
+                                <li><strong>Access review:</strong> users removed from the AD security group are deactivated on sync and cannot sign in.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mt-3 mb-2">Earlier — Version 1.3.0</p>
+                            <ul class="list-disc ml-5 space-y-1.5">
+                                <li>DOWN / ERROR classification; Windows/Linux service status monitoring + remote start/stop/restart; time ranges up to 1 month; advanced filtering.</li>
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.5.4 — Çeviri turu 2</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.5.4) Daha geniş İngilizce:</strong> Dashboard düzenle, Servis düzenle, Kimlik düzenle, Entegrasyon düzenle ve Yetki düzenle ekranları, Raporlar tablosu (tipler, süreler, detay) ve sık geçen Denetim açıklamaları çevrildi. WhatsApp/Arama yanındaki "(yakında)" etiketi kaldırıldı (artık yayında).</li>
+                                <li class="text-slate-500">Not: tarayıcının native kontrolleri (dosya seçici "Dosya Seç", tarih-saat seçici popup) tarayıcının kendi diline bağlıdır, uygulamadan zorlanamaz.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.5.3 — Geniş çeviri & Sesli/IVR birleştirme</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.5.3) Çeviri:</strong> Mutabakat sayfası artık tamamen iki dilli (sunucu-taraflı); Denetim ve Ayarlar (LDAP / Güvenlik ve Uyumluluk / Bildirim Kanalları / Login logo) içinde kalan Türkçe alanlar çevrildi.</li>
+                                <li><strong>(2.5.3) Sesli Arama / IVR birleştirildi:</strong> Ayrı "Sesli Arama" kanal türü "IVR" ile birleştirilip tek <b>"Sesli Arama / IVR"</b> seçeneği yapıldı (ikisi de aynı işi yapıyor). Mevcut Voice entegrasyonları otomatik taşınır.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.5.2 — About İngilizce & düzeltmeler</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.5.2) About tam İngilizce:</strong> Hakkında sayfası artık seçili dile göre sunucu tarafında çevrilir. Bundan sonra her değişiklik hem Türkçe hem İngilizce yazılır.</li>
+                                <li><strong>(2.5.2) Koyu tema düzeltmesi:</strong> Dashboard altındaki servis durum kartları koyu temada artık beyaz kalmıyor.</li>
+                                <li><strong>(2.5.2) WhatsApp şablonu geri geldi:</strong> Onaylı şablon (Content SID) alanı WhatsApp entegrasyonuna (Bildirim Kanalları) eklendi. Doluysa alarmlar yeniden butonlu interaktif şablon olarak gider; eski şablon otomatik geri yüklenir ve istediğin zaman değiştirilebilir.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.5.x — Dil (TR/EN) & tema</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Dil seçimi:</strong> Kullanıcı menüsüne <b>Dil</b> (Türkçe 🇹🇷 / English 🇬🇧) eklendi; seçim kullanıcı bazlı hatırlanır, arayüz çevrilir.</li>
+                                <li><strong>Koyu tema:</strong> Sağ üstte adınıza tıklayın → <b>Tema</b> → Açık/Koyu (her birinin solunda renk yuvarlağı). Kullanıcı bazlı, girişler ve cihazlar arası hatırlanır.</li>
+                                <li><strong>Grafik teması:</strong> Grafik eksen/kılavuz renkleri temaya uyar; UP/DOWN/ERROR/YAVAŞ/TOPLAM kutuları koyu temada okunur.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.3.0 — Dashboard sekme birleştirme</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li>Ayrı "Dashboard" sekmesi kaldırıldı. Ana (filtresiz) görünüm artık "Dashboard'lar" içinde sabit <b>"Hepsi"</b> alt-sekmesi; silinemez, sıralanamaz.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.2.x — Bildirim Kanalları (tek kutu)</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Tek "Bildirim Kanalları" kutusu:</strong> SMS / WhatsApp / Sesli / IVR entegrasyonları Ayarlar'da tek yerden eklenir, düzenlenir, silinir ve aç/kapa yapılır. Eklerken tür seçilir; her entegrasyon kendi alıcı listesini kullanabilir. Kod gerekmez.</li>
+                                <li><strong>Esnek entegrasyon modeli:</strong> tüm kanallar aynı şablonlu HTTP isteğiyle çalışır ({to}/{from}/{message}/{user}/{password}/{apikey}). Alarm anında servis bazlı aç/kapa (Mail/SMS/WhatsApp/Arama) ile eşleşen tüm aktif entegrasyonlar tetiklenir. Yerleşik Twilio ayarları otomatik entegrasyona taşındı.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.1.x — Toplu düzenleme & tasarım</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Aç/Kapa anahtarı:</strong> tüm aktif/pasif kutucukları modern toggle (kapalı gri, açık yeşil).</li>
+                                <li><strong>Genişletilmiş toplu düzenleme:</strong> Servisler'de "Seçilenleri Düzenle" ile kontrol aralığı, yavaşlık eşiği ve CPU/RAM/Disk eşikleri toplu değiştirilebilir, toplu keyword eklenebilir. Aç/Kapat alanları segmentli buton (Dokunma/Aç/Kapat).</li>
+                                <li><strong>Düzeltme:</strong> Dashboard'da Tip + Keyword filtresi birlikte seçilince <b>kesişim</b> alınır.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.0.x — İnteraktif WhatsApp (Faz 4)</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Şablonlu alarm + butonlar:</strong> onaylı WhatsApp şablonu ({{1}}..{{4}}) ile alarm; Başlat / Yeniden Başlat / Durdur butonları.</li>
+                                <li><strong>İki yönlü müdahale:</strong> butona basınca gelen webhook ile servise uzaktan start/stop/restart uygulanır; sonuç WhatsApp'tan yanıtlanır.</li>
+                                <li><strong>Yetki ve eşleme:</strong> numara → kullanıcı (Kullanıcılar'da telefon alanı); yalnızca <b>"Alarmlara müdahale"</b> yetkisi olanlar işlem yapar. Tüm işlemler Denetim'e yazılır.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 1.8–1.9 — SMS & WhatsApp bildirimi</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>SMS / WhatsApp bildirimi (Twilio):</strong> servis DOWN/ERROR/RECOVERED olunca mesaj gider. Servis bazlı "Alarm Yönetimi" kanalları açar/kapatır. Özel HTTP SMS sağlayıcıları (ör. NetGSM) kod gerekmeden eklenir.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 1.6–1.7 — Mutabakat, açıklamalar & düzeltmeler</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>Mutabakat modülü:</strong> envanterimizi firmanın listesiyle (CSV/XLSX) çapraz karşılaştırır; eksik/fazla sunucular ve CPU/RAM/Disk/IP/OS uyuşmazlıkları. Tamamen bağımsız ve yetkiyle korunur.</li>
+                                <li><strong>Servis açıklaması</strong> dashboard kartları, raporlar ve CSV'de; grafiğin "Servis Seç" filtresi artık kartlara da uygulanır.</li>
+                                <li><strong>Uptime düzeltmesi:</strong> CPU/RAM/Disk eşik aşımları (ERROR) raporlarda artık kesinti sayılmaz.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 1.4–1.5 — Güvenlik sertleştirmesi & yetkilendirme (PCI DSS / ISO 27001 / NIST)</p>
+                            <ul class="list-disc ml-5 space-y-1.5">
+                                <li><strong>Granüler yetkilendirme</strong> (Kullanıcılar ekranı); CSRF, güvenli çerezler, HTTPS/HSTS, güvenlik başlıkları, kaba kuvvet koruması.</li>
+                                <li><strong>Denetim kaydı</strong> tüm hassas işlemler için salt-okunur ekranla; ≥1 yıl saklama; 15 dk boşta zaman aşımı; hesap kilitleme; giden TLS doğrulaması varsayılan açık.</li>
+                                <li><strong>Erişim gözden geçirme:</strong> AD grubundan düşen kullanıcılar senkronda pasifleşir, giriş yapamaz.</li>
+                            </ul>
+                            <p class="font-semibold text-slate-700 mt-3 mb-2">Önceki — Sürüm 1.3.0</p>
+                            <ul class="list-disc ml-5 space-y-1.5">
+                                <li>DOWN / ERROR sınıflandırması; Windows/Linux servis durum izleme + uzaktan başlat/durdur/yeniden başlat; 1 aya kadar zaman aralıkları; gelişmiş filtreleme.</li>
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-gear-wide-connected text-brand-500"></i> @T("Yetenekler", "Capabilities")</div>
+                <div class="text-slate-700 leading-relaxed">
+                    @if (en)
+                    {
+                        <text>End-to-end service and infrastructure monitoring from a single console: databases (MySQL, MSSQL, Oracle),
+                        Active Directory / LDAPS, DNS, DHCP, SFTP, Exchange / Exchange Online (SMTP &amp; IMAP),
+                        HTTP/HTTPS endpoints, ICMP ping and TCP port checks, plus real-time
+                        <strong>CPU / RAM / Disk health monitoring</strong> on Windows and Linux servers. Live-charted main screen,
+                        tabbed and customizable multi-dashboards, CPU/RAM/Disk timelines,
+                        date–time ranged availability reports going back up to 1 year,
+                        average/peak usage statistics, CSV export/import, keyword/tag-based filtering,
+                        automatic email notifications on threshold breaches and an instant "check now" feature.</text>
+                    }
+                    else
+                    {
+                        <text>Tek bir merkezden uçtan uca servis ve altyapı izleme: veritabanları (MySQL, MSSQL, Oracle),
+                        Active Directory / LDAPS, DNS, DHCP, SFTP, Exchange / Exchange Online (SMTP &amp; IMAP),
+                        HTTP/HTTPS uç noktaları, ICMP ping ve TCP port kontrolleri ile Windows ve Linux sunucularında
+                        gerçek zamanlı <strong>CPU / RAM / Disk sağlık izleme</strong>. Canlı grafikli ana ekran,
+                        sekmeli ve özelleştirilebilir çoklu dashboard'lar, CPU/RAM/Disk zaman çizelgeleri,
+                        tarih–saat aralıklı ve 1 yıla kadar geriye dönük erişilebilirlik raporları,
+                        ortalama/zirve kullanım istatistikleri, CSV dışa/içe aktarma, keyword/etiket bazlı filtreleme,
+                        eşik aşımında otomatik e-posta bildirimleri ve anlık "şimdi kontrol et" özelliği.</text>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-6">
+        <div class="card-head"><i class="bi bi-shield-lock text-brand-500"></i> @T("Güvenlik", "Security")</div>
+        <div class="card-body">
+            <p class="text-slate-700 mb-4">
+                @if (en)
+                {
+                    <text>vMon never stores the account passwords used in monitoring tests as plain text.
+                    All passwords are encrypted using <strong>DPAPI (Data Protection API)</strong>, the enterprise-grade
+                    data protection facility of the Windows operating system.</text>
+                }
+                else
+                {
+                    <text>vMon, izleme testlerinde kullanılan hesap şifrelerini hiçbir zaman düz metin olarak saklamaz.
+                    Tüm şifreler, Windows işletim sisteminin kurumsal standartlardaki veri koruma altyapısı olan
+                    <strong>DPAPI (Data Protection API)</strong> ile şifrelenerek kaydedilir.</text>
+                }
+            </p>
+            <ul class="space-y-3">
+                @{
+                    var itemsTr = new (string, string)[] {
+                        ("Makineye özel şifreleme", "Şifreleme anahtarları doğrudan Windows tarafından, sunucuya özgü olarak yönetilir. Veritabanı dosyası kopyalansa dahi şifreler yalnızca bu sunucu üzerinde çözülebilir."),
+                        ("Uygulama içinde anahtar yok", "Kodda veya yapılandırma dosyalarında gömülü herhangi bir şifreleme anahtarı bulunmaz; anahtar yönetimi tamamen işletim sistemine aittir."),
+                        ("Yalnızca kullanım anında çözme", "Şifreler sadece servis kontrolü çalıştığı anda bellekte çözülür; diske yazılmaz ve günlük kayıtlarına geçmez."),
+                        ("Arayüzde gizlilik", "Kayıtlı şifreler hiçbir ekranda geri gösterilmez; düzenleme sırasında yalnızca yeni şifre girilebilir."),
+                        ("HashiCorp Vault entegrasyonu", "Kimlik bilgileri merkezi Vault kasasından kontrol anında güvenli biçimde çekilebilir; uygulama hiçbir gizli değeri kalıcı saklamak zorunda kalmaz."),
+                        ("LDAP / Active Directory ile oturum açma", "Uygulamaya erişim kurumsal kimliklerle korunur; yalnızca belirlenen güvenlik grubunun üyeleri giriş yapabilir."),
+                        ("Rol tabanlı yetkilendirme", "Yapılandırma ekranı yalnızca uygulama adminlerine açıktır; diğer kullanıcılar izleme ve raporlamayı tüm gücüyle kullanırken kritik ayarlar güvende kalır.")
+                    };
+                    var itemsEn = new (string, string)[] {
+                        ("Machine-specific encryption", "Encryption keys are managed directly by Windows, specific to this server. Even if the database file is copied, passwords can only be decrypted on this server."),
+                        ("No keys inside the application", "There are no encryption keys embedded in the code or configuration files; key management belongs entirely to the operating system."),
+                        ("Decryption only at use time", "Passwords are decrypted in memory only while a service check runs; they are never written to disk or to logs."),
+                        ("Confidential in the UI", "Saved passwords are never shown back on any screen; during editing only a new password can be entered."),
+                        ("HashiCorp Vault integration", "Credentials can be securely pulled from a central Vault at check time; the application never has to persist any secret."),
+                        ("LDAP / Active Directory sign-in", "Access is protected with corporate identities; only members of the designated security group can sign in."),
+                        ("Role-based authorization", "The configuration screen is open only to application admins; other users get the full power of monitoring and reporting while critical settings stay safe.")
+                    };
+                    var secItems = en ? itemsEn : itemsTr;
+                }
+                @foreach (var item in secItems)
+                {
+                    <li class="flex gap-3">
+                        <i class="bi bi-check-circle-fill text-emerald-500 mt-0.5"></i>
+                        <span class="text-slate-700"><strong>@item.Item1:</strong> @item.Item2</span>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>

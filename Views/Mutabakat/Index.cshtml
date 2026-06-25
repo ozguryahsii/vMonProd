@@ -1,0 +1,164 @@
+@model vMonitor.Models.MutabakatResult?
+@{
+    var en = Context.Request.Cookies["vmon_lang"] == "en";
+    string T(string tr, string eng) => en ? eng : tr;
+    ViewData["Title"] = T("Mutabakat", "Reconciliation");
+    string own = ViewBag.OwnName ?? T("Bizim Envanter", "Our Inventory");
+    string vendor = ViewBag.VendorName ?? T("Hizmet Aldığımız Firma", "Vendor");
+
+    string Esc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+    string N(double? v) => v.HasValue ? v.Value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) : "—";
+
+    string ServerTable(List<vMonitor.Models.InvServer> list, string id)
+    {
+        if (list.Count == 0) return $"<div class='text-slate-400 text-sm py-3'>{T("Kayıt yok", "No records")} 🎉</div>";
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<div class='flex justify-end mb-1'><button type='button' class='btn btn-outline btn-sm' onclick=\"exportTable('{id}','mutabakat')\"><i class='bi bi-download'></i> CSV</button></div>");
+        sb.Append($"<div class='overflow-x-auto rounded-xl border border-slate-100'><table class='tbl' id='{id}'><thead><tr><th>{T("Sunucu", "Server")}</th><th>IP</th><th>CPU</th><th>RAM (GB)</th><th>Disk (GB)</th><th>{T("İşletim Sistemi", "Operating System")}</th></tr></thead><tbody>");
+        foreach (var s in list)
+            sb.Append($"<tr><td class='font-medium'>{Esc(s.Host)}</td><td class='mono'>{Esc(s.Ip)}</td><td>{N(s.Cpu)}</td><td>{N(s.Mem)}</td><td>{N(s.Disk)}</td><td>{Esc(string.IsNullOrWhiteSpace(s.OsText) ? s.OsFamily : s.OsText)}</td></tr>");
+        sb.Append("</tbody></table></div>");
+        return sb.ToString();
+    }
+
+    string DiffTable(List<vMonitor.Models.FieldDiff> list, string colA, string colB, string id)
+    {
+        if (list.Count == 0) return $"<div class='text-slate-400 text-sm py-3'>{T("Fark yok", "No differences")} 🎉</div>";
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<div class='flex justify-end mb-1'><button type='button' class='btn btn-outline btn-sm' onclick=\"exportTable('{id}','mutabakat-farklar')\"><i class='bi bi-download'></i> CSV</button></div>");
+        sb.Append($"<div class='overflow-x-auto rounded-xl border border-slate-100'><table class='tbl' id='{id}'><thead><tr><th>{T("Sunucu", "Server")}</th><th>{T("Alan", "Field")}</th><th>{Esc(colA)}</th><th>{Esc(colB)}</th></tr></thead><tbody>");
+        foreach (var d in list)
+            sb.Append($"<tr><td class='font-medium'>{Esc(d.Host)}</td><td><span class='badge pill-info'>{Esc(d.Field)}</span></td><td class='text-slate-700'>{Esc(d.Ours)}</td><td class='text-slate-700'>{Esc(d.Theirs)}</td></tr>");
+        sb.Append("</tbody></table></div>");
+        return sb.ToString();
+    }
+}
+
+<div class="mb-5">
+    <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2"><i class="bi bi-clipboard-data text-brand-500"></i> @T("Mutabakat", "Reconciliation")</h1>
+    <p class="text-sm text-slate-500 mt-0.5">@own ↔ @vendor @T("envanter karşılaştırması", "inventory comparison")</p>
+</div>
+
+<div class="card mb-5">
+    <div class="card-head"><i class="bi bi-upload text-brand-500"></i> @T("Dosya Yükle ve Karşılaştır", "Upload Files & Compare")</div>
+    <div class="card-body">
+        <form method="post" asp-action="Compare" enctype="multipart/form-data" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="font-medium text-slate-700 mb-2"><i class="bi bi-building text-brand-500"></i> @own — @T("Bu ay", "This month") <span class="text-rose-500">*</span></div>
+                    <label class="label">@T("Envanter dosyası (.csv / .xlsx)", "Inventory file (.csv / .xlsx)")</label>
+                    <input type="file" name="ourFile" accept=".csv,.xlsx" class="input !w-auto" required />
+                    <label class="label mt-2">@T("Ay", "Month")</label>
+                    <input type="text" name="ourMonth" class="input" placeholder="@T("örn. 2026-06 / Haziran 2026", "e.g. 2026-06 / June 2026")" />
+                </div>
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="font-medium text-slate-700 mb-2"><i class="bi bi-building-check text-brand-500"></i> @vendor — @T("Bu ay", "This month") <span class="text-rose-500">*</span></div>
+                    <label class="label">@T("Liste dosyası (.csv / .xlsx)", "List file (.csv / .xlsx)")</label>
+                    <input type="file" name="vendorFile" accept=".csv,.xlsx" class="input !w-auto" required />
+                    <label class="label mt-2">@T("Ay", "Month")</label>
+                    <input type="text" name="vendorMonth" class="input" placeholder="@T("örn. 2026-06 / Haziran 2026", "e.g. 2026-06 / June 2026")" />
+                </div>
+                <div class="rounded-xl border border-slate-200 border-dashed p-4">
+                    <div class="font-medium text-slate-700 mb-2"><i class="bi bi-clock-history text-slate-400"></i> @vendor — @T("Önceki ay", "Previous month") <span class="text-slate-400 text-xs">(@T("opsiyonel", "optional"))</span></div>
+                    <label class="label">@T("Liste dosyası (.csv / .xlsx)", "List file (.csv / .xlsx)")</label>
+                    <input type="file" name="vendorPrevFile" accept=".csv,.xlsx" class="input !w-auto" />
+                    <label class="label mt-2">@T("Ay", "Month")</label>
+                    <input type="text" name="vendorPrevMonth" class="input" placeholder="@T("örn. 2026-05 / Mayıs 2026", "e.g. 2026-05 / May 2026")" />
+                    <div class="hint mt-1">@T("Yüklenirse, firmanın önceki ay listesiyle bu ay arasındaki değişiklik de çıkarılır.", "If uploaded, the change between the vendor's previous-month list and this month is also computed.")</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="btn btn-primary"><i class="bi bi-arrow-left-right"></i> @T("Karşılaştır", "Compare")</button>
+                <span class="hint">@T("Eşleştirme sunucu adına göre yapılır (FQDN'de ilk etiket). CPU/RAM/Disk/IP/OS alanları kıyaslanır.", "Matching is by server name (first label of the FQDN). CPU/RAM/Disk/IP/OS fields are compared.")</span>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model != null)
+{
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+        <div class="stat"><div class="stat-num text-slate-700">@Model.OurCount</div><div class="stat-label">@own @(string.IsNullOrWhiteSpace(Model.OurMonth) ? "" : "(" + Model.OurMonth + ")")</div></div>
+        <div class="stat"><div class="stat-num text-slate-700">@Model.VendorCount</div><div class="stat-label">@vendor @(string.IsNullOrWhiteSpace(Model.VendorMonth) ? "" : "(" + Model.VendorMonth + ")")</div></div>
+        <div class="stat"><div class="stat-num text-emerald-500">@Model.MatchedCount</div><div class="stat-label">@T("Eşleşen sunucu", "Matched servers")</div></div>
+        <div class="stat"><div class="stat-num text-rose-500">@Model.OnlyOurs.Count</div><div class="stat-label">@T("Firmada eksik", "Missing at vendor")</div></div>
+        <div class="stat"><div class="stat-num text-orange-500">@Model.OnlyVendor.Count</div><div class="stat-label">@T("Bizde yok (firma fazla)", "Not in ours (vendor extra)")</div></div>
+    </div>
+
+    @if (Model.Warnings.Count > 0)
+    {
+        <div class="alert-warn text-sm mb-5">
+            <i class="bi bi-exclamation-triangle"></i>
+            @foreach (var w in Model.Warnings) { <div>@w</div> }
+        </div>
+    }
+
+    <!-- KARŞILAŞTIRMA 1 -->
+    <div class="card mb-5">
+        <div class="card-head"><i class="bi bi-arrow-left-right text-brand-500"></i> @T("Karşılaştırma 1", "Comparison 1") — @own ↔ @vendor (@T("bu ay", "this month"))</div>
+        <div class="card-body space-y-6">
+            <div>
+                <h3 class="font-semibold text-slate-700 mb-1"><span class="badge pill-down">@T("Eksik", "Missing")</span> @T($"{vendor} listesinde olmayan (bizde var)", $"Not in {vendor}'s list (we have it)") — @Model.OnlyOurs.Count</h3>
+                @Html.Raw(ServerTable(Model.OnlyOurs, "tOnlyOurs"))
+            </div>
+            <div>
+                <h3 class="font-semibold text-slate-700 mb-1"><span class="badge pill-error">@T("Fazla", "Extra")</span> @T($"Bizde olmayan ({vendor} listesinde var)", $"Not in ours (in {vendor}'s list)") — @Model.OnlyVendor.Count</h3>
+                @Html.Raw(ServerTable(Model.OnlyVendor, "tOnlyVendor"))
+            </div>
+            <div>
+                <h3 class="font-semibold text-slate-700 mb-1"><span class="badge pill-slow">@T("Alan Farkı", "Field Diff")</span> @T("Eşleşen sunucularda uyuşmazlık", "Mismatch on matched servers") — @Model.FieldDiffs.Count</h3>
+                @Html.Raw(DiffTable(Model.FieldDiffs, own, vendor, "tFieldDiffs"))
+            </div>
+        </div>
+    </div>
+
+    <!-- KARŞILAŞTIRMA 2 -->
+    @if (Model.HasPrev)
+    {
+        <div class="card mb-5">
+            <div class="card-head"><i class="bi bi-clock-history text-brand-500"></i> @T("Karşılaştırma 2", "Comparison 2") — @vendor @T("önceki ay", "previous month") (@Model.VendorPrevMonth) ↔ @T("bu ay", "this month") (@Model.VendorMonth)</div>
+            <div class="card-body space-y-6">
+                <div>
+                    <h3 class="font-semibold text-slate-700 mb-1"><span class="badge pill-up">@T("Eklenen", "Added")</span> @T("Bu ay listeye eklenen", "Added to this month's list") — @Model.VendorAdded.Count</h3>
+                    @Html.Raw(ServerTable(Model.VendorAdded, "tAdded"))
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-700 mb-1"><span class="badge pill-down">@T("Çıkan", "Removed")</span> @T("Bu ay listeden çıkan", "Removed from this month's list") — @Model.VendorRemoved.Count</h3>
+                    @Html.Raw(ServerTable(Model.VendorRemoved, "tRemoved"))
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-700 mb-1"><span class="badge pill-slow">@T("Değişen", "Changed")</span> @T("Alanı değişen sunucular", "Servers with changed fields") — @Model.VendorChanged.Count</h3>
+                    @Html.Raw(DiffTable(Model.VendorChanged, T("Önceki ay", "Previous month"), T("Bu ay", "This month"), "tChanged"))
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert-info text-sm mb-5"><i class="bi bi-info-circle"></i> @T($"Önceki ay karşılaştırması için {vendor}'in önceki ay dosyasını da yükleyin.", $"To compare with the previous month, also upload {vendor}'s previous-month file.")</div>
+    }
+}
+
+@section Scripts {
+<script>
+function exportTable(tableId, prefix) {
+    const tbl = document.getElementById(tableId);
+    if (!tbl) return;
+    const rows = [...tbl.querySelectorAll("tr")].map(tr =>
+        [...tr.querySelectorAll("th,td")].map(td => {
+            let t = (td.innerText || "").replace(/\s+/g, " ").trim();
+            if (t.includes('"') || t.includes(";") || t.includes(",")) t = '"' + t.replace(/"/g, '""') + '"';
+            return t;
+        }).join(";")
+    ).join("\r\n");
+    const bom = "﻿";
+    const blob = new Blob([bom + rows], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = prefix + "_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+</script>
+}

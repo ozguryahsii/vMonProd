@@ -1,0 +1,67 @@
+@model List<vMonitor.Models.SmsProvider>
+@{
+    ViewData["Title"] = "Bildirim Kanalları";
+    var kindLabels = new Dictionary<string, (string l, string cls)>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Sms"] = ("SMS", "pill-info"),
+        ["Whatsapp"] = ("WhatsApp", "pill-up"),
+        ["Voice"] = ("Sesli/IVR", "pill-error"),
+        ["Ivr"] = ("Sesli/IVR", "pill-error")
+    };
+}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2"><i class="bi bi-plug text-brand-500"></i> Bildirim Kanalları (Entegrasyonlar)</h1>
+        <p class="text-sm text-slate-500 mt-0.5">SMS / WhatsApp / Sesli / IVR entegrasyonlarını tek yerden yönetin. Kod değişikliği gerekmez. "Twilio" yerleşiktir.</p>
+    </div>
+    <div class="flex gap-2">
+        <a class="btn btn-outline btn-sm" asp-controller="Settings" asp-action="Index"><i class="bi bi-arrow-left"></i> Ayarlar</a>
+        <a class="btn btn-primary btn-sm" asp-action="Create"><i class="bi bi-plus-lg"></i> Yeni Entegrasyon</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="overflow-x-auto">
+        <table class="tbl">
+            <thead><tr><th>Tür</th><th>Ad</th><th>Yöntem</th><th>URL</th><th>Alıcılar</th><th>Aktif</th><th>Test</th><th></th></tr></thead>
+            <tbody>
+            @if (Model.Count == 0)
+            {
+                <tr><td colspan="8" class="text-center text-slate-400 py-6">Henüz entegrasyon yok. "Yeni Entegrasyon" ile ekleyin.</td></tr>
+            }
+            @foreach (var p in Model)
+            {
+                var kl = kindLabels.GetValueOrDefault(p.Kind ?? "Sms", (l: p.Kind ?? "?", cls: "pill-type"));
+                <tr>
+                    <td><span class="badge @kl.cls">@kl.l</span></td>
+                    <td class="font-semibold text-slate-800">@p.Name</td>
+                    <td><span class="badge pill-type">@p.Method</span></td>
+                    <td class="mono text-slate-500 truncate max-w-[22rem]" title="@p.Url">@p.Url</td>
+                    <td class="mono text-slate-400 truncate max-w-[12rem]" title="@p.Recipients">@(string.IsNullOrWhiteSpace(p.Recipients) ? "(global)" : p.Recipients)</td>
+                    <td>
+                        <form method="post" asp-action="Toggle" asp-route-id="@p.Id">
+                            @Html.AntiForgeryToken()
+                            <input type="checkbox" class="switch" onchange="this.form.submit()" @(p.Enabled ? "checked" : "") title="Aktif/Pasif" />
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post" asp-action="Test" asp-route-id="@p.Id" class="flex items-center gap-1">
+                            @Html.AntiForgeryToken()
+                            <input type="text" name="to" class="input mono !w-36 !py-1" placeholder="+90..." />
+                            <button class="btn btn-outline btn-sm"><i class="bi bi-send"></i></button>
+                        </form>
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                        <a class="btn btn-outline btn-sm" asp-action="Edit" asp-route-id="@p.Id"><i class="bi bi-pencil"></i></a>
+                        <form method="post" asp-action="Delete" asp-route-id="@p.Id" class="inline" onsubmit="return confirm('@p.Name silinsin mi?');">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

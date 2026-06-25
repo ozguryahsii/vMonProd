@@ -1,0 +1,128 @@
+@model vMonitor.Models.SmsProvider
+@{ ViewData["Title"] = Model.Id == 0 ? "Yeni Entegrasyon" : "Entegrasyon Düzenle"; }
+
+<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-5"><i class="bi bi-plug text-brand-500"></i> @ViewData["Title"]</h1>
+
+<div class="card max-w-4xl">
+    <div class="card-body">
+        <form method="post" asp-action="Save">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="All" class="text-rose-600 text-sm mb-3"></div>
+
+            <div class="alert-info text-sm mb-4">
+                <i class="bi bi-info-circle"></i> URL ve gövde şablonlarında şu yer tutucuları kullanın; gönderimde gerçek değerlerle değiştirilir:
+                <span class="mono">{to}</span> (alıcı), <span class="mono">{from}</span> (gönderen/başlık),
+                <span class="mono">{message}</span> (mesaj), <span class="mono">{user}</span>, <span class="mono">{password}</span>, <span class="mono">{apikey}</span>.
+                <div class="mt-2 text-xs">
+                    <b>Örnek (NetGSM GET):</b>
+                    <span class="mono break-all">https://api.netgsm.com.tr/sms/send/get?usercode={user}&amp;password={password}&amp;gsmno={to}&amp;message={message}&amp;msgheader={from}</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-3">
+                    <label class="label">Kanal Türü *</label>
+                    <select asp-for="Kind" class="input">
+                        <option value="Sms">SMS</option>
+                        <option value="Whatsapp">WhatsApp</option>
+                        <option value="Ivr">Sesli Arama / IVR</option>
+                    </select>
+                    <div class="hint">Bu entegrasyon hangi kanaldan gönderir.</div>
+                </div>
+                <div class="md:col-span-5">
+                    <label class="label">Entegrasyon Adı *</label>
+                    <input asp-for="Name" class="input" placeholder="örn. NetGSM, Verimor, …" />
+                    <div class="hint">Listede bu adla görünür. "Twilio" kullanılamaz.</div>
+                </div>
+                <div class="md:col-span-4">
+                    <label class="label">Yöntem</label>
+                    <select asp-for="Method" class="input"><option>GET</option><option>POST</option></select>
+                </div>
+                <div class="md:col-span-6">
+                    <label class="label">Gönderen / Başlık ({from})</label>
+                    <input asp-for="Sender" class="input mono" placeholder="örn. SIRKETADI" />
+                </div>
+                <div class="md:col-span-6">
+                    <label class="label">Alıcılar (opsiyonel)</label>
+                    <input asp-for="Recipients" class="input mono" placeholder="+905xx..., +905yy...  (boşsa global ayar alıcıları)" />
+                    <div class="hint">Bu kanala özel alıcılar; virgül/; ile ayırın. Boşsa global SMS/WhatsApp alıcıları kullanılır.</div>
+                </div>
+
+                <div class="md:col-span-12" id="templateRow">
+                    <label class="label">Alarm Şablonu — Content SID (yalnızca WhatsApp)</label>
+                    <input asp-for="TemplateSid" class="input mono" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                    <div class="hint">Twilio onaylı WhatsApp şablonunun Content SID'i. <b>Doluysa</b> alarm <b>butonlu (Başlat/Yeniden/Durdur)</b> interaktif şablon olarak gider; <b>boşsa</b> düz metin gönderilir. Şablonu değiştirmek için yenisini buraya yazıp kaydedin.</div>
+                </div>
+
+                <div class="md:col-span-12">
+                    <label class="label">URL *</label>
+                    <input asp-for="Url" class="input mono" placeholder="https://api.saglayici.com/sms?user={user}&password={password}&to={to}&msg={message}" />
+                </div>
+
+                <div class="md:col-span-3">
+                    <label class="label">POST Gövde Türü</label>
+                    <select asp-for="ContentType" class="input"><option value="form">form (x-www-form-urlencoded)</option><option value="json">json</option></select>
+                    <div class="hint">Yalnızca POST'ta kullanılır.</div>
+                </div>
+                <div class="md:col-span-9">
+                    <label class="label">POST Gövdesi (şablon)</label>
+                    <input asp-for="Body" class="input mono" placeholder="form: user={user}&pass={password}&gsmno={to}&message={message}  |  json: {&quot;to&quot;:&quot;{to}&quot;,&quot;text&quot;:&quot;{message}&quot;}" />
+                </div>
+
+                <div class="md:col-span-4">
+                    <label class="label">Kimlik Doğrulama</label>
+                    <select asp-for="AuthType" class="input">
+                        <option value="none">Yok (URL/gövde/başlıkta)</option>
+                        <option value="basic">Basic (user:password)</option>
+                        <option value="bearer">Bearer (apikey)</option>
+                    </select>
+                </div>
+                <div class="md:col-span-4">
+                    <label class="label">Kullanıcı Adı</label>
+                    <input asp-for="Username" class="input mono" autocomplete="off" />
+                </div>
+                <div class="md:col-span-4">
+                    <label class="label">Şifre ({password})</label>
+                    <input type="password" name="newPassword" class="input" autocomplete="new-password"
+                           placeholder="@(string.IsNullOrEmpty(Model.PasswordEncrypted) ? "Şifre girin" : "•••• kayıtlı — değiştirmek için girin")" />
+                </div>
+
+                <div class="md:col-span-6">
+                    <label class="label">API Key / Token ({apikey})</label>
+                    <input type="password" name="newApiKey" class="input" autocomplete="new-password"
+                           placeholder="@(string.IsNullOrEmpty(Model.ApiKeyEncrypted) ? "Varsa girin" : "•••• kayıtlı — değiştirmek için girin")" />
+                </div>
+                <div class="md:col-span-6">
+                    <label class="label">Başarı Metni (opsiyonel)</label>
+                    <input asp-for="SuccessContains" class="input mono" placeholder="ör. 00  (boşsa HTTP 2xx başarı sayılır)" />
+                </div>
+
+                <div class="md:col-span-12">
+                    <label class="label">Ek Başlıklar (opsiyonel — her satır "Anahtar: Değer")</label>
+                    <textarea asp-for="Headers" class="input mono" rows="2" placeholder="X-Api-Key: {apikey}"></textarea>
+                </div>
+
+                <div class="md:col-span-12">
+                    <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="Enabled" class="switch" /> Aktif</label>
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-2">
+                <button class="btn btn-primary"><i class="bi bi-save"></i> Kaydet</button>
+                <a class="btn btn-outline" asp-action="Index">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var kind = document.getElementById("Kind");
+    var tpl = document.getElementById("templateRow");
+    function sync() { tpl.classList.toggle("hidden", (kind.value || "").toLowerCase() !== "whatsapp"); }
+    if (kind && tpl) { kind.addEventListener("change", sync); sync(); }
+})();
+</script>
+}

@@ -1,0 +1,300 @@
+@model MonitorSettings
+@{
+    ViewData["Title"] = "Ayarlar";
+}
+
+<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-5"><i class="bi bi-gear text-brand-500"></i> Ayarlar</h1>
+
+<form method="post" asp-action="Save">
+    @Html.AntiForgeryToken()
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="card">
+            <div class="card-head"><i class="bi bi-stopwatch text-brand-500"></i> İzleme</div>
+            <div class="card-body space-y-4">
+                <div>
+                    <label class="label">Global Kontrol Aralığı (dakika)</label>
+                    <input asp-for="CheckIntervalMinutes" type="number" min="1" class="input" />
+                    <div class="hint">Servis bazında ayrıca özelleştirilebilir.</div>
+                </div>
+                <div>
+                    <label class="label">Bildirim Eşiği (ardışık hata sayısı)</label>
+                    <input asp-for="FailureThreshold" type="number" min="1" class="input" />
+                    <div class="hint">Bu kadar ardışık başarısız kontrol sonrası DOWN maili gönderilir.</div>
+                </div>
+                <div>
+                    <label class="label">Geçmiş Saklama Süresi (gün)</label>
+                    <input asp-for="HistoryRetentionDays" type="number" min="1" class="input" />
+                    <div class="hint">Daha eski kontrol kayıtları otomatik silinir.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><i class="bi bi-envelope text-brand-500"></i> Email (SMTP Relay)</div>
+            <div class="card-body space-y-4">
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input asp-for="EmailEnabled" class="switch" /> Email bildirimleri aktif
+                </label>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2"><label class="label">SMTP Sunucusu</label><input asp-for="SmtpHost" class="input mono" placeholder="smtp-relay.firma.local" /></div>
+                    <div><label class="label">Port</label><input asp-for="SmtpPort" type="number" class="input" /></div>
+                </div>
+                <div><label class="label">Gönderen Adres</label><input asp-for="MailFrom" class="input mono" placeholder="vmon@firma.com" /></div>
+                <div>
+                    <label class="label">Alıcılar</label>
+                    <textarea asp-for="MailRecipients" class="input mono" rows="2" placeholder="ops@firma.com, admin@firma.com"></textarea>
+                    <div class="hint">Virgül veya noktalı virgül ile ayırın.</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnTestEmail" class="btn btn-outline btn-sm"><i class="bi bi-send"></i> Test Maili Gönder</button>
+                    <span id="testEmailResult" class="text-sm"></span>
+                </div>
+                <div class="hint">Relay tabanlı gönderim. Test <b>kayıtlı</b> ayarlarla yapılır — önce kaydedin.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-5">
+        <div class="card-head"><i class="bi bi-shield-lock text-brand-500"></i> Oturum Açma (LDAP / Active Directory)</div>
+        <div class="card-body space-y-4">
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input asp-for="AuthEnabled" class="switch" /> LDAP ile oturum açma zorunlu (kapalıyken uygulama herkese açıktır)
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-5"><label class="label">LDAP Sunucusu (DC host/IP)</label><input asp-for="LdapAuthHost" class="input mono" placeholder="dc01.sirket.local" /></div>
+                <div class="md:col-span-2"><label class="label">Port</label><input asp-for="LdapAuthPort" type="number" class="input" /></div>
+                <div class="md:col-span-5 flex items-end">
+                    <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="LdapAuthUseSsl" class="switch" /> LDAPS kullan (port 636)</label>
+                </div>
+                <div class="md:col-span-4"><label class="label">Domain (NETBIOS / UPN)</label><input asp-for="LdapAuthDomain" class="input mono" placeholder="SIRKET veya sirket.local" /></div>
+                <div class="md:col-span-8"><label class="label">Arama Temel DN (BaseDN)</label><input asp-for="LdapAuthBaseDn" class="input mono" placeholder="DC=sirket,DC=local" /></div>
+                <div class="md:col-span-12">
+                    <label class="label">İzin Verilen Güvenlik Grubu (tam DN)</label>
+                    <input asp-for="LdapAuthGroupDn" class="input mono" placeholder="CN=vMon Kullanicilari,OU=Gruplar,DC=sirket,DC=local" />
+                    <div class="hint">Yalnızca bu grubun (ve alt gruplarının) üyeleri giriş yapabilir. Boş bırakılırsa geçerli kimliği olan tüm domain kullanıcıları girebilir.</div>
+                </div>
+                <div class="md:col-span-12">
+                    <label class="label">Admin Kullanıcıları (yalnızca Ayarlar erişimi)</label>
+                    <input asp-for="AdminUsers" class="input mono" placeholder="ahmet.yilmaz, mehmet.demir" />
+                    <div class="hint">Virgülle ayrılmış kullanıcı adları. Yalnızca bu kişiler <b>Ayarlar / Kullanıcılar</b> sekmelerine girebilir; diğer kullanıcılar kendilerine atanan yetkilerle uygulamayı kullanır. Boş bırakılırsa giriş yapan herkes admin sayılır — kendinizi eklemeyi unutmayın.</div>
+                </div>
+                <div class="md:col-span-12">
+                    <label class="label">Senkron Kimliği (grup üyelerini çekmek için)</label>
+                    <select asp-for="LdapSyncCredentialId" class="input md:max-w-md" asp-items="ViewBag.Credentials">
+                        <option value="">— Yok —</option>
+                    </select>
+                    <div class="hint">
+                        Kullanıcılar ekranındaki "LDAP'tan Senkronize Et" için kullanılır. <strong>Kimlik Bilgileri</strong> ekranından eklediğiniz
+                        bir hesabı seçin (Vault destekli olabilir; kullanıcı adı/şifre güvenli biçimde oradan çözülür).
+                        Salt-okunur bir AD hesabı yeterlidir. <a class="text-brand-600 hover:underline" asp-controller="Credentials" asp-action="Create">Yeni kimlik ekle</a>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-100" />
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div><label class="label text-xs">Test kullanıcı adı</label><input type="text" id="testLdapUser" class="input mono !py-1.5" autocomplete="off" /></div>
+                <div><label class="label text-xs">Test şifre</label><input type="password" id="testLdapPass" class="input !py-1.5" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" /></div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnTestLdap" class="btn btn-outline btn-sm"><i class="bi bi-person-check"></i> Test Girişi</button>
+                    <span id="testLdapResult" class="text-sm"></span>
+                </div>
+            </div>
+            <div class="alert-warn text-sm">
+                <i class="bi bi-exclamation-triangle"></i> Önce ayarları <b>kaydedin</b>, sonra "Test Girişi" ile doğrulayın; çalıştığını gördükten sonra
+                "oturum açma zorunlu" anahtarını açın. Kendinizi <b>Admin Kullanıcıları</b> listesine eklemeyi unutmayın; aksi halde
+                Ayarlar erişiminiz kısıtlanabilir.
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-5">
+        <div class="card-head"><i class="bi bi-shield-check text-brand-500"></i> Güvenlik ve Uyumluluk</div>
+        <div class="card-body space-y-5">
+            <label class="flex items-start gap-3 text-sm text-slate-700">
+                <input asp-for="TrustInternalTlsCertificates" class="switch mt-0.5" />
+                <span>
+                    <span class="font-medium">İç sertifikalara güven (TLS doğrulamasını gevşet)</span>
+                    <span class="block hint">Vault ve LDAPS bağlantılarında sertifika zinciri doğrulaması <b>gevşetilir</b>.
+                    Varsayılan <b>kapalı</b> = tam doğrulama (PCI DSS 4.2.1 / NIST SC-8). Yalnızca kurum içi CA sertifikalarınız
+                    Windows güven deposunda kayıtlı değilse ve bağlantı doğrulama hatası alıyorsanız geçici olarak açın.</span>
+                </span>
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="label">Hesap kilitleme eşiği (başarısız deneme)</label>
+                    <input asp-for="MaxLoginAttempts" type="number" min="1" max="10" class="input" />
+                    <div class="hint">PCI DSS 8.3.4: en çok 10.</div>
+                </div>
+                <div>
+                    <label class="label">Kilit süresi (dakika)</label>
+                    <input asp-for="LockoutMinutes" type="number" min="30" class="input" />
+                    <div class="hint">PCI DSS 8.3.4: en az 30.</div>
+                </div>
+                <div>
+                    <label class="label">Denetim kaydı saklama (gün)</label>
+                    <input asp-for="AuditRetentionDays" type="number" min="365" class="input" />
+                    <div class="hint">PCI DSS 10.5.1: en az 365.</div>
+                </div>
+            </div>
+            <div class="alert-info text-sm">
+                <i class="bi bi-info-circle"></i> Oturum boşta kalma zaman aşımı <b>15 dakika</b> olarak sabittir (PCI DSS 8.2.8).
+                Tüm yönetimsel işlemler <a class="text-brand-600 hover:underline" asp-controller="Audit" asp-action="Index">Denetim Kaydı</a> ekranında izlenir.
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-5">
+        <div class="card-head"><i class="bi bi-clipboard-data text-brand-500"></i> Mutabakat (Envanter Karşılaştırma)</div>
+        <div class="card-body space-y-4">
+            <label class="flex items-start gap-3 text-sm text-slate-700">
+                <input asp-for="MutabakatEnabled" class="switch mt-0.5" />
+                <span>
+                    <span class="font-medium">Mutabakat sekmesini etkinleştir</span>
+                    <span class="block hint">Kapalıyken sekme hiç kimseye (admin dahil) görünmez. Açıkken yalnızca
+                    <b>"Mutabakat sayfasını görüntüle"</b> yetkisi verilen kullanıcılar görür — yetkiyi
+                    <a class="text-brand-600 hover:underline" asp-controller="Users" asp-action="Index">Kullanıcılar</a> ekranından verin.</span>
+                </span>
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div><label class="label">Bizim firma adı</label><input asp-for="MutabakatOwnCompany" class="input" placeholder="örn. Şirketimiz A.Ş." /></div>
+                <div><label class="label">Hizmet aldığımız firma adı</label><input asp-for="MutabakatVendorCompany" class="input" placeholder="örn. Hizmet Sağlayıcı" /></div>
+            </div>
+            <div class="hint">Bu adlar Mutabakat ekranındaki başlık ve karşılaştırma kolonlarında görünür.</div>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <button class="btn btn-primary"><i class="bi bi-save"></i> Kaydet</button>
+    </div>
+</form>
+
+@{
+    var integrations = ViewBag.Integrations as List<vMonitor.Models.SmsProvider> ?? new List<vMonitor.Models.SmsProvider>();
+    var kindMeta = new Dictionary<string, (string l, string cls)>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Sms"] = ("SMS", "pill-info"), ["Whatsapp"] = ("WhatsApp", "pill-up"),
+        ["Voice"] = ("Sesli/IVR", "pill-error"), ["Ivr"] = ("Sesli/IVR", "pill-error")
+    };
+    var settingsReturn = Url.Action("Index", "Settings");
+}
+<div class="card mt-5">
+    <div class="card-head">
+        <span><i class="bi bi-plug text-brand-500"></i> Bildirim Kanalları (Entegrasyonlar)</span>
+        <a class="btn btn-primary btn-sm" asp-controller="SmsProviders" asp-action="Create"><i class="bi bi-plus-lg"></i> Yeni Entegrasyon</a>
+    </div>
+    <div class="card-body space-y-4">
+        <p class="text-sm text-slate-500">
+            SMS / WhatsApp / Sesli arama / IVR entegrasyonlarını buradan tek yerden yönetin — ekleyin, düzenleyin, silin, aktif/pasif yapın.
+            Kod değişikliği gerekmez. Her entegrasyon kendi alıcı listesini kullanabilir.
+        </p>
+        <div class="flex flex-wrap gap-2">
+            <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Sms"><i class="bi bi-chat-dots"></i> SMS ekle</a>
+            <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Whatsapp"><i class="bi bi-whatsapp"></i> WhatsApp ekle</a>
+            <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Ivr"><i class="bi bi-telephone"></i> Sesli Arama / IVR ekle</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="tbl">
+                <thead><tr><th>Tür</th><th>Ad</th><th>URL</th><th>Alıcılar</th><th>Aktif</th><th></th></tr></thead>
+                <tbody>
+                @if (integrations.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-slate-400 py-6">Henüz entegrasyon yok. Yukarıdaki düğmelerle ekleyin.</td></tr>
+                }
+                @foreach (var p in integrations)
+                {
+                    var km = kindMeta.GetValueOrDefault(p.Kind ?? "Sms", (l: p.Kind ?? "?", cls: "pill-type"));
+                    <tr>
+                        <td><span class="badge @km.cls">@km.l</span></td>
+                        <td class="font-semibold text-slate-800">@p.Name</td>
+                        <td class="mono text-slate-500 truncate max-w-[20rem]" title="@p.Url">@p.Url</td>
+                        <td class="mono text-slate-400 truncate max-w-[11rem]" title="@p.Recipients">@(string.IsNullOrWhiteSpace(p.Recipients) ? "(global)" : p.Recipients)</td>
+                        <td>
+                            <form method="post" asp-controller="SmsProviders" asp-action="Toggle" asp-route-id="@p.Id">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="returnUrl" value="@settingsReturn" />
+                                <input type="checkbox" class="switch" onchange="this.form.submit()" @(p.Enabled ? "checked" : "") title="Aktif/Pasif" />
+                            </form>
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Edit" asp-route-id="@p.Id"><i class="bi bi-pencil"></i></a>
+                            <form method="post" asp-controller="SmsProviders" asp-action="Delete" asp-route-id="@p.Id" class="inline" onsubmit="return confirm('@p.Name silinsin mi?');">
+                                @Html.AntiForgeryToken()
+                                <button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-5 max-w-2xl">
+    <div class="card-head"><i class="bi bi-image text-brand-500"></i> Giriş Ekranı Logosu</div>
+    <div class="card-body space-y-4">
+        @if (!string.IsNullOrWhiteSpace(Model.LoginLogoFile))
+        {
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <img src="~/Account/Logo" asp-append-version="true" alt="Logo" class="max-h-16" />
+                </div>
+                <form method="post" asp-action="RemoveLogo" onsubmit="return confirm('Logo kaldırılsın mı?');">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Logoyu Kaldır</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <div class="text-slate-400 text-sm">Şu anda logo tanımlı değil. Giriş ekranında logo gösterilmez.</div>
+        }
+        <form method="post" asp-action="UploadLogo" enctype="multipart/form-data" class="flex flex-wrap items-end gap-3">
+            @Html.AntiForgeryToken()
+            <div>
+                <label class="label">Yeni Logo Yükle</label>
+                <input type="file" name="logoFile" class="input !w-auto" accept=".png,.jpg,.jpeg,.gif,.webp" required />
+            </div>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-upload"></i> Yükle</button>
+        </form>
+        <div class="hint">PNG, JPG, GIF veya WEBP (en fazla 2 MB). Logo dosyası uygulamayla birlikte gelmez; buradan yüklersiniz ve sunucuda saklanır.</div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.getElementById("btnTestEmail").addEventListener("click", async function () {
+    const result = document.getElementById("testEmailResult");
+    this.disabled = true; result.textContent = "Gönderiliyor..."; result.className = "text-sm text-slate-400";
+    try {
+        const resp = await fetch("/api/test-email", { method: "POST" });
+        if (!resp.ok) throw new Error(await resp.text());
+        result.textContent = "✅ Test maili gönderildi."; result.className = "text-sm text-emerald-600";
+    } catch (e) { result.textContent = "❌ " + e.message; result.className = "text-sm text-rose-600"; }
+    finally { this.disabled = false; }
+});
+
+document.getElementById("btnTestLdap").addEventListener("click", async function () {
+    const result = document.getElementById("testLdapResult");
+    const u = document.getElementById("testLdapUser").value, p = document.getElementById("testLdapPass").value;
+    this.disabled = true; result.textContent = "Deneniyor..."; result.className = "text-sm text-slate-400";
+    try {
+        const resp = await fetch("/api/test-ldap-login", { method: "POST", body: new URLSearchParams({ username: u, password: p }) });
+        const data = await resp.json();
+        result.textContent = (data.ok ? "✅ " : "❌ ") + data.message;
+        result.className = "text-sm " + (data.ok ? "text-emerald-600" : "text-rose-600");
+    } catch (e) { result.textContent = "❌ " + e.message; result.className = "text-sm text-rose-600"; }
+    finally { this.disabled = false; document.getElementById("testLdapPass").value = ""; }
+});
+
+// Güvenlik: test alanları sayfa her açıldığında boş olsun (tarayıcı otomatik doldurmasını da temizle)
+function clearTestFields() {
+    document.getElementById("testLdapUser").value = "";
+    document.getElementById("testLdapPass").value = "";
+}
+clearTestFields();
+window.addEventListener("pageshow", clearTestFields);
+setTimeout(clearTestFields, 200); // bazı tarayıcıların gecikmeli autofill'ini de temizle
+</script>
+}
