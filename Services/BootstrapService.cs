@@ -42,7 +42,7 @@ public class BootstrapService
     public BootstrapService(IWebHostEnvironment env)
     {
         var dataDir = Path.Combine(env.ContentRootPath, "Data");
-        Directory.CreateDirectory(dataDir);
+        try { Directory.CreateDirectory(dataDir); } catch { /* izin yoksa açılışta çökme; sonra ele alınır */ }
         _path = Path.Combine(dataDir, "bootstrap.json");
         _legacySqlite = Path.Combine(dataDir, "monitoring.db");
     }

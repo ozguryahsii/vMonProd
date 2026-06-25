@@ -115,7 +115,10 @@ public class SettingsService
 
     public async Task<MonitorSettings> GetAsync(CancellationToken ct = default)
     {
-        var dict = await _db.Settings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+        // DB henüz hazır değilse (kurulum modu / erişilemez) varsayılan ayarlarla dön — istek anında 500 verme.
+        Dictionary<string, string?> dict;
+        try { dict = await _db.Settings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, ct); }
+        catch { return new MonitorSettings(); }
         var s = new MonitorSettings();
         if (dict.TryGetValue("CheckIntervalMinutes", out var v) && int.TryParse(v, out var i) && i > 0) s.CheckIntervalMinutes = i;
         if (dict.TryGetValue("FailureThreshold", out v) && int.TryParse(v, out i) && i > 0) s.FailureThreshold = i;

@@ -141,40 +141,46 @@ var app = builder.Build();
 // Create database on startup + manuel şema adımları
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    // Şemayı kur: tüm sağlayıcılarda model'den (yoksa) oluşturur. SQLite'a özel artımlı ALTER'lar yalnız SQLite'ta.
-    db.Database.EnsureCreated();
-
+    // Setup modunda HİÇBİR DB işlemi yapılmaz (uygulama her koşulda başlar; kullanıcı /Setup'ta yapılandırır).
+    // Yapılandırılmış modda bile DB hazırlığı try/catch ile sarılır — DB erişilemese dahi uygulama 500.30 vermez.
     if (bcfg.Configured)
     {
-        if (bcfg.Provider == DbProviderKind.Sqlite)
-            DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları için artımlı şema + veri-fix
-
-        // Yerleşik Twilio SMS/WhatsApp ayarlarını "Bildirim Kanalları" entegrasyonlarına bir kez taşı
         try
         {
-            TwilioChannelMigration.RunAsync(db, scope.ServiceProvider.GetRequiredService<SettingsService>(), logger)
-                .GetAwaiter().GetResult();
-        }
-        catch (Exception ex) { logger.LogError(ex, "Twilio kanal taşıması atlandı."); }
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.EnsureCreated();   // tüm sağlayıcılarda model'den (yoksa) şema kurar
 
-        // TLS güven ayarını giden istemcilere uygula (Vault) — açılışta bir kez
-        try
-        {
-            var s = scope.ServiceProvider.GetRequiredService<SettingsService>().GetAsync().GetAwaiter().GetResult();
-            VaultClient.TrustInternalCertificates = s.TrustInternalTlsCertificates;
-        }
-        catch (Exception ex) { logger.LogWarning(ex, "TLS güven ayarı okunamadı, güvenli varsayılan kullanılıyor."); }
+            if (bcfg.Provider == DbProviderKind.Sqlite)
+                DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları için artımlı şema + veri-fix
 
-        // Denetim kaydı yazma yolunu açılışta sına — başarısız olursa Data\audit-error.log oluşur
-        try
-        {
-            scope.ServiceProvider.GetRequiredService<AuditService>()
-                .LogAsync("app.start", "vMon", "Uygulama başlatıldı.", true, user: "sistem").GetAwaiter().GetResult();
+            try
+            {
+                TwilioChannelMigration.RunAsync(db, scope.ServiceProvider.GetRequiredService<SettingsService>(), logger)
+                    .GetAwaiter().GetResult();
+            }
+            catch (Exception ex) { logger.LogError(ex, "Twilio kanal taşıması atlandı."); }
+
+            try
+            {
+                var s = scope.ServiceProvider.GetRequiredService<SettingsService>().GetAsync().GetAwaiter().GetResult();
+                VaultClient.TrustInternalCertificates = s.TrustInternalTlsCertificates;
+            }
+            catch (Exception ex) { logger.LogWarning(ex, "TLS güven ayarı okunamadı, güvenli varsayılan kullanılıyor."); }
+
+            try
+            {
+                scope.ServiceProvider.GetRequiredService<AuditService>()
+                    .LogAsync("app.start", "vMon", "Uygulama başlatıldı.", true, user: "sistem").GetAwaiter().GetResult();
+            }
+            catch (Exception ex) { logger.LogError(ex, "Açılış denetim kaydı yazılamadı."); }
         }
-        catch (Exception ex) { logger.LogError(ex, "Açılış denetim kaydı yazılamadı."); }
+        catch (Exception ex)
+        {
+            // DB açılışta hazırlanamadı (erişilemez/izin yok) — uygulama yine de ayakta kalır, hata loglanır.
+            logger.LogError(ex, "Açılış veritabanı hazırlığı başarısız — uygulama başlatılıyor (DB sonra erişilebilir olabilir).");
+        }
     }
 }
 
@@ -257,6 +263,7 @@ app.Use(async (ctx, next) =>
 {
     var path = ctx.Request.Path;
     bool open = path.StartsWithSegments("/Account")
+                || path.StartsWithSegments("/Setup")          // kurulum sihirbazı (yapılandırma öncesi)
                 || path.StartsWithSegments("/lib")
                 || path.StartsWithSegments("/css")
                 || path.StartsWithSegments("/js")
