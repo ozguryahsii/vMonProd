@@ -35,6 +35,9 @@ public class MonitorSettings
     /// <summary>Giriş ekranı logosu — Data klasöründeki dosya adı (admin yükler). Boşsa logo gösterilmez.</summary>
     public string LoginLogoFile { get; set; } = "";
 
+    /// <summary>Müşteri/şirket adı (kurulum sihirbazında girilir; markalama/başlıkta kullanılır).</summary>
+    public string CompanyName { get; set; } = "";
+
     /// <summary>Kullanıcı senkronizasyonunda kullanılacak kimlik bilgisi (Kimlik Bilgileri ekranından, Vault destekli olabilir).</summary>
     public int? LdapSyncCredentialId { get; set; }
 
@@ -138,6 +141,7 @@ public class SettingsService
         if (dict.TryGetValue("LdapAuthGroupDn", out v)) s.LdapAuthGroupDn = v ?? "";
         if (dict.TryGetValue("AdminUsers", out v)) s.AdminUsers = v ?? "";
         if (dict.TryGetValue("LoginLogoFile", out v)) s.LoginLogoFile = v ?? "";
+        if (dict.TryGetValue("CompanyName", out v)) s.CompanyName = v ?? "";
         if (dict.TryGetValue("LdapSyncCredentialId", out v) && int.TryParse(v, out var ci) && ci > 0) s.LdapSyncCredentialId = ci;
         if (dict.TryGetValue("TrustInternalTlsCertificates", out v)) s.TrustInternalTlsCertificates = v == "true";
         if (dict.TryGetValue("MaxLoginAttempts", out v) && int.TryParse(v, out i) && i > 0) s.MaxLoginAttempts = Math.Min(i, 10);
@@ -184,6 +188,7 @@ public class SettingsService
             ["LdapAuthGroupDn"] = s.LdapAuthGroupDn,
             ["AdminUsers"] = s.AdminUsers,
             ["LoginLogoFile"] = s.LoginLogoFile,
+            ["CompanyName"] = s.CompanyName,
             ["LdapSyncCredentialId"] = s.LdapSyncCredentialId?.ToString() ?? "",
             ["TrustInternalTlsCertificates"] = s.TrustInternalTlsCertificates ? "true" : "false",
             ["MaxLoginAttempts"] = s.MaxLoginAttempts.ToString(),

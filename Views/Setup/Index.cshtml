@@ -9,28 +9,268 @@
     <title>vMon — Kurulum</title>
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" asp-append-version="true" />
     <style>
-        body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-               background:#0b1220; color:#e2e8f0; font-family:Segoe UI, system-ui, sans-serif; }
-        .box { max-width:560px; padding:2.5rem; background:#1e293b; border:1px solid #334155; border-radius:1rem; }
-        .logo { width:56px; height:56px; border-radius:1rem; background:#ed1c24; display:inline-flex;
-                align-items:center; justify-content:center; margin-bottom:1rem; }
-        h1 { margin:.2rem 0; font-size:1.6rem; }
-        .muted { color:#94a3b8; line-height:1.6; }
-        ol { color:#cbd5e1; line-height:1.9; }
+        :root { --bg:#0b1220; --card:#1e293b; --card2:#0f172a; --bord:#334155; --txt:#e2e8f0; --mut:#94a3b8; --brand:#ed1c24; --ok:#10b981; --err:#f43f5e; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; background:var(--bg); color:var(--txt);
+               font-family:Segoe UI, system-ui, sans-serif; display:flex; align-items:flex-start; justify-content:center; padding:4vh 1rem; }
+        .wrap { width:100%; max-width:720px; }
+        .head { text-align:center; margin-bottom:1.5rem; }
+        .logo { width:52px; height:52px; border-radius:.9rem; background:var(--brand); display:inline-flex; align-items:center; justify-content:center; }
+        .steps { display:flex; gap:.5rem; justify-content:center; margin:1rem 0 1.5rem; flex-wrap:wrap; }
+        .steps .s { display:flex; align-items:center; gap:.4rem; color:var(--mut); font-size:.85rem; }
+        .steps .s .n { width:1.6rem; height:1.6rem; border-radius:50%; border:1px solid var(--bord); display:inline-flex; align-items:center; justify-content:center; font-size:.8rem; }
+        .steps .s.active { color:var(--txt); }
+        .steps .s.active .n { background:var(--brand); border-color:var(--brand); color:#fff; }
+        .steps .s.done .n { background:var(--ok); border-color:var(--ok); color:#fff; }
+        .card { background:var(--card); border:1px solid var(--bord); border-radius:1rem; padding:1.75rem; }
+        h2 { margin:0 0 .3rem; font-size:1.25rem; }
+        .sub { color:var(--mut); font-size:.9rem; margin:0 0 1.25rem; }
+        label { display:block; font-size:.85rem; color:#cbd5e1; margin:.9rem 0 .35rem; }
+        input[type=text], input[type=password], input[type=number], input[type=email], select {
+            width:100%; background:var(--card2); border:1px solid #475569; color:var(--txt);
+            border-radius:.6rem; padding:.6rem .7rem; font-size:.9rem; outline:none; }
+        input:focus, select:focus { border-color:var(--brand); }
+        .row { display:flex; gap:.8rem; flex-wrap:wrap; }
+        .row > div { flex:1; min-width:140px; }
+        .chk { display:flex; align-items:center; gap:.5rem; margin-top:.9rem; font-size:.9rem; color:#cbd5e1; }
+        .chk input { width:auto; }
+        .hint { color:var(--mut); font-size:.78rem; margin-top:.3rem; }
+        .btns { display:flex; justify-content:space-between; gap:.6rem; margin-top:1.5rem; }
+        .btn { border:none; border-radius:.6rem; padding:.6rem 1.1rem; font-size:.9rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem; }
+        .btn-p { background:var(--brand); color:#fff; }
+        .btn-o { background:transparent; border:1px solid var(--bord); color:var(--txt); }
+        .btn-g { background:#334155; color:var(--txt); }
+        .btn:disabled { opacity:.5; cursor:not-allowed; }
+        .msg { margin-top:.8rem; font-size:.85rem; min-height:1.2rem; }
+        .msg.ok { color:var(--ok); } .msg.err { color:var(--err); }
+        .hidden { display:none !important; }
+        .testbar { display:flex; gap:.6rem; align-items:flex-end; margin-top:1rem; }
+        .testbar > div { flex:1; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <div class="logo"><i class="bi bi-activity" style="font-size:1.6rem;color:#fff"></i></div>
-        <h1>vMon — İlk Kurulum</h1>
-        <p class="muted">Uygulama henüz yapılandırılmadı (veritabanı bağlantısı tanımlı değil). Kurulum sihirbazı şu adımları toplayacak:</p>
-        <ol>
-            <li>Veritabanı (SQLite / MSSQL / MySQL / Oracle / PostgreSQL) + bağlantı testi</li>
-            <li>Şirket adı</li>
-            <li>Yönetici kullanıcı(lar)</li>
-            <li>E-posta / SMTP (opsiyonel, test ile)</li>
-        </ol>
-        <p class="muted"><i class="bi bi-info-circle"></i> Kurulum sihirbazı arayüzü bir sonraki sürümde tamamlanacaktır (Faz C). Altyapı (çoklu-DB + bootstrap) hazırdır.</p>
+<div class="wrap" id="wizard">
+    <div class="head">
+        <div class="logo"><i class="bi bi-activity" style="font-size:1.5rem;color:#fff"></i></div>
+        <h1 style="margin:.5rem 0 0;font-size:1.5rem;">vMon — İlk Kurulum</h1>
     </div>
+
+    <div class="steps">
+        <div class="s active" data-step="1"><span class="n">1</span> Veritabanı</div>
+        <div class="s" data-step="2"><span class="n">2</span> Şirket</div>
+        <div class="s" data-step="3"><span class="n">3</span> Yönetici</div>
+        <div class="s" data-step="4"><span class="n">4</span> E-posta</div>
+    </div>
+
+    <div class="card">
+        <!-- ADIM 1: Veritabanı -->
+        <section class="step" data-step="1">
+            <h2>Veritabanı bağlantısı</h2>
+            <p class="sub">Uygulamanın verilerini saklayacağı veritabanını seçin. (Bu adım atlanamaz.)</p>
+            <label>Veritabanı türü *</label>
+            <select id="Provider" name="Provider">
+                <option value="Sqlite">SQLite (sunucuda yerel dosya)</option>
+                <option value="SqlServer">Microsoft SQL Server</option>
+                <option value="PostgreSql">PostgreSQL</option>
+                <option value="MySql">MySQL</option>
+                <option value="Oracle">Oracle</option>
+            </select>
+
+            <div id="netFields" class="hidden">
+                <div class="row">
+                    <div style="flex:2"><label>Sunucu (Host/IP) *</label><input type="text" name="Host" id="Host" placeholder="db.firma.local" /></div>
+                    <div><label>Port</label><input type="number" name="Port" id="Port" placeholder="" /></div>
+                </div>
+                <div class="row">
+                    <div><label id="dbLabel">Veritabanı adı *</label><input type="text" name="Database" id="Database" placeholder="vmon" /></div>
+                    <div><label>Kullanıcı adı</label><input type="text" name="Username" id="Username" placeholder="vmon_user" /></div>
+                </div>
+                <label id="passLabel">Şifre</label>
+                <input type="password" name="Password" id="Password" placeholder="••••••••" />
+                <div class="row">
+                    <label class="chk"><input type="checkbox" name="UseSsl" id="UseSsl" /> SSL/şifreli bağlantı</label>
+                    <label class="chk"><input type="checkbox" name="TrustServerCertificate" id="TrustServerCertificate" /> Sertifika hatalarını yoksay</label>
+                </div>
+
+                <label class="chk"><input type="checkbox" name="UseVault" id="UseVault" /> Şifreyi HashiCorp Vault'tan çek</label>
+                <div id="vaultFields" class="hidden">
+                    <label>Vault Secret URL</label><input type="text" name="VaultUrl" placeholder="vault.firma.local/v1/vmon/data/db" />
+                    <label>Vault Token</label><input type="password" name="VaultToken" placeholder="hvs...." />
+                    <div class="row">
+                        <div><label>Kullanıcı adı anahtarı</label><input type="text" name="VaultUserKey" placeholder="username" /></div>
+                        <div><label>Şifre anahtarı</label><input type="text" name="VaultKey" placeholder="password" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sqliteNote" class="hint" style="margin-top:1rem;"><i class="bi bi-info-circle"></i> SQLite seçtiğinizde veritabanı sunucu üzerinde (Data/monitoring.db) otomatik oluşturulur — ek bilgi gerekmez.</div>
+
+            <button type="button" class="btn btn-o" id="btnTestDb" style="margin-top:1rem;"><i class="bi bi-plug"></i> Bağlantıyı Test Et</button>
+            <div class="msg" id="dbMsg"></div>
+
+            <div class="btns">
+                <span></span>
+                <button type="button" class="btn btn-p" data-next>İleri <i class="bi bi-arrow-right"></i></button>
+            </div>
+        </section>
+
+        <!-- ADIM 2: Şirket -->
+        <section class="step hidden" data-step="2">
+            <h2>Şirket bilgisi</h2>
+            <p class="sub">Müşteri/şirket adı — arayüzde markalama için kullanılır.</p>
+            <label>Şirket adı *</label>
+            <input type="text" name="CompanyName" id="CompanyName" placeholder="örn. Örnek Sigorta A.Ş." />
+            <div class="btns">
+                <button type="button" class="btn btn-o" data-back><i class="bi bi-arrow-left"></i> Geri</button>
+                <button type="button" class="btn btn-p" data-next>İleri <i class="bi bi-arrow-right"></i></button>
+            </div>
+        </section>
+
+        <!-- ADIM 3: Yönetici -->
+        <section class="step hidden" data-step="3">
+            <h2>Yönetici kullanıcı(lar)</h2>
+            <p class="sub">Ayarlar/Kullanıcılar ekranlarına erişebilecek admin kullanıcı adları (LDAP sAMAccountName). Virgülle ayırın.</p>
+            <label>Admin kullanıcıları *</label>
+            <input type="text" name="AdminUsers" id="AdminUsers" placeholder="ahmet.yilmaz, mehmet.demir" />
+            <div class="hint">LDAP oturum açma daha sonra Ayarlar'dan yapılandırılır; o zamana dek uygulama açık moddadır.</div>
+            <div class="btns">
+                <button type="button" class="btn btn-o" data-back><i class="bi bi-arrow-left"></i> Geri</button>
+                <button type="button" class="btn btn-p" data-next>İleri <i class="bi bi-arrow-right"></i></button>
+            </div>
+        </section>
+
+        <!-- ADIM 4: SMTP -->
+        <section class="step hidden" data-step="4">
+            <h2>E-posta (SMTP)</h2>
+            <p class="sub">Alarm e-postaları için SMTP relay. <b>Bu adım atlanabilir.</b> Doldurursanız ilerlemeden önce test zorunludur.</p>
+            <label class="chk"><input type="checkbox" name="SmtpEnabled" id="SmtpEnabled" /> SMTP yapılandır</label>
+            <div id="smtpFields" class="hidden">
+                <div class="row">
+                    <div style="flex:2"><label>SMTP sunucusu</label><input type="text" name="SmtpHost" id="SmtpHost" placeholder="smtp-relay.firma.local" /></div>
+                    <div><label>Port</label><input type="number" name="SmtpPort" id="SmtpPort" value="25" /></div>
+                </div>
+                <label>Gönderen adres</label><input type="text" name="MailFrom" id="MailFrom" placeholder="vmon@firma.com" />
+                <label>Varsayılan alıcılar</label><input type="text" name="MailRecipients" id="MailRecipients" placeholder="ops@firma.com, admin@firma.com" />
+                <div class="testbar">
+                    <div><label>Test alıcısı</label><input type="text" name="SmtpTestTo" id="SmtpTestTo" placeholder="sen@firma.com" /></div>
+                    <button type="button" class="btn btn-o" id="btnTestSmtp"><i class="bi bi-send"></i> Test Gönder</button>
+                </div>
+                <div class="msg" id="smtpMsg"></div>
+            </div>
+            <div class="btns">
+                <button type="button" class="btn btn-o" data-back><i class="bi bi-arrow-left"></i> Geri</button>
+                <div style="display:flex;gap:.6rem;">
+                    <button type="button" class="btn btn-g" id="btnSkipSmtp">Atla</button>
+                    <button type="button" class="btn btn-p" id="btnFinish"><i class="bi bi-check-lg"></i> Kurulumu Tamamla</button>
+                </div>
+            </div>
+            <div class="msg" id="finishMsg"></div>
+        </section>
+    </div>
+</div>
+
+<script>
+(function () {
+    let step = 1, dbTested = false, smtpTested = false;
+    const provider = document.getElementById("Provider");
+
+    function gather() {
+        const p = new URLSearchParams();
+        document.querySelectorAll('#wizard [name]').forEach(el => {
+            p.set(el.name, el.type === 'checkbox' ? (el.checked ? 'true' : 'false') : (el.value || ''));
+        });
+        return p;
+    }
+    function show(n) {
+        step = n;
+        document.querySelectorAll('.step').forEach(s => s.classList.toggle('hidden', +s.dataset.step !== n));
+        document.querySelectorAll('.steps .s').forEach(s => {
+            const d = +s.dataset.step;
+            s.classList.toggle('active', d === n);
+            s.classList.toggle('done', d < n);
+        });
+        window.scrollTo(0, 0);
+    }
+    function msg(el, ok, text) { el.className = 'msg ' + (ok ? 'ok' : 'err'); el.textContent = text; }
+
+    // Sağlayıcı değişince ağ alanlarını göster/gizle + varsayılan portu güncelle
+    const defaultPorts = { SqlServer: 1433, PostgreSql: 5432, MySql: 3306, Oracle: 1521 };
+    function onProvider() {
+        const v = provider.value, net = v !== 'Sqlite';
+        document.getElementById('netFields').classList.toggle('hidden', !net);
+        document.getElementById('sqliteNote').classList.toggle('hidden', net);
+        document.getElementById('Port').placeholder = defaultPorts[v] || '';
+        document.getElementById('dbLabel').textContent = (v === 'Oracle') ? 'Service Name *' : 'Veritabanı adı *';
+        dbTested = false; document.getElementById('dbMsg').textContent = '';
+    }
+    provider.addEventListener('change', onProvider); onProvider();
+
+    document.getElementById('UseVault').addEventListener('change', function () {
+        document.getElementById('vaultFields').classList.toggle('hidden', !this.checked);
+        document.getElementById('Password').closest('div, body') && (document.getElementById('passLabel').style.opacity = this.checked ? .5 : 1);
+    });
+    document.getElementById('SmtpEnabled').addEventListener('change', function () {
+        document.getElementById('smtpFields').classList.toggle('hidden', !this.checked);
+        smtpTested = false;
+    });
+
+    async function post(url, body) {
+        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        return r.json();
+    }
+
+    document.getElementById('btnTestDb').addEventListener('click', async function () {
+        const m = document.getElementById('dbMsg'); msg(m, true, 'Test ediliyor...'); this.disabled = true;
+        try { const d = await post('/Setup/TestDb', gather()); msg(m, d.ok, d.message); dbTested = d.ok; }
+        catch (e) { msg(m, false, 'Hata: ' + e.message); }
+        finally { this.disabled = false; }
+    });
+
+    document.getElementById('btnTestSmtp').addEventListener('click', async function () {
+        const m = document.getElementById('smtpMsg'); msg(m, true, 'Gönderiliyor...'); this.disabled = true;
+        try { const d = await post('/Setup/TestSmtp', gather()); msg(m, d.ok, d.message); smtpTested = d.ok; }
+        catch (e) { msg(m, false, 'Hata: ' + e.message); }
+        finally { this.disabled = false; }
+    });
+
+    // İleri/Geri
+    document.querySelectorAll('[data-next]').forEach(b => b.addEventListener('click', () => {
+        if (step === 1 && provider.value !== 'Sqlite' && !dbTested) {
+            msg(document.getElementById('dbMsg'), false, 'Devam etmeden önce bağlantıyı test edin.'); return;
+        }
+        if (step === 2 && !document.getElementById('CompanyName').value.trim()) {
+            alert('Şirket adı zorunlu.'); return;
+        }
+        if (step === 3 && !document.getElementById('AdminUsers').value.trim()) {
+            alert('En az bir yönetici kullanıcı girin.'); return;
+        }
+        show(step + 1);
+    }));
+    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show(step - 1)));
+
+    async function finish() {
+        const m = document.getElementById('finishMsg');
+        const smtpOn = document.getElementById('SmtpEnabled').checked;
+        if (smtpOn && document.getElementById('SmtpHost').value.trim() && !smtpTested) {
+            msg(document.getElementById('smtpMsg'), false, 'SMTP doldurulduğu için önce test edin (veya "Atla").'); return;
+        }
+        msg(m, true, 'Kurulum yapılıyor...');
+        document.getElementById('btnFinish').disabled = true; document.getElementById('btnSkipSmtp').disabled = true;
+        try {
+            const d = await post('/Setup/Complete', gather());
+            if (!d.ok) { msg(m, false, d.message); document.getElementById('btnFinish').disabled = false; document.getElementById('btnSkipSmtp').disabled = false; return; }
+            msg(m, true, 'Kurulum tamamlandı ✅ Uygulama yeniden başlatılıyor, birazdan yönlendirileceksiniz...');
+            try { await post('/Setup/Restart', new URLSearchParams()); } catch (e) { }
+            setTimeout(() => { window.location.href = '/'; }, 6000);
+        } catch (e) { msg(m, false, 'Hata: ' + e.message); document.getElementById('btnFinish').disabled = false; document.getElementById('btnSkipSmtp').disabled = false; }
+    }
+    document.getElementById('btnFinish').addEventListener('click', finish);
+    document.getElementById('btnSkipSmtp').addEventListener('click', function () {
+        document.getElementById('SmtpEnabled').checked = false;
+        document.getElementById('smtpFields').classList.add('hidden');
+        finish();
+    });
+})();
+</script>
 </body>
 </html>
