@@ -83,12 +83,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddScoped<LdapAuthService>();
 builder.Services.AddHttpContextAccessor();
 
-// SQLite database — Data/monitoring.db (uygulama klasörü içinde)
-var dbFolder = Path.Combine(builder.Environment.ContentRootPath, "Data");
-Directory.CreateDirectory(dbFolder);
-var dbPath = Path.Combine(dbFolder, "monitoring.db");
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+// ---- Veritabanı sağlayıcısı (çoklu-DB) ----
+// Önyükleme: Data/bootstrap.json hangi sağlayıcı + bağlantı? Yoksa eski SQLite kurulumundan geriye-uyum.
+// Yapılandırılmadıysa kurulum (Setup) moduna girilir; tüm istekler /Setup'a yönlendirilir.
+var bootstrap = new BootstrapService(builder.Environment);
+var bcfg = bootstrap.EnsureConfig();
+var secrets = new DpapiSecretProtector();
+builder.Services.AddSingleton(bootstrap);
+builder.Services.AddSingleton(bcfg);
+builder.Services.AddSingleton<ISecretProtector>(secrets);
+
+if (bcfg.Configured)
+{
+    var dbPass = DbProviderConfig.ResolvePassword(bcfg, secrets);
+    var connStr = DbProviderConfig.BuildConnectionString(bcfg, dbPass);
+    builder.Services.AddDbContext<AppDbContext>(o => DbProviderConfig.Apply(o, bcfg, connStr));
+}
+else
+{
+    // Kurulum modu: DI grafiği çözülsün diye geçici scratch SQLite (gerçek izleme yapılmaz; middleware /Setup'a yönlendirir).
+    var scratch = Path.Combine(builder.Environment.ContentRootPath, "Data", "setup-temp.db");
+    builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={scratch}"));
+}
 
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<EmailService>();
@@ -116,7 +132,9 @@ builder.Services.AddScoped<IServiceChecker, LinuxHealthChecker>();
 builder.Services.AddScoped<IServiceChecker, WindowsServiceChecker>();
 builder.Services.AddScoped<IServiceChecker, LinuxServiceChecker>();
 
-builder.Services.AddHostedService<MonitoringBackgroundService>();
+// İzleme arka plan servisi yalnızca yapılandırılmış kurulumda çalışır (Setup modunda değil)
+if (bcfg.Configured)
+    builder.Services.AddHostedService<MonitoringBackgroundService>();
 
 var app = builder.Build();
 
@@ -125,32 +143,39 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    // Şemayı kur: tüm sağlayıcılarda model'den (yoksa) oluşturur. SQLite'a özel artımlı ALTER'lar yalnız SQLite'ta.
     db.Database.EnsureCreated();
-    DbSchemaHelper.EnsureSchema(db, logger);
 
-    // Yerleşik Twilio SMS/WhatsApp ayarlarını "Bildirim Kanalları" entegrasyonlarına bir kez taşı
-    try
+    if (bcfg.Configured)
     {
-        TwilioChannelMigration.RunAsync(db, scope.ServiceProvider.GetRequiredService<SettingsService>(), logger)
-            .GetAwaiter().GetResult();
-    }
-    catch (Exception ex) { logger.LogError(ex, "Twilio kanal taşıması atlandı."); }
+        if (bcfg.Provider == DbProviderKind.Sqlite)
+            DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları için artımlı şema + veri-fix
 
-    // TLS güven ayarını giden istemcilere uygula (Vault) — açılışta bir kez
-    try
-    {
-        var s = scope.ServiceProvider.GetRequiredService<SettingsService>().GetAsync().GetAwaiter().GetResult();
-        VaultClient.TrustInternalCertificates = s.TrustInternalTlsCertificates;
-    }
-    catch (Exception ex) { logger.LogWarning(ex, "TLS güven ayarı okunamadı, güvenli varsayılan kullanılıyor."); }
+        // Yerleşik Twilio SMS/WhatsApp ayarlarını "Bildirim Kanalları" entegrasyonlarına bir kez taşı
+        try
+        {
+            TwilioChannelMigration.RunAsync(db, scope.ServiceProvider.GetRequiredService<SettingsService>(), logger)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex) { logger.LogError(ex, "Twilio kanal taşıması atlandı."); }
 
-    // Denetim kaydı yazma yolunu açılışta sına — başarısız olursa Data\audit-error.log oluşur
-    try
-    {
-        scope.ServiceProvider.GetRequiredService<AuditService>()
-            .LogAsync("app.start", "vMon", "Uygulama başlatıldı.", true, user: "sistem").GetAwaiter().GetResult();
+        // TLS güven ayarını giden istemcilere uygula (Vault) — açılışta bir kez
+        try
+        {
+            var s = scope.ServiceProvider.GetRequiredService<SettingsService>().GetAsync().GetAwaiter().GetResult();
+            VaultClient.TrustInternalCertificates = s.TrustInternalTlsCertificates;
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "TLS güven ayarı okunamadı, güvenli varsayılan kullanılıyor."); }
+
+        // Denetim kaydı yazma yolunu açılışta sına — başarısız olursa Data\audit-error.log oluşur
+        try
+        {
+            scope.ServiceProvider.GetRequiredService<AuditService>()
+                .LogAsync("app.start", "vMon", "Uygulama başlatıldı.", true, user: "sistem").GetAwaiter().GetResult();
+        }
+        catch (Exception ex) { logger.LogError(ex, "Açılış denetim kaydı yazılamadı."); }
     }
-    catch (Exception ex) { logger.LogError(ex, "Açılış denetim kaydı yazılamadı."); }
 }
 
 // Güvenlik başlıkları (tüm yanıtlara)
@@ -210,6 +235,21 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Kurulum kapısı: uygulama henüz yapılandırılmadıysa (bootstrap yok) tüm istekleri /Setup'a yönlendir.
+// (Yalnızca Setup modunda kayıtlanır; yapılandırılmış kurulumlarda hiç çalışmaz.)
+if (!bcfg.Configured)
+{
+    app.Use(async (ctx, next) =>
+    {
+        var path = ctx.Request.Path;
+        bool allow = path.StartsWithSegments("/Setup")
+                  || path.StartsWithSegments("/lib") || path.StartsWithSegments("/css")
+                  || path.StartsWithSegments("/js") || path.Equals("/favicon.ico");
+        if (!allow) { ctx.Response.Redirect("/Setup"); return; }
+        await next();
+    });
+}
 
 // Erişim kapısı: AuthEnabled ise, giriş yapmamış kullanıcıyı login'e yönlendir.
 // Statik dosyalar (UseStaticFiles yukarıda) ve /Account herkese açıktır.

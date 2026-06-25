@@ -10,6 +10,7 @@ Data/*.db
 Data/*.db-wal
 Data/*.db-shm
 Data/login-logo.*
+Data/bootstrap.json
 
 # ---- Deploy / geçici ----
 app_offline.htm
