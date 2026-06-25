@@ -128,11 +128,15 @@
 
         <!-- ADIM 3: Yönetici -->
         <section class="step hidden" data-step="3">
-            <h2>Yönetici kullanıcı(lar)</h2>
-            <p class="sub">Ayarlar/Kullanıcılar ekranlarına erişebilecek admin kullanıcı adları (LDAP sAMAccountName). Virgülle ayırın.</p>
-            <label>Admin kullanıcıları *</label>
-            <input type="text" name="AdminUsers" id="AdminUsers" placeholder="ahmet.yilmaz, mehmet.demir" />
-            <div class="hint">LDAP oturum açma daha sonra Ayarlar'dan yapılandırılır; o zamana dek uygulama açık moddadır.</div>
+            <h2>Yönetici hesabı</h2>
+            <p class="sub">Şifreli giriş yapacağın <b>yerel yönetici</b> hesabını oluştur. (LDAP'ı sonra Ayarlar'dan bağlarsın; senkron sonrası bu yerel hesabı Kullanıcılar'dan silebilirsin.)</p>
+            <label>Yönetici kullanıcı adı *</label>
+            <input type="text" name="AdminUsers" id="AdminUsers" placeholder="admin" autocomplete="off" />
+            <div class="row">
+                <div><label>Şifre *</label><input type="password" name="AdminPassword" id="AdminPassword" placeholder="en az 8 karakter" autocomplete="new-password" /></div>
+                <div><label>Şifre (tekrar) *</label><input type="password" id="AdminPassword2" placeholder="••••••••" autocomplete="new-password" /></div>
+            </div>
+            <div class="hint">Bu hesapla giriş yapacaksın. Kurulumdan sonra uygulama şifre soracak.</div>
             <div class="btns">
                 <button type="button" class="btn btn-o" data-back><i class="bi bi-arrow-left"></i> Geri</button>
                 <button type="button" class="btn btn-p" data-next>İleri <i class="bi bi-arrow-right"></i></button>
@@ -241,8 +245,13 @@
         if (step === 2 && !document.getElementById('CompanyName').value.trim()) {
             alert('Şirket adı zorunlu.'); return;
         }
-        if (step === 3 && !document.getElementById('AdminUsers').value.trim()) {
-            alert('En az bir yönetici kullanıcı girin.'); return;
+        if (step === 3) {
+            const u = document.getElementById('AdminUsers').value.trim();
+            const p = document.getElementById('AdminPassword').value;
+            const p2 = document.getElementById('AdminPassword2').value;
+            if (!u) { alert('Yönetici kullanıcı adı zorunlu.'); return; }
+            if (p.length < 8) { alert('Şifre en az 8 karakter olmalı.'); return; }
+            if (p !== p2) { alert('Şifreler eşleşmiyor.'); return; }
         }
         show(step + 1);
     }));

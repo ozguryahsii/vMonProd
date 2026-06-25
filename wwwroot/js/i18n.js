@@ -22,7 +22,7 @@
         "Test": "Test", "Uygula": "Apply", "Yükle": "Upload", "Gönder": "Send", "Kapat": "Close",
         "Evet": "Yes", "Hayır": "No", "Geri": "Back", "Ara": "Search", "Yeni": "New", "Tümü": "All",
         "Filtrele": "Filter", "Temizle": "Clear", "Getir": "Load", "Kontrol Et": "Check", "Geçmiş": "History",
-        "Aktif": "Active", "Pasif": "Passive", "Aktif/Pasif": "Active/Passive", "Bekliyor": "Pending",
+        "Aktif": "Active", "Pasif": "Passive", "Aktif/Pasif": "Active/Passive", "Bekliyor": "Pending", "Yerel": "Local",
         "Durum": "Status", "Yetkiler": "Permissions", "Yetkiler ": "Permissions", "Yetki yok": "No permissions",
         "Port": "Port", "Domain": "Domain", "Açıklama": "Description", "Kullanım": "Usage", "Kaynak": "Source",
         "Manuel": "Manual", "Manuel Şifre": "Manual Password", "Detay": "Detail", "Özet": "Summary",

@@ -40,6 +40,10 @@
                 <tr class="@(u.IsActive ? "" : "opacity-60")">
                     <td class="mono font-semibold text-slate-800">
                         @u.Sam
+                        @if (u.IsLocal)
+                        {
+                            <span class="badge pill-info ml-1" title="Yerel hesap (LDAP değil) — kurulumda oluşturuldu"><i class="bi bi-person-badge"></i> Yerel</span>
+                        }
                         @if (!u.IsActive)
                         {
                             <span class="badge pill-muted ml-1" title="AD güvenlik grubundan düşmüş — giriş yapamaz"><i class="bi bi-pause-circle"></i> PASİF</span>

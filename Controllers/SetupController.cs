@@ -53,7 +53,8 @@ public class SetupController : Controller
         public string VaultKey { get; set; } = "";
         // Diğer adımlar
         public string CompanyName { get; set; } = "";
-        public string AdminUsers { get; set; } = "";
+        public string AdminUsers { get; set; } = "";     // yerel admin kullanıcı adı
+        public string AdminPassword { get; set; } = "";  // yerel admin şifresi
         public bool SmtpEnabled { get; set; } = false;
         public string SmtpHost { get; set; } = "";
         public int SmtpPort { get; set; } = 25;
@@ -162,7 +163,9 @@ public class SetupController : Controller
         try
         {
             if (string.IsNullOrWhiteSpace(f.CompanyName)) return Json(new { ok = false, message = "Şirket adı zorunlu." });
-            if (string.IsNullOrWhiteSpace(f.AdminUsers)) return Json(new { ok = false, message = "En az bir yönetici kullanıcı zorunlu." });
+            if (string.IsNullOrWhiteSpace(f.AdminUsers)) return Json(new { ok = false, message = "Yönetici kullanıcı adı zorunlu." });
+            if (string.IsNullOrWhiteSpace(f.AdminPassword) || f.AdminPassword.Length < 8)
+                return Json(new { ok = false, message = "Yönetici şifresi en az 8 karakter olmalı." });
 
             var c = ToConfig(f);
             var pass = ResolvePlainPassword(f, c);
@@ -174,10 +177,27 @@ public class SetupController : Controller
                 if (c.Provider == DbProviderKind.Sqlite)
                     DbSchemaHelper.EnsureSchema(ctx, _logger);
 
+                // Yerel admin kullanıcı (şifreli) — kurulumdan sonra şifreli giriş zorunlu
+                var adminSam = f.AdminUsers.Trim();
+                if (!await ctx.AppUsers.AnyAsync(u => u.Sam == adminSam, ct))
+                {
+                    ctx.AppUsers.Add(new AppUser
+                    {
+                        Sam = adminSam,
+                        DisplayName = adminSam,
+                        IsLocal = true,
+                        IsActive = true,
+                        PasswordHash = PasswordHasher.Hash(f.AdminPassword),
+                        PermissionsCsv = ""
+                    });
+                    await ctx.SaveChangesAsync(ct);
+                }
+
                 var ss = new SettingsService(ctx);
                 var ms = await ss.GetAsync(ct);
                 ms.CompanyName = f.CompanyName.Trim();
-                ms.AdminUsers = f.AdminUsers.Trim();
+                ms.AdminUsers = adminSam;
+                ms.AuthEnabled = true;   // yerel admin oluşturuldu → giriş ekranı + şifre zorunlu
                 if (f.SmtpEnabled && !string.IsNullOrWhiteSpace(f.SmtpHost))
                 {
                     ms.EmailEnabled = true;

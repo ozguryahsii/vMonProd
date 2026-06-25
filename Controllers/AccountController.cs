@@ -84,6 +84,31 @@ public class AccountController : Controller
             return View();
         }
 
+        // ---- Yerel (LDAP olmayan) kullanıcı: kurulumda oluşturulan admin. LDAP'tan önce denenir. ----
+        var uname = (username ?? "").Trim();
+        var localUser = await _db.AppUsers.FirstOrDefaultAsync(u => u.IsLocal && u.Sam.ToLower() == uname.ToLower());
+        if (localUser != null)
+        {
+            if (!localUser.IsActive)
+            {
+                await _audit.LogAsync("login.denied", uname, "Yerel kullanıcı pasif.", false);
+                ViewBag.Error = "Hesabınız pasif durumda.";
+                ViewBag.ReturnUrl = returnUrl; return View();
+            }
+            if (PasswordHasher.Verify(password, localUser.PasswordHash))
+            {
+                _loginGate.TryRemove(gateKey, out _);
+                return await CompleteLoginAsync(localUser, settings.IsAdmin(localUser.Sam),
+                    localUser.DisplayName ?? localUser.Sam, returnUrl);
+            }
+            var le = _loginGate.TryGetValue(gateKey, out var lex) && DateTime.Now - lex.FirstAt < lockWindow
+                ? (lex.Count + 1, lex.FirstAt) : (1, DateTime.Now);
+            _loginGate[gateKey] = le;
+            await _audit.LogAsync("login.fail", uname, "Yerel kullanıcı şifresi hatalı.", false);
+            ViewBag.Error = "Kullanıcı adı veya şifre hatalı.";
+            ViewBag.ReturnUrl = returnUrl; ViewBag.Username = username; return View();
+        }
+
         var result = _ldap.Validate(settings, username, password);
 
         if (!result.Success)
@@ -121,13 +146,20 @@ public class AccountController : Controller
         }
 
         appUser.DisplayName = result.DisplayName ?? username;
+        return await CompleteLoginAsync(appUser, isAdmin, result.DisplayName ?? username, returnUrl);
+    }
+
+    /// <summary>Başarılı kimlik doğrulama sonrası ortak adımlar: claim'ler + oturum + tema/dil çerezi + denetim + yönlendirme.
+    /// Hem yerel kullanıcı hem LDAP başarısında çağrılır.</summary>
+    private async Task<IActionResult> CompleteLoginAsync(AppUser appUser, bool isAdmin, string displayName, string? returnUrl)
+    {
         appUser.LastLogin = DateTime.Now;
         await _db.SaveChangesAsync();
 
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, result.DisplayName ?? username),
-            new("sam", sam)
+            new(ClaimTypes.Name, displayName),
+            new("sam", appUser.Sam)
         };
         if (isAdmin)
             claims.Add(new Claim("admin", "true"));
@@ -137,10 +169,8 @@ public class AccountController : Controller
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(identity));
-        await _audit.LogAsync("login.success", sam, isAdmin ? "Admin girişi" : "Kullanıcı girişi", true, user: sam);
-
-        // Tema/dil tercihini çereze yaz (sunucu _Layout'ta okuyup uygular — yanıp sönme olmaz; cihazlar arası kalıcı)
         WritePrefCookies(appUser.Theme, appUser.Language);
+        await _audit.LogAsync("login.success", appUser.Sam, isAdmin ? "Admin girişi" : "Kullanıcı girişi", true, user: appUser.Sam);
 
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             return Redirect(returnUrl);
