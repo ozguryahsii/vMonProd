@@ -29,12 +29,16 @@
                 <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-tag text-brand-500"></i> @T("Versiyon", "Version")</div>
                 <div class="text-slate-700 flex-1">
                     <button type="button" @@click="open=!open" class="inline-flex items-center gap-2 group">
-                        <span class="badge pill-info">v2.7.0</span>
+                        <span class="badge pill-info">v2.8.0</span>
                         <span class="text-xs text-brand-600 group-hover:underline">@T("Sürüm notları", "Release notes") <i class="bi" :class="open ? 'bi-chevron-up' : 'bi-chevron-down'"></i></span>
                     </button>
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
                         @if (en)
                         {
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.8.0 — UTC time handling</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.8.0) UTC storage / local display:</strong> all timestamps are stored in UTC and shown in your local time. This keeps reports and history consistent across servers and time zones (cloud-ready).</li>
+                            </ul>
                             <p class="font-semibold text-slate-700 mb-2">Version 2.7.0 — Safe schema upgrades</p>
                             <ul class="list-disc ml-5 space-y-1.5 mb-3">
                                 <li><strong>(2.7.0) Provider-independent schema sync:</strong> when a new version adds a column, it is added to the existing database automatically on any provider — additive only (never drops or alters), so there is no data-loss risk.</li>
@@ -112,6 +116,10 @@
                         }
                         else
                         {
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.8.0 — UTC zaman yönetimi</p>
+                            <ul class="list-disc ml-5 space-y-1.5 mb-3">
+                                <li><strong>(2.8.0) UTC sakla / yerel göster:</strong> tüm zaman damgaları UTC saklanır ve yerel saatinizle gösterilir. Bu, raporları ve geçmişi sunucular ve zaman dilimleri arasında tutarlı tutar (cloud'a hazır).</li>
+                            </ul>
                             <p class="font-semibold text-slate-700 mb-2">Sürüm 2.7.0 — Güvenli şema yükseltme</p>
                             <ul class="list-disc ml-5 space-y-1.5 mb-3">
                                 <li><strong>(2.7.0) Provider-bağımsız şema senkronu:</strong> yeni sürüm bir kolon eklediğinde, bu kolon var olan veritabanına her sağlayıcıda otomatik eklenir — yalnızca ekleme yapar (asla silmez/değiştirmez), böylece veri kaybı riski yoktur.</li>
