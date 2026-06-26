@@ -65,7 +65,7 @@
                             }
                         }
                     </td>
-                    <td class="text-slate-500 text-sm">@(u.LastLogin?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
+                    <td class="text-slate-500 text-sm">@(u.LastLogin?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
                     <td class="text-right whitespace-nowrap">
                         @if (!isAdmin)
                         {

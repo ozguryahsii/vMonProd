@@ -9,7 +9,7 @@ public class AlarmSession
     public int ServiceId { get; set; }
     /// <summary>Normalize telefon (yalnız rakamlar).</summary>
     public string Phone { get; set; } = "";
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? HandledAt { get; set; }
     public string? Action { get; set; }
     public string? Result { get; set; }

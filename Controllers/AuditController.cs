@@ -39,7 +39,7 @@ public class AuditController : MvcBase
         var where = new List<string>();
         if (days > 0)
         {
-            var since = DateTime.Now.AddDays(-Math.Min(days, 3650)).ToString("yyyy-MM-dd HH:mm:ss");
+            var since = DateTime.UtcNow.AddDays(-Math.Min(days, 3650)).ToString("yyyy-MM-dd HH:mm:ss");
             where.Add($"At >= '{since}'");
         }
         if (!string.IsNullOrWhiteSpace(act))
