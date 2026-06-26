@@ -1,0 +1,37 @@
+name: Release
+
+# Tag atınca (v*.*.*) otomatik: build → self-contained publish → kurulum scriptleriyle zip → GitHub Release
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish (self-contained win-x64)
+        run: dotnet publish -c Release -r win-x64 --self-contained true -o package/app
+
+      - name: Add install scripts
+        shell: pwsh
+        run: Copy-Item install/* package/ -Recurse -Force
+
+      - name: Zip package
+        shell: pwsh
+        run: Compress-Archive -Path package/* -DestinationPath "vMon-${{ github.ref_name }}-win-x64.zip" -Force
+
+      - name: Create GitHub Release + upload zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "vMon-*-win-x64.zip"
+          generate_release_notes: true
