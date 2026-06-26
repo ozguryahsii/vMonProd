@@ -242,11 +242,16 @@ public class SetupController : Controller
         }
     }
 
-    /// <summary>Yeni yapılandırmayla başlamak için uygulamayı yeniden başlatır (IIS InProcess otomatik kaldırır).</summary>
+    /// <summary>Yeni yapılandırmayla başlamak için uygulamayı yeniden başlatır.
+    /// IIS (InProcess): StopApplication → sonraki istekte worker yeniden başlar.
+    /// Windows Service: StopApplication yalnız durdurur → kurtarma (recovery) için sıfırdan-farklı kodla çık (SCM yeniden başlatır).</summary>
     [HttpPost]
     public IActionResult Restart()
     {
-        _life.StopApplication();
+        if (Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService())
+            _ = Task.Run(async () => { await Task.Delay(1500); Environment.Exit(1); });
+        else
+            _life.StopApplication();
         return Json(new { ok = true });
     }
 

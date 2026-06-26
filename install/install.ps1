@@ -68,6 +68,9 @@ else {
         & sc.exe delete $ServiceName | Out-Null; Start-Sleep -Seconds 2
     }
     New-Service -Name $ServiceName -BinaryPathName $bin -DisplayName 'vMon Monitoring' -StartupType Automatic | Out-Null
+    # Kurulum sonrasi self-restart icin servis kurtarma: sifirdan-farkli kodla cikinca SCM yeniden baslatir
+    & sc.exe failure $ServiceName reset= 86400 actions= restart/3000 | Out-Null
+    & sc.exe failureflag $ServiceName 1 | Out-Null
     Start-Service $ServiceName
     Write-Host "`nService install DONE. Open in browser: http://<server>:$Port  (the /Setup wizard appears)" -ForegroundColor Green
 }
