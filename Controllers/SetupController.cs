@@ -100,6 +100,12 @@ public class SetupController : Controller
 
     private AppDbContext BuildContext(BootstrapConfig c, string plainPassword)
     {
+        // SQLite: veritabanı dosyasının klasörü yoksa oluştur (Error 14 'unable to open database file' önlenir)
+        if (c.Provider == DbProviderKind.Sqlite && !string.IsNullOrEmpty(c.SqlitePath))
+        {
+            var dir = Path.GetDirectoryName(c.SqlitePath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        }
         var connStr = DbProviderConfig.BuildConnectionString(c, plainPassword);
         var ob = new DbContextOptionsBuilder<AppDbContext>();
         DbProviderConfig.Apply(ob, c, connStr);
