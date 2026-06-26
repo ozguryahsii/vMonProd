@@ -42,7 +42,7 @@ public class MonitoringBackgroundService : BackgroundService
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             settings = await scope.ServiceProvider.GetRequiredService<SettingsService>().GetAsync(ct);
 
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             var services = await db.Services.AsNoTracking()
                 .Where(s => s.Enabled)
                 .Select(s => new { s.Id, s.LastCheckedAt, s.IntervalMinutesOverride })
@@ -83,19 +83,19 @@ public class MonitoringBackgroundService : BackgroundService
         }
 
         // Günlük temizlik
-        if (DateTime.Now - _lastCleanup > TimeSpan.FromHours(24))
+        if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromHours(24))
         {
-            _lastCleanup = DateTime.Now;
+            _lastCleanup = DateTime.UtcNow;
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var cutoff = DateTime.Now.AddDays(-settings.HistoryRetentionDays);
+            var cutoff = DateTime.UtcNow.AddDays(-settings.HistoryRetentionDays);
             var deleted = await db.CheckResults.Where(r => r.CheckedAt < cutoff).ExecuteDeleteAsync(ct);
             deleted += await db.Outages.Where(o => o.EndedAt != null && o.EndedAt < cutoff).ExecuteDeleteAsync(ct);
             deleted += await db.HealthMetrics.Where(m => m.CheckedAt < cutoff).ExecuteDeleteAsync(ct);
             if (deleted > 0) _logger.LogInformation("{Count} eski kayıt temizlendi", deleted);
 
             // Denetim kaydı saklama (PCI DSS 10.5.1: en az 1 yıl) — ayrı, daha uzun eşik
-            var auditCutoff = DateTime.Now.AddDays(-Math.Max(settings.AuditRetentionDays, 365));
+            var auditCutoff = DateTime.UtcNow.AddDays(-Math.Max(settings.AuditRetentionDays, 365));
             var auditDeleted = await db.AuditLogs.Where(a => a.At < auditCutoff).ExecuteDeleteAsync(ct);
             if (auditDeleted > 0) _logger.LogInformation("{Count} eski denetim kaydı temizlendi", auditDeleted);
         }

@@ -34,7 +34,7 @@ public class AuditService
 
             _db.AuditLogs.Add(new AuditLog
             {
-                At = DateTime.Now,
+                At = DateTime.UtcNow,
                 User = user ?? "?",
                 Ip = ip,
                 Action = action,
@@ -53,7 +53,7 @@ public class AuditService
                 var dir = Path.Combine(_env.ContentRootPath, "Data");
                 Directory.CreateDirectory(dir);
                 File.AppendAllText(Path.Combine(dir, "audit-error.log"),
-                    $"{DateTime.Now:o}\t{action}\t{target}\t{ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+                    $"{DateTime.UtcNow:o}\t{action}\t{target}\t{ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
             }
             catch { /* dosyaya da yazılamıyorsa sessiz geç */ }
         }

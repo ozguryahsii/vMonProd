@@ -76,7 +76,7 @@ public class AccountController : Controller
         var lockWindow = TimeSpan.FromMinutes(settings.LockoutMinutes);
         var gateKey = (username ?? "").Trim().ToLowerInvariant() + "|" + ip;
 
-        if (_loginGate.TryGetValue(gateKey, out var st) && st.Count >= maxAttempts && DateTime.Now - st.FirstAt < lockWindow)
+        if (_loginGate.TryGetValue(gateKey, out var st) && st.Count >= maxAttempts && DateTime.UtcNow - st.FirstAt < lockWindow)
         {
             await _audit.LogAsync("login.locked", username, $"Hesap geçici kilitli ({maxAttempts} başarısız deneme).", false);
             ViewBag.Error = $"Çok fazla başarısız deneme. Hesap {settings.LockoutMinutes} dakika kilitlendi.";
@@ -101,8 +101,8 @@ public class AccountController : Controller
                 return await CompleteLoginAsync(localUser, settings.IsAdmin(localUser.Sam),
                     localUser.DisplayName ?? localUser.Sam, returnUrl);
             }
-            var le = _loginGate.TryGetValue(gateKey, out var lex) && DateTime.Now - lex.FirstAt < lockWindow
-                ? (lex.Count + 1, lex.FirstAt) : (1, DateTime.Now);
+            var le = _loginGate.TryGetValue(gateKey, out var lex) && DateTime.UtcNow - lex.FirstAt < lockWindow
+                ? (lex.Count + 1, lex.FirstAt) : (1, DateTime.UtcNow);
             _loginGate[gateKey] = le;
             await _audit.LogAsync("login.fail", uname, "Yerel kullanıcı şifresi hatalı.", false);
             ViewBag.Error = "Kullanıcı adı veya şifre hatalı.";
@@ -114,8 +114,8 @@ public class AccountController : Controller
         if (!result.Success)
         {
             // Pencere dolduysa sayacı sıfırla, değilse artır
-            var entry = _loginGate.TryGetValue(gateKey, out var e) && DateTime.Now - e.FirstAt < lockWindow
-                ? (e.Count + 1, e.FirstAt) : (1, DateTime.Now);
+            var entry = _loginGate.TryGetValue(gateKey, out var e) && DateTime.UtcNow - e.FirstAt < lockWindow
+                ? (e.Count + 1, e.FirstAt) : (1, DateTime.UtcNow);
             _loginGate[gateKey] = entry;
             await _audit.LogAsync("login.fail", username, result.Error, false);
             ViewBag.Error = result.Error;
@@ -153,7 +153,7 @@ public class AccountController : Controller
     /// Hem yerel kullanıcı hem LDAP başarısında çağrılır.</summary>
     private async Task<IActionResult> CompleteLoginAsync(AppUser appUser, bool isAdmin, string displayName, string? returnUrl)
     {
-        appUser.LastLogin = DateTime.Now;
+        appUser.LastLogin = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
         var claims = new List<Claim>

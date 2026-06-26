@@ -63,7 +63,7 @@
                 @foreach (var a in Model)
                 {
                     <tr>
-                        <td class="mono whitespace-nowrap">@a.At.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="mono whitespace-nowrap">@a.At.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
                         <td class="font-medium">@a.User</td>
                         <td class="mono text-slate-500">@a.Ip</td>
                         <td><span class="badge pill-info">@a.Action</span></td>

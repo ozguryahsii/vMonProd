@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using vMonitor.Models;
 
 namespace vMonitor.Data;
@@ -6,6 +7,17 @@ namespace vMonitor.Data;
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    // UTC sakla / UTC oku: yazarken yerel/belirsiz değer UTC'ye çevrilir, okurken Kind=Utc işaretlenir.
+    // Böylece tüm DB tarihleri UTC tutulur; JSON 'Z' ile serialize edilir (JS yerele çevirir),
+    // EF sorgu parametreleri (rapor tarih aralıkları) de otomatik UTC'ye dönüşür. Gösterim için .ToLocalTime().
+    private static readonly ValueConverter<DateTime, DateTime> UtcConverter = new(
+        v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+    private static readonly ValueConverter<DateTime?, DateTime?> UtcNullableConverter = new(
+        v => v.HasValue ? (v.Value.Kind == DateTimeKind.Utc ? v.Value : v.Value.ToUniversalTime()) : v,
+        v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
 
     public DbSet<MonitoredService> Services => Set<MonitoredService>();
     public DbSet<Credential> Credentials => Set<Credential>();
@@ -30,5 +42,13 @@ public class AppDbContext : DbContext
           .WithMany()
           .HasForeignKey(s => s.CredentialId)
           .OnDelete(DeleteBehavior.SetNull);
+
+        // Tüm DateTime alanlarına UTC dönüştürücüsü uygula (sakla UTC / oku UTC)
+        foreach (var entity in mb.Model.GetEntityTypes())
+            foreach (var prop in entity.GetProperties())
+            {
+                if (prop.ClrType == typeof(DateTime)) prop.SetValueConverter(UtcConverter);
+                else if (prop.ClrType == typeof(DateTime?)) prop.SetValueConverter(UtcNullableConverter);
+            }
     }
 }

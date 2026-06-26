@@ -62,7 +62,7 @@ public class ApiController : ControllerBase
 
         return Ok(new
         {
-            now = DateTime.Now,
+            now = DateTime.UtcNow,
             services = services.Select(s => new
             {
                 s.Id, s.Name, s.Type, s.Target, s.Port, s.Enabled,
@@ -196,7 +196,7 @@ public class ApiController : ControllerBase
             .Where(x => int.TryParse(x, out _)).Select(int.Parse).Distinct().Take(20).ToList();
         if (idList.Count == 0) return Ok(new { series = Array.Empty<object>() });
 
-        var since = DateTime.Now.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
+        var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
 
         var points = await _db.CheckResults.AsNoTracking()
             .Where(r => idList.Contains(r.ServiceId) && r.CheckedAt >= since)
@@ -226,7 +226,7 @@ public class ApiController : ControllerBase
     public async Task<IActionResult> Metrics(int id, [FromQuery] int minutes = 1440, CancellationToken ct = default)
     {
         if (!Can(Perms.DashboardsView)) return Forbid403();
-        var since = DateTime.Now.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
+        var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
         var points = await _db.HealthMetrics.AsNoTracking()
             .Where(m => m.ServiceId == id && m.CheckedAt >= since)
             .OrderBy(m => m.CheckedAt)
@@ -318,7 +318,7 @@ public class ApiController : ControllerBase
             .Select(s => new { s.Id, s.Name, Type = s.Type.ToString(), s.Target, s.Port, s.Enabled, s.CapacityInfo, s.Keyword, s.Description })
             .ToListAsync(ct);
 
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         var result = services.Select(s =>
         {
             stats.TryGetValue(s.Id, out var st);

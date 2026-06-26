@@ -54,7 +54,7 @@ public class WhatsappWebhookController : Controller
         }
 
         // En son açık alarm oturumu (son 2 saat)
-        var since = DateTime.Now.AddMinutes(-120);
+        var since = DateTime.UtcNow.AddMinutes(-120);
         var session = await _db.AlarmSessions
             .Where(a => a.Phone == phone && a.HandledAt == null && a.CreatedAt >= since)
             .OrderByDescending(a => a.CreatedAt).FirstOrDefaultAsync();
@@ -66,7 +66,7 @@ public class WhatsappWebhookController : Controller
 
         if (svc.Type != ServiceType.WindowsServiceControl && svc.Type != ServiceType.LinuxServiceControl)
         {
-            session.HandledAt = DateTime.Now; session.Action = action; session.Result = "kontrol edilemez tip";
+            session.HandledAt = DateTime.UtcNow; session.Action = action; session.Result = "kontrol edilemez tip";
             await _db.SaveChangesAsync();
             return Twiml($"'{svc.Name}' servisi uzaktan kontrol edilemiyor (servis tipi uygun değil).");
         }
@@ -80,7 +80,7 @@ public class WhatsappWebhookController : Controller
             res = await Task.Run(() => ServiceControl.LinuxAction(svc, svc.Credential, action));
         }
 
-        session.HandledAt = DateTime.Now; session.Action = action; session.Result = res.Message;
+        session.HandledAt = DateTime.UtcNow; session.Action = action; session.Result = res.Message;
         await _db.SaveChangesAsync();
         await _audit.LogAsync("whatsapp.action", svc.Name, $"{user.Sam} (WhatsApp): {action} → {res.Message}", res.Ok, user: user.Sam, ip: phone);
 

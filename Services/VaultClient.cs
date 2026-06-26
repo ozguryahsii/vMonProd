@@ -95,11 +95,11 @@ public static class VaultClient
 
     private static Dictionary<string, string> GetSecretData(Credential c)
     {
-        if (Cache.TryGetValue(c.Id, out var cached) && DateTime.Now - cached.FetchedAt < CacheTtl)
+        if (Cache.TryGetValue(c.Id, out var cached) && DateTime.UtcNow - cached.FetchedAt < CacheTtl)
             return cached.Data;
 
         var data = FetchSecretAsync(c).GetAwaiter().GetResult();
-        Cache[c.Id] = (DateTime.Now, data);
+        Cache[c.Id] = (DateTime.UtcNow, data);
         return data;
     }
 

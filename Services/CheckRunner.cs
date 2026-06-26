@@ -40,7 +40,7 @@ public class CheckRunner
         var slow = outcome.IsUp && svc.ResponseTimeThresholdMs.HasValue
                    && outcome.ResponseTimeMs > svc.ResponseTimeThresholdMs.Value;
 
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         var status = outcome.Status;            // Up / Down / Error
         var isDown = status == CheckStatus.Down;
         var isError = status == CheckStatus.Error;
@@ -152,7 +152,7 @@ public class CheckRunner
                         {
                             ["1"] = svc.Name,
                             ["2"] = (isError ? "Eşik aşıldı — " : "Erişilemiyor — ") + err,
-                            ["3"] = now.ToString("dd.MM.yyyy HH:mm:ss"),
+                            ["3"] = now.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"),
                             ["4"] = "-"
                         };
                         await TrySendWhatsappTemplateAsync(settings, svc, vars, ct);
@@ -244,14 +244,14 @@ public class CheckRunner
                     {
                         ["1"] = svc.Name,
                         ["2"] = (isError ? "Eşik aşıldı — " : "Erişilemiyor — ") + err,
-                        ["3"] = now.ToString("dd.MM.yyyy HH:mm:ss"),
+                        ["3"] = now.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"),
                         ["4"] = "-"
                     };
                     var (ok, msg) = await _whatsapp.SendTemplateRawAsync(p.Username, p.PasswordEncrypted, p.Sender, recips, p.TemplateSid, vars, ct);
                     if (ok)
                     {
                         foreach (var r in recips)
-                            _db.AlarmSessions.Add(new AlarmSession { ServiceId = svc.Id, Phone = WhatsappService.NormalizePhone(r), CreatedAt = DateTime.Now });
+                            _db.AlarmSessions.Add(new AlarmSession { ServiceId = svc.Id, Phone = WhatsappService.NormalizePhone(r), CreatedAt = DateTime.UtcNow });
                         await _db.SaveChangesAsync(ct);
                     }
                     else _logger.LogWarning("WhatsApp şablon '{P}' gönderilemedi ({Svc}): {Msg}", p.Name, svc.Name, msg);
@@ -298,7 +298,7 @@ public class CheckRunner
 
             // İnteraktif korelasyon: butona basılınca hangi servise işlem yapılacağını bulmak için oturum aç
             foreach (var r in recipients)
-                _db.AlarmSessions.Add(new AlarmSession { ServiceId = svc.Id, Phone = WhatsappService.NormalizePhone(r), CreatedAt = DateTime.Now });
+                _db.AlarmSessions.Add(new AlarmSession { ServiceId = svc.Id, Phone = WhatsappService.NormalizePhone(r), CreatedAt = DateTime.UtcNow });
             await _db.SaveChangesAsync(ct);
         }
         catch (Exception ex) { _logger.LogError(ex, "WhatsApp şablon gönderilemedi ({Service})", svc.Name); }

@@ -7,7 +7,7 @@ namespace vMonitor.Models;
 public class AuditLog
 {
     public int Id { get; set; }
-    public DateTime At { get; set; } = DateTime.Now;
+    public DateTime At { get; set; } = DateTime.UtcNow;
     /// <summary>Eylemi yapan kullanıcı (sAMAccountName) veya "sistem" / "anonim".</summary>
     public string User { get; set; } = "";
     public string? Ip { get; set; }
