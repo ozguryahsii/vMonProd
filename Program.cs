@@ -9,8 +9,23 @@ using vMonitor.Services.Checkers;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Windows Service olarak da çalışabilsin (IIS altında no-op). Hem IIS hem servis dağıtımı desteklenir.
+builder.Host.UseWindowsService();
+
+// HTTPS zorunluluğu: IIS (TLS) veya servis+sertifika → true (varsayılan); düz-HTTP servis (ters proxy arkası) → false.
+// false iken: HTTPS yönlendirme/HSTS kapanır ve oturum çerezi Secure=Always yerine SameAsRequest olur (HTTP'de login çalışır).
+var requireHttps = builder.Configuration.GetValue("Hosting:RequireHttps", true);
+
 // Kestrel sürüm başlığını gizle (bilgi ifşası)
 builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
+
+// Ters proxy (nginx/IIS) arkasında gerçek şema/IP'yi al (servis modunda TLS proxy'de sonlanırsa)
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                       | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear(); o.KnownProxies.Clear();   // iç ağ proxy'sine güven
+});
 
 // Tüm POST/PUT/DELETE isteklerinde CSRF token doğrula (form + API)
 builder.Services.AddControllersWithViews(o =>
@@ -38,7 +53,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.SlidingExpiration = true;
         o.Cookie.Name = "vMon.Auth";
         o.Cookie.HttpOnly = true;
-        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;   // yalnızca HTTPS
+        o.Cookie.SecurePolicy = requireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
         o.Cookie.SameSite = SameSiteMode.Strict;             // CSRF'e karşı
 
         // Yetkiler her istekte VERİTABANINDAN canlı doğrulanır: admin bir kullanıcının yetkisini
@@ -187,6 +202,9 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Ters proxy başlıklarını uygula (servis modu + nginx/IIS TLS sonlandırma)
+app.UseForwardedHeaders();
+
 // Güvenlik başlıkları (tüm yanıtlara)
 app.Use(async (ctx, next) =>
 {
@@ -228,11 +246,12 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api"),
             await ctx.Response.WriteAsync("İşlem sırasında bir hata oluştu.");
         })));
 
-if (!app.Environment.IsDevelopment())
+// HTTPS yönlendirme/HSTS yalnızca HTTPS zorunluyken (IIS-TLS veya servis+sertifika). Düz-HTTP servis modunda kapalı.
+if (requireHttps)
 {
-    app.UseHsts();
+    if (!app.Environment.IsDevelopment()) app.UseHsts();
+    app.UseHttpsRedirection();
 }
-app.UseHttpsRedirection();
 
 if (!app.Environment.IsDevelopment())
 {
