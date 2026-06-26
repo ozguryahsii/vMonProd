@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  vMon kaldırma. Varsayılan olarak dosyalar/Data KORUNUR; tamamen silmek için -RemoveData ekle.
+  vMon uninstall. By default files/Data are KEPT; add -RemoveData to delete everything.
 
 .EXAMPLE
   .\uninstall.ps1 -Mode Service -ServiceName vMon
@@ -29,7 +29,7 @@ else {
 
 if ($RemoveData) {
     if (Test-Path $Path) { Remove-Item $Path -Recurse -Force }
-    Write-Host "vMon ve TÜM veriler kaldırıldı: $Path" -ForegroundColor Yellow
+    Write-Host "vMon and ALL data removed: $Path" -ForegroundColor Yellow
 } else {
-    Write-Host "vMon kaldırıldı. Dosyalar/Data korundu: $Path" -ForegroundColor Green
+    Write-Host "vMon removed. Files/Data kept: $Path" -ForegroundColor Green
 }
