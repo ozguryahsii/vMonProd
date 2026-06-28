@@ -16,14 +16,16 @@ public class AccountController : Controller
     private readonly IWebHostEnvironment _env;
     private readonly AppDbContext _db;
     private readonly AuditService _audit;
+    private readonly OtpService _otp;
 
-    public AccountController(SettingsService settings, LdapAuthService ldap, IWebHostEnvironment env, AppDbContext db, AuditService audit)
+    public AccountController(SettingsService settings, LdapAuthService ldap, IWebHostEnvironment env, AppDbContext db, AuditService audit, OtpService otp)
     {
         _settings = settings;
         _ldap = ldap;
         _env = env;
         _db = db;
         _audit = audit;
+        _otp = otp;
     }
 
     [HttpGet]
@@ -98,8 +100,8 @@ public class AccountController : Controller
             if (PasswordHasher.Verify(password, localUser.PasswordHash))
             {
                 _loginGate.TryRemove(gateKey, out _);
-                return await CompleteLoginAsync(localUser, settings.IsAdmin(localUser.Sam),
-                    localUser.DisplayName ?? localUser.Sam, returnUrl);
+                return await ProceedAsync(localUser, settings.IsAdmin(localUser.Sam),
+                    localUser.DisplayName ?? localUser.Sam, returnUrl, settings);
             }
             var le = _loginGate.TryGetValue(gateKey, out var lex) && DateTime.UtcNow - lex.FirstAt < lockWindow
                 ? (lex.Count + 1, lex.FirstAt) : (1, DateTime.UtcNow);
@@ -146,7 +148,76 @@ public class AccountController : Controller
         }
 
         appUser.DisplayName = result.DisplayName ?? username;
-        return await CompleteLoginAsync(appUser, isAdmin, result.DisplayName ?? username, returnUrl);
+        return await ProceedAsync(appUser, isAdmin, result.DisplayName ?? username, returnUrl, settings);
+    }
+
+    /// <summary>Şifre doğrulandıktan sonraki adım: OTP kapalıysa doğrudan giriş; açıksa kod üret+gönder ve OTP ekranına yönlendir.</summary>
+    private async Task<IActionResult> ProceedAsync(AppUser appUser, bool isAdmin, string displayName, string? returnUrl, MonitorSettings settings)
+    {
+        if (!settings.OtpEnabled)
+            return await CompleteLoginAsync(appUser, isAdmin, displayName, returnUrl);
+
+        // OTP gerekli → yeni LDAP kullanıcısı verify adımında bulunabilsin diye önce kaydet
+        if (appUser.Id == 0) { await _db.SaveChangesAsync(); }
+
+        var (token, code) = _otp.Create(appUser, isAdmin, displayName, returnUrl);
+        var (ok, err) = await _otp.SendAsync(settings, appUser, code);
+        if (!ok)
+        {
+            await _audit.LogAsync("login.otp.failsend", appUser.Sam, err, false);
+            ViewBag.Error = "Doğrulama kodu gönderilemedi: " + err + " (Profil bilgilerinizi/kanalı kontrol edin.)";
+            ViewBag.ReturnUrl = returnUrl; return View("Login");
+        }
+        Response.Cookies.Append("vmon_otp", token, new CookieOptions
+        { HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true, MaxAge = TimeSpan.FromMinutes(6), Path = "/" });
+        await _audit.LogAsync("login.otp.sent", appUser.Sam, $"Kanal: {settings.OtpChannel}", true);
+        return RedirectToAction(nameof(Otp));
+    }
+
+    [HttpGet]
+    public IActionResult Otp()
+    {
+        var p = _otp.Peek(Request.Cookies["vmon_otp"]);
+        if (p == null) return RedirectToAction(nameof(Login));
+        ViewBag.Channel = _settings.GetAsync().GetAwaiter().GetResult().OtpChannel;
+        return View();
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> VerifyOtp(string? code)
+    {
+        var token = Request.Cookies["vmon_otp"];
+        var (ok, p, err) = _otp.Verify(token, code);
+        if (!ok)
+        {
+            if (p == null && _otp.Peek(token) == null) { Response.Cookies.Delete("vmon_otp"); return RedirectToAction(nameof(Login)); }
+            ViewBag.Error = err;
+            ViewBag.Channel = (await _settings.GetAsync()).OtpChannel;
+            return View("Otp");
+        }
+        Response.Cookies.Delete("vmon_otp");
+        var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Sam == p!.Sam);
+        if (user == null) return RedirectToAction(nameof(Login));
+        await _audit.LogAsync("login.otp.ok", user.Sam, "OTP doğrulandı", true);
+        return await CompleteLoginAsync(user, p!.IsAdmin, p!.DisplayName, p!.ReturnUrl);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResendOtp()
+    {
+        var p = _otp.Peek(Request.Cookies["vmon_otp"]);
+        if (p == null) return RedirectToAction(nameof(Login));
+        var settings = await _settings.GetAsync();
+        var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Sam == p.Sam);
+        if (user == null) return RedirectToAction(nameof(Login));
+        var (token, code) = _otp.Create(user, p.IsAdmin, p.DisplayName, p.ReturnUrl);
+        var (ok, err) = await _otp.SendAsync(settings, user, code);
+        Response.Cookies.Append("vmon_otp", token, new CookieOptions
+        { HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true, MaxAge = TimeSpan.FromMinutes(6), Path = "/" });
+        ViewBag.Channel = settings.OtpChannel;
+        ViewBag.Error = ok ? null : ("Kod gönderilemedi: " + err);
+        ViewBag.Info = ok ? "Yeni kod gönderildi." : null;
+        return View("Otp");
     }
 
     /// <summary>Başarılı kimlik doğrulama sonrası ortak adımlar: claim'ler + oturum + tema/dil çerezi + denetim + yönlendirme.
@@ -205,6 +276,33 @@ public class AccountController : Controller
         // Çerezleri güncel değerlerle yaz (anonim/açık modda da çalışsın)
         WritePrefCookies(theme ?? Request.Cookies["vmon_theme"], lang ?? Request.Cookies["vmon_lang"]);
         return Ok(new { ok = true });
+    }
+
+    /// <summary>Oturum açmış kullanıcının kendi iletişim bilgileri (OTP için e-posta/telefon).</summary>
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Profile()
+    {
+        var sam = User.FindFirst("sam")?.Value;
+        var u = await _db.AppUsers.FirstOrDefaultAsync(x => x.Sam == sam);
+        if (u == null) return RedirectToAction("Index", "Home");
+        return View(u);
+    }
+
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Profile(string? email, string? phone)
+    {
+        var sam = User.FindFirst("sam")?.Value;
+        var u = await _db.AppUsers.FirstOrDefaultAsync(x => x.Sam == sam);
+        if (u != null)
+        {
+            u.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+            u.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+            await _db.SaveChangesAsync();
+            TempData["Message"] = "Profil güncellendi.";
+        }
+        return RedirectToAction(nameof(Profile));
     }
 
     [HttpPost, ValidateAntiForgeryToken]

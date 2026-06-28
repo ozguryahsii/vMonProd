@@ -17,8 +17,11 @@ public class AppUser
     /// pasif kullanıcı giriş yapamaz (PCI DSS 8.2.4-8.2.5, ISO 27001 A.5.18).</summary>
     public bool IsActive { get; set; } = true;
 
-    /// <summary>WhatsApp/SMS interaktif yanıt için telefon (E.164). Gelen buton bu numarayla kullanıcıya eşlenir.</summary>
+    /// <summary>WhatsApp/SMS interaktif yanıt + OTP için telefon (E.164). Gelen buton bu numarayla kullanıcıya eşlenir.</summary>
     public string? Phone { get; set; }
+
+    /// <summary>OTP (e-posta ile) için kullanıcının e-posta adresi.</summary>
+    public string? Email { get; set; }
 
     /// <summary>Kullanıcı arayüz teması: "light" veya "dark". Sonraki girişlerde hatırlanır.</summary>
     public string Theme { get; set; } = "light";
