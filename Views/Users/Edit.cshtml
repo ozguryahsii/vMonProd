@@ -19,9 +19,13 @@
             <form method="post" asp-action="Save" asp-route-id="@Model.Id" class="space-y-3">
                 @Html.AntiForgeryToken()
                 <div>
-                    <label class="label">Telefon (WhatsApp/SMS interaktif için)</label>
+                    <label class="label">Telefon (WhatsApp/SMS interaktif + OTP için)</label>
                     <input type="text" name="phone" value="@Model.Phone" class="input mono max-w-xs" placeholder="+905321234567" />
-                    <div class="hint">Bu numaradan gelen WhatsApp buton komutları bu kullanıcıyla eşlenir; işlem yapabilmesi için aşağıdaki <b>"Alarmlara müdahale"</b> yetkisi gerekir.</div>
+                    <div class="hint">Bu numaradan gelen WhatsApp buton komutları bu kullanıcıyla eşlenir; işlem yapabilmesi için aşağıdaki <b>"Alarmlara müdahale"</b> yetkisi gerekir. SMS/WhatsApp OTP de bu numaraya gider.</div>
+                </div>
+                <div>
+                    <label class="label">E-posta (OTP: E-posta kanalı için)</label>
+                    <input type="email" name="email" value="@Model.Email" class="input mono max-w-xs" placeholder="ad.soyad@firma.com" />
                 </div>
                 <p class="text-sm text-slate-600 mb-2">Kullanıcının erişebileceği yetenekleri işaretleyin:</p>
                 @foreach (var p in Perms.All)

@@ -41,6 +41,33 @@ public class EmailService
         _logger.LogInformation("Email gönderildi: {Subject} -> {Recipients}", subject, settings.MailRecipients);
     }
 
+    /// <summary>Belirli bir adrese e-posta gönderir (OTP gibi kullanıcıya özel mesajlar için).</summary>
+    public async Task SendToAsync(MonitorSettings settings, string toAddress, string subject, string body, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(settings.SmtpHost))
+            throw new InvalidOperationException("SMTP sunucusu tanımlı değil (Ayarlar sayfasından girin).");
+        if (string.IsNullOrWhiteSpace(toAddress))
+            throw new InvalidOperationException("Alıcı e-posta adresi yok.");
+
+        using var client = new SmtpClient(settings.SmtpHost, settings.SmtpPort)
+        {
+            EnableSsl = false,
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            UseDefaultCredentials = false
+        };
+        using var msg = new MailMessage
+        {
+            From = new MailAddress(settings.MailFrom, "vMon"),
+            Subject = subject,
+            Body = body,
+            IsBodyHtml = true,
+            BodyEncoding = System.Text.Encoding.UTF8,
+            SubjectEncoding = System.Text.Encoding.UTF8
+        };
+        msg.To.Add(toAddress.Trim());
+        await client.SendMailAsync(msg, ct);
+    }
+
     public Task SendDownAlertAsync(MonitorSettings settings, MonitoredService svc, string? error, CancellationToken ct = default)
     {
         var body = $@"<h3 style='color:#dc3545'>⛔ Servis DOWN: {svc.Name}</h3>

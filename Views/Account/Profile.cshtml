@@ -1,0 +1,47 @@
+@model vMonitor.Models.AppUser
+@{
+    ViewData["Title"] = "Profil";
+}
+
+<div class="max-w-xl mx-auto">
+    <div class="mb-5">
+        <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2"><i class="bi bi-person-badge text-brand-500"></i> Profilim</h1>
+        <p class="text-sm text-slate-500 mt-0.5">İki adımlı doğrulama (OTP) için iletişim bilgilerinizi buradan güncelleyin.</p>
+    </div>
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl px-4 py-3 mb-4 text-sm flex items-center gap-2">
+            <i class="bi bi-check-circle-fill"></i> @TempData["Message"]
+        </div>
+    }
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
+            <div class="h-11 w-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-lg"><i class="bi bi-person"></i></div>
+            <div>
+                <div class="font-semibold text-slate-800">@(Model.DisplayName ?? Model.Sam)</div>
+                <div class="text-xs text-slate-400">@Model.Sam @(Model.IsLocal ? "· yerel kullanıcı" : "· AD kullanıcısı")</div>
+            </div>
+        </div>
+
+        <form method="post" asp-action="Profile" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <div>
+                <label class="block text-sm font-medium text-slate-600 mb-1.5"><i class="bi bi-envelope text-slate-400"></i> E-posta (OTP: E-posta kanalı)</label>
+                <input type="email" name="email" value="@Model.Email" placeholder="ad.soyad@firma.com"
+                       class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-600 mb-1.5"><i class="bi bi-telephone text-slate-400"></i> Telefon (OTP: SMS/WhatsApp kanalı, E.164)</label>
+                <input type="text" name="phone" value="@Model.Phone" placeholder="+905xxxxxxxxx"
+                       class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none" />
+            </div>
+            <div class="pt-2">
+                <button class="bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-xl px-5 py-2.5 text-sm shadow-sm transition">
+                    <i class="bi bi-save"></i> Kaydet
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

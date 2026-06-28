@@ -42,13 +42,14 @@ public class UsersController : MvcBase
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(int id, string[]? perms, string? phone)
+    public async Task<IActionResult> Save(int id, string[]? perms, string? phone, string? email)
     {
         var u = await _db.AppUsers.FindAsync(id);
         if (u == null) return NotFound();
         var valid = Perms.All.Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         u.PermissionsCsv = string.Join(",", (perms ?? Array.Empty<string>()).Where(p => valid.Contains(p)).Distinct());
         u.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+        u.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
         await _db.SaveChangesAsync();
         await _audit.LogAsync("user.permissions", u.Sam, "Yetkiler: " + (string.IsNullOrEmpty(u.PermissionsCsv) ? "(yok)" : u.PermissionsCsv));
         TempData["Message"] = $"{u.DisplayName ?? u.Sam} yetkileri güncellendi. (Kullanıcı bir sonraki girişinde geçerli olur.)";

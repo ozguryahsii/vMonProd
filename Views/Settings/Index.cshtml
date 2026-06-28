@@ -109,6 +109,30 @@
     </div>
 
     <div class="card mt-5">
+        <div class="card-head"><i class="bi bi-shield-lock-fill text-brand-500"></i> İki Adımlı Doğrulama (OTP)</div>
+        <div class="card-body space-y-4">
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input asp-for="OtpEnabled" class="switch" /> İki adımlı doğrulamayı zorunlu kıl (şifreden sonra tek kullanımlık kod istenir)
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="label">Kod gönderme kanalı</label>
+                    <select asp-for="OtpChannel" class="input">
+                        <option value="Email">E-posta (SMTP)</option>
+                        <option value="Sms">SMS</option>
+                        <option value="Whatsapp">WhatsApp</option>
+                    </select>
+                    <div class="hint">SMS/WhatsApp için <b>Bildirim Kanalları</b>'nda aktif bir entegrasyon olmalı; kod kullanıcının telefonuna gider.</div>
+                </div>
+            </div>
+            <div class="alert-warn text-sm">
+                <i class="bi bi-exclamation-triangle"></i> Açmadan önce <b>kendi Profil</b> bilgilerinizi doldurun: e-posta kanalı için e-posta, SMS/WhatsApp için telefon.
+                İletişim bilgisi eksik kullanıcılar kod alamaz ve giriş yapamaz. (Profil: sağ üst menü → <b>Profilim</b>.)
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-5">
         <div class="card-head"><i class="bi bi-shield-check text-brand-500"></i> Güvenlik ve Uyumluluk</div>
         <div class="card-body space-y-5">
             <label class="flex items-start gap-3 text-sm text-slate-700">

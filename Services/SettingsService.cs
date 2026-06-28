@@ -38,6 +38,11 @@ public class MonitorSettings
     /// <summary>Müşteri/şirket adı (kurulum sihirbazında girilir; markalama/başlıkta kullanılır).</summary>
     public string CompanyName { get; set; } = "";
 
+    /// <summary>İki faktörlü giriş (OTP) zorunlu mu? Açıkken şifreden sonra tek kullanımlık kod istenir.</summary>
+    public bool OtpEnabled { get; set; } = false;
+    /// <summary>OTP kodunun gönderileceği kanal: "Email" / "Sms" / "Whatsapp".</summary>
+    public string OtpChannel { get; set; } = "Email";
+
     /// <summary>Kullanıcı senkronizasyonunda kullanılacak kimlik bilgisi (Kimlik Bilgileri ekranından, Vault destekli olabilir).</summary>
     public int? LdapSyncCredentialId { get; set; }
 
@@ -142,6 +147,8 @@ public class SettingsService
         if (dict.TryGetValue("AdminUsers", out v)) s.AdminUsers = v ?? "";
         if (dict.TryGetValue("LoginLogoFile", out v)) s.LoginLogoFile = v ?? "";
         if (dict.TryGetValue("CompanyName", out v)) s.CompanyName = v ?? "";
+        if (dict.TryGetValue("OtpEnabled", out v)) s.OtpEnabled = v == "true";
+        if (dict.TryGetValue("OtpChannel", out v) && !string.IsNullOrWhiteSpace(v)) s.OtpChannel = v;
         if (dict.TryGetValue("LdapSyncCredentialId", out v) && int.TryParse(v, out var ci) && ci > 0) s.LdapSyncCredentialId = ci;
         if (dict.TryGetValue("TrustInternalTlsCertificates", out v)) s.TrustInternalTlsCertificates = v == "true";
         if (dict.TryGetValue("MaxLoginAttempts", out v) && int.TryParse(v, out i) && i > 0) s.MaxLoginAttempts = Math.Min(i, 10);
@@ -189,6 +196,8 @@ public class SettingsService
             ["AdminUsers"] = s.AdminUsers,
             ["LoginLogoFile"] = s.LoginLogoFile,
             ["CompanyName"] = s.CompanyName,
+            ["OtpEnabled"] = s.OtpEnabled ? "true" : "false",
+            ["OtpChannel"] = s.OtpChannel,
             ["LdapSyncCredentialId"] = s.LdapSyncCredentialId?.ToString() ?? "",
             ["TrustInternalTlsCertificates"] = s.TrustInternalTlsCertificates ? "true" : "false",
             ["MaxLoginAttempts"] = s.MaxLoginAttempts.ToString(),

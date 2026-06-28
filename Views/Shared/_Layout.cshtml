@@ -154,6 +154,7 @@
                                     <i class="bi bi-check2 ml-auto text-brand-500 lang-check" data-for="en"></i>
                                 </button>
                                 <div class="border-t border-slate-100 my-1.5"></div>
+                                <a href="@Url.Action("Profile","Account")" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700"><i class="bi bi-person-badge"></i> Profilim</a>
                                 <form method="post" asp-controller="Account" asp-action="Logout">
                                     @Html.AntiForgeryToken()
                                     <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 text-sm font-medium"><i class="bi bi-box-arrow-right"></i> Çıkış</button>
