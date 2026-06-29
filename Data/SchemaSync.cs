@@ -100,6 +100,74 @@ public static class SchemaSync
         finally { if (opened) try { await conn.CloseAsync(); } catch { } }
     }
 
+    /// <summary>Non-nullable (bool/int/string vb.) kolonlardaki NULL değerleri varsayılanla DOLDURUR.
+    /// Eski bir DB geri yüklenip yeni kolonlar NULL eklendiğinde, EF non-nullable bir değeri NULL okuyamayıp
+    /// çöker ("The data is NULL at ordinal N"). Bu pas her açılışta o NULL'ları güvenle düzeltir (idempotent).</summary>
+    public static async Task BackfillNonNullableAsync(AppDbContext ctx, DbProviderKind provider, ILogger logger, CancellationToken ct = default)
+    {
+        DbConnection conn = ctx.Database.GetDbConnection();
+        bool opened = false;
+        try
+        {
+            if (conn.State != System.Data.ConnectionState.Open) { await conn.OpenAsync(ct); opened = true; }
+
+            foreach (var et in ctx.Model.GetEntityTypes())
+            {
+                var table = et.GetTableName();
+                if (string.IsNullOrEmpty(table)) continue;
+                var storeObj = StoreObjectIdentifier.Table(table, et.GetSchema());
+
+                HashSet<string> existing;
+                try { existing = await GetColumnsAsync(conn, provider, table, ct); }
+                catch { continue; }
+                if (existing.Count == 0) continue;
+
+                foreach (var prop in et.GetProperties())
+                {
+                    if (prop.IsNullable || prop.IsPrimaryKey()) continue;     // yalnız zorunlu (non-null) alanlar
+                    var col = prop.GetColumnName(storeObj);
+                    if (string.IsNullOrEmpty(col) || !existing.Contains(col)) continue;
+                    var def = DefaultLiteral(prop.ClrType, provider);
+                    if (def == null) continue;
+                    var sql = $"UPDATE {QuoteIdent(provider, table)} SET {QuoteIdent(provider, col)} = {def} WHERE {QuoteIdent(provider, col)} IS NULL";
+                    try
+                    {
+                        var n = await ctx.Database.ExecuteSqlRawAsync(sql, ct);
+                        if (n > 0) logger.LogWarning("Şema iyileştirme: {Table}.{Col} → {N} NULL satır varsayılanla dolduruldu.", table, col, n);
+                    }
+                    catch (Exception ex) { logger.LogDebug(ex, "Backfill adımı atlandı: {Sql}", sql); }
+                }
+            }
+        }
+        catch (Exception ex) { logger.LogError(ex, "NULL backfill başarısız (atlandı)."); }
+        finally { if (opened) try { await conn.CloseAsync(); } catch { } }
+    }
+
+    private static string QuoteIdent(DbProviderKind p, string id) => p switch
+    {
+        DbProviderKind.MySql => $"`{id}`",
+        DbProviderKind.SqlServer => $"[{id}]",
+        _ => $"\"{id}\""
+    };
+
+    private static string? DefaultLiteral(Type t, DbProviderKind p)
+    {
+        t = Nullable.GetUnderlyingType(t) ?? t;
+        if (t.IsEnum) return "0";
+        if (t == typeof(bool) || t == typeof(byte) || t == typeof(sbyte) || t == typeof(short) || t == typeof(ushort)
+            || t == typeof(int) || t == typeof(uint) || t == typeof(long) || t == typeof(ulong)
+            || t == typeof(double) || t == typeof(float) || t == typeof(decimal)) return "0";
+        if (t == typeof(string)) return "''";
+        if (t == typeof(DateTime) || t == typeof(DateTimeOffset))
+            return p switch
+            {
+                DbProviderKind.SqlServer => "'1970-01-01T00:00:00'",
+                DbProviderKind.Oracle => "TIMESTAMP '1970-01-01 00:00:00'",
+                _ => "'1970-01-01 00:00:00'"
+            };
+        return null; // Guid vb. → atla
+    }
+
     private static async Task<HashSet<string>> GetColumnsAsync(DbConnection conn, DbProviderKind p, string table, CancellationToken ct)
     {
         // Tablo adı modelden gelir (kullanıcı girdisi değil) → gömülü kullanımı güvenli.

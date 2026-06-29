@@ -172,6 +172,8 @@ using (var scope = app.Services.CreateScope())
             // GÜVENLİ yükseltme: önce eksik TABLOLARI oluştur (yeni özellik tablosu), sonra eksik KOLONLARI ekle
             SchemaSync.EnsureTablesAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
             SchemaSync.EnsureColumnsAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
+            // Eski DB geri yüklenince yeni non-null kolonlar NULL kalabilir → EF okurken çöker. NULL'ları varsayılanla doldur.
+            SchemaSync.BackfillNonNullableAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
 
             if (bcfg.Provider == DbProviderKind.Sqlite)
                 DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları: legacy CREATE/ALTER + veri-fix (idempotent)
@@ -185,56 +187,6 @@ using (var scope = app.Services.CreateScope())
                 if (healed > 0) logger.LogWarning("{N} yerel kullanıcı yeniden aktifleştirildi (pasife düşmüştü).", healed);
             }
             catch (Exception ex) { logger.LogDebug(ex, "Yerel kullanıcı iyileştirme atlandı."); }
-
-            // BREAK-GLASS (kilitten çıkış): Data\reset-admin.txt varsa içindeki "kullanıcı|şifre" ile yerel admin'i
-            // OLUŞTUR/SIFIRLA, aktif yap, admin listesine ekle; sonra dosyayı sil. Şifre unutulduğunda/kilitlenince kurtarma.
-            try
-            {
-                var resetFile = Path.Combine(app.Environment.ContentRootPath, "Data", "reset-admin.txt");
-                if (File.Exists(resetFile))
-                {
-                    var raw = File.ReadAllText(resetFile).Trim();
-                    var parts = raw.Split('|', 2);
-                    var rsUser = parts.Length > 0 ? parts[0].Trim() : "";
-                    var rsPass = parts.Length > 1 ? parts[1].Trim() : "";
-                    if (!string.IsNullOrWhiteSpace(rsUser) && !string.IsNullOrWhiteSpace(rsPass))
-                    {
-                        var settingsSvc = scope.ServiceProvider.GetRequiredService<SettingsService>();
-                        var st = settingsSvc.GetAsync().GetAwaiter().GetResult();
-                        var u = db.AppUsers.FirstOrDefault(x => x.Sam.ToLower() == rsUser.ToLower());
-                        if (u == null) { u = new vMonitor.Models.AppUser { Sam = rsUser }; db.AppUsers.Add(u); }
-                        u.IsLocal = true;
-                        u.IsActive = true;
-                        u.PasswordHash = vMonitor.Services.PasswordHasher.Hash(rsPass);
-                        if (string.IsNullOrWhiteSpace(u.DisplayName)) u.DisplayName = rsUser;
-                        // admin listesine ekle
-                        var admins = (st.AdminUsers ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                        if (!admins.Any(a => string.Equals(a, rsUser, StringComparison.OrdinalIgnoreCase)))
-                        { admins.Add(rsUser); st.AdminUsers = string.Join(", ", admins); settingsSvc.SaveAsync(st).GetAwaiter().GetResult(); }
-                        db.SaveChanges();
-                        logger.LogWarning("BREAK-GLASS: yerel admin '{User}' sıfırlandı/oluşturuldu ve admin yapıldı.", rsUser);
-                    }
-                    try { File.Delete(resetFile); } catch { }
-                }
-            }
-            catch (Exception ex) { logger.LogError(ex, "Break-glass admin sıfırlama başarısız."); }
-
-            // ACİL AÇIK MOD: Data\disable-auth.txt varsa oturum zorunluluğunu KAPAT (login bozuksa bile içeri girebilmek için).
-            // Girince sorun çözülüp Ayarlar'dan tekrar açılır. Dosya kullanıldıktan sonra silinir.
-            try
-            {
-                var openFile = Path.Combine(app.Environment.ContentRootPath, "Data", "disable-auth.txt");
-                if (File.Exists(openFile))
-                {
-                    var settingsSvc = scope.ServiceProvider.GetRequiredService<SettingsService>();
-                    var st = settingsSvc.GetAsync().GetAwaiter().GetResult();
-                    st.AuthEnabled = false;
-                    settingsSvc.SaveAsync(st).GetAwaiter().GetResult();
-                    logger.LogWarning("ACİL: oturum zorunluluğu KAPATILDI (disable-auth.txt). Uygulama açık modda.");
-                    try { File.Delete(openFile); } catch { }
-                }
-            }
-            catch (Exception ex) { logger.LogError(ex, "Acil açık mod ayarı başarısız."); }
 
             try
             {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using vMonitor.Models;
@@ -14,18 +15,17 @@ public class HomeController : MvcBase
 
     public IActionResult About() => View();
 
-    /// <summary>Hata sayfası: gerçek istisnayı LOGLAR ve özetini gösterir (kapıya takılmadan görünür olsun diye
-    /// erişim listesinde açıktır). Böylece "login'e dönüyor" gibi görünen gizli hatalar teşhis edilebilir.</summary>
+    /// <summary>Hata sayfası: gerçek istisnayı yalnızca LOGLAR; kullanıcıya bilgi sızdırmamak için sadece
+    /// genel mesaj + bir referans (TraceId) gösterir. Ayrıntı uygulama loglarında / Event Viewer'dadır.</summary>
     public IActionResult Error()
     {
         var feature = HttpContext.Features.Get<IExceptionHandlerPathFeature>();
         var ex = feature?.Error;
+        var traceId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
         if (ex != null)
-            _logger.LogError(ex, "İşlenmeyen hata. Yol: {Path}", feature?.Path);
-        var detail = ex == null
-            ? "Bir hata oluştu. Lütfen logları kontrol edin."
-            : $"Bir hata oluştu.\n\nYol: {feature?.Path}\nHata: {ex.GetType().Name}: {ex.GetBaseException().Message}\n\n(Ayrıntı uygulama loglarında / Event Viewer'da.)";
+            _logger.LogError(ex, "İşlenmeyen hata. Yol: {Path} TraceId: {TraceId}", feature?.Path, traceId);
         Response.StatusCode = 500;
-        return Content(detail, "text/plain; charset=utf-8");
+        return Content($"Bir hata oluştu. Lütfen sistem yöneticisine başvurun.\nReferans: {traceId}",
+            "text/plain; charset=utf-8");
     }
 }
