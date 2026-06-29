@@ -116,7 +116,7 @@ public class StatisticsController : Controller
             .Select(o => new { o.ServiceId, o.StartedAt, o.EndedAt }).ToListAsync();
         double outMin = outs.Sum(o => ((o.EndedAt ?? now) - o.StartedAt).TotalMinutes);
         var outDaily = outs.GroupBy(o => o.StartedAt.ToLocalTime().Date).OrderBy(g => g.Key)
-            .Select(g => new { day = g.Key.ToString("dd.MM"), value = g.Count() }).ToList();
+            .Select(g => new { day = g.Key.ToString("dd.MM"), date = g.Key.ToString("yyyy-MM-dd"), value = g.Count() }).ToList();
         var worst = outs.GroupBy(o => o.ServiceId).Select(g => new { name = idName.GetValueOrDefault(g.Key, "?"), value = g.Count() })
             .OrderByDescending(x => x.value).Take(5).ToList();
 
@@ -322,6 +322,47 @@ public class StatisticsController : Controller
         }
 
         return Json(new { count = servers.Count, servers, trend });
+    }
+
+    /// <summary>Yazdırılabilir / PDF-kaydedilebilir yönetim raporu sayfası (Layout=null, print-stilli).</summary>
+    [HttpGet]
+    public async Task<IActionResult> Report()
+    {
+        if (!CanView()) { TempData["Error"] = "Yetkiniz yok."; return RedirectToAction("Index", "Home"); }
+        var s = await _settings.GetAsync();
+        ViewBag.Company = string.IsNullOrWhiteSpace(s.CompanyName) ? "vMon" : s.CompanyName;
+        return View();
+    }
+
+    /// <summary>Belirli bir günde (yerel tarih) başlayan kesintilerin detayını döner.</summary>
+    [HttpGet]
+    public async Task<IActionResult> OutageDay(string date)
+    {
+        if (!CanView()) return Forbid();
+        if (!DateTime.TryParse(date, out var d)) return Json(new { items = Array.Empty<object>() });
+        var dayStartLocal = d.Date;
+        var dayEndLocal = dayStartLocal.AddDays(1);
+        var fromUtc = dayStartLocal.ToUniversalTime();
+        var toUtc = dayEndLocal.ToUniversalTime();
+        var all = await HealthServicesAsync();
+        var idName = all.ToDictionary(s => s.Id, s => s.Name);
+        var ids = idName.Keys.ToHashSet();
+        var now = DateTime.UtcNow;
+        var rows = await _db.Outages.AsNoTracking()
+            .Where(o => ids.Contains(o.ServiceId) && o.StartedAt >= fromUtc && o.StartedAt < toUtc)
+            .OrderBy(o => o.StartedAt)
+            .Select(o => new { o.ServiceId, o.StartedAt, o.EndedAt, o.FirstError })
+            .ToListAsync();
+        var items = rows.Select(o => new
+        {
+            name = idName.GetValueOrDefault(o.ServiceId, "?"),
+            start = o.StartedAt,
+            end = o.EndedAt,
+            minutes = Math.Round(((o.EndedAt ?? now) - o.StartedAt).TotalMinutes),
+            ongoing = o.EndedAt == null,
+            error = o.FirstError
+        }).ToList();
+        return Json(new { date = dayStartLocal.ToString("dd.MM.yyyy"), count = items.Count, items });
     }
 
     public record WidgetDto(int Id, string Type, string Source, string? Title, string? ConfigJson, int X, int Y, int W, int H);

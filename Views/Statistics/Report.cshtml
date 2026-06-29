@@ -1,0 +1,185 @@
+@{
+    Layout = null;
+    var company = ViewBag.Company as string ?? "vMon";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Altyapı Sağlık Raporu — @company</title>
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" asp-append-version="true" />
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <style>
+        * { box-sizing:border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; color:#1e293b; margin:0; background:#f1f5f9; }
+        .page { max-width:900px; margin:0 auto; background:#fff; padding:28px 34px; }
+        .toolbar { max-width:900px; margin:12px auto; display:flex; gap:8px; justify-content:flex-end; }
+        .btn { border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; color:#334155; text-decoration:none; }
+        .btn-primary { background:#ed1c24; color:#fff; border-color:#ed1c24; }
+        header.rpt { display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid #ed1c24; padding-bottom:14px; margin-bottom:18px; }
+        header.rpt .brand { display:flex; align-items:center; gap:12px; }
+        header.rpt .logo { width:42px; height:42px; border-radius:10px; background:#ed1c24; color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px; }
+        header.rpt h1 { font-size:19px; margin:0; }
+        header.rpt .sub { color:#64748b; font-size:12px; }
+        header.rpt .meta { text-align:right; font-size:12px; color:#64748b; }
+        h2.sec { font-size:14px; margin:22px 0 8px; color:#0f172a; border-left:4px solid #ed1c24; padding-left:8px; }
+        .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+        .kpi { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; }
+        .kpi .v { font-size:22px; font-weight:800; }
+        .kpi .l { font-size:11px; color:#64748b; }
+        table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+        th, td { text-align:left; padding:5px 8px; border-bottom:1px solid #eef2f7; }
+        th { color:#64748b; background:#f8fafc; }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+        .chart { height:230px; }
+        .muted { color:#94a3b8; }
+        .pill { display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:600; }
+        .up{color:#10b981} .down{color:#ef4444} .warn{color:#f59e0b}
+        footer.rpt { margin-top:24px; border-top:1px solid #e2e8f0; padding-top:10px; font-size:11px; color:#94a3b8; text-align:center; }
+        @@media print {
+            body { background:#fff; }
+            .toolbar { display:none; }
+            .page { max-width:none; padding:0; }
+            h2.sec { page-break-after:avoid; }
+            table, .kpi, .chart { page-break-inside:avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <select id="range" class="btn">
+            <option value="7">Son 7 gün</option>
+            <option value="30" selected>Son 30 gün</option>
+        </select>
+        <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Yazdır / PDF Kaydet</button>
+    </div>
+
+    <div class="page">
+        <header class="rpt">
+            <div class="brand">
+                <div class="logo"><i class="bi bi-activity"></i></div>
+                <div>
+                    <h1>Altyapı Sağlık Raporu</h1>
+                    <div class="sub">@company · vMon Servis İzleme</div>
+                </div>
+            </div>
+            <div class="meta">
+                <div id="genDate"></div>
+                <div id="rangeLbl"></div>
+            </div>
+        </header>
+
+        <h2 class="sec">Genel Özet</h2>
+        <div class="kpis" id="kpis"></div>
+
+        <div class="grid2">
+            <div>
+                <h2 class="sec">İşletim Sistemi Dağılımı</h2>
+                <div id="osChart" class="chart"></div>
+            </div>
+            <div>
+                <h2 class="sec">Filo Kaynak Trendi (Ort. %)</h2>
+                <div id="fleetChart" class="chart"></div>
+            </div>
+        </div>
+
+        <h2 class="sec">Kapasite (Kullanılan / Atanan)</h2>
+        <table id="capTbl"></table>
+
+        <div class="grid2">
+            <div>
+                <h2 class="sec">En Yüksek CPU Kullanan 10 Sunucu</h2>
+                <table id="topCpu"></table>
+            </div>
+            <div>
+                <h2 class="sec">En Yüksek Disk Kullanan 10 Sunucu</h2>
+                <table id="topDisk"></table>
+            </div>
+        </div>
+
+        <h2 class="sec">Kesinti Özeti (Son 7 Gün)</h2>
+        <div id="outageSummary" class="muted"></div>
+        <table id="worstTbl"></table>
+
+        <h2 class="sec">Destek Sonu (EOL) İşletim Sistemleri</h2>
+        <table id="eolTbl"></table>
+
+        <footer class="rpt">Bu rapor vMon tarafından otomatik üretilmiştir · @company</footer>
+    </div>
+
+    <script>
+    (function(){
+        const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        const pct = v => v==null?'—':(Math.round(v*10)/10)+'%';
+        const num = v => v==null?'—':(Math.round(v*10)/10).toLocaleString('tr-TR');
+        let DATA = null, osCh, fleetCh;
+
+        function kpi(v,l){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
+
+        function render(days){
+            if(!DATA) return;
+            document.getElementById('genDate').textContent = 'Oluşturma: ' + new Date(DATA.lastUpdated).toLocaleString('tr-TR');
+            document.getElementById('rangeLbl').textContent = 'Aralık: Son ' + days + ' gün';
+
+            const c=DATA.counts, u=DATA.uptime;
+            document.getElementById('kpis').innerHTML =
+                kpi(c.total,'Toplam Sunucu')+kpi('<span class="up">'+c.up+'</span>','Up (Sorunsuz)')
+                +kpi('<span class="down">'+c.down+'</span>','Down')+kpi('<span class="warn">'+c.error+'</span>','Hata/Eşik')
+                +kpi(num(DATA.cpu.used)+' / '+num(DATA.cpu.alloc),'CPU çekirdek (kull./atanan)')
+                +kpi(num(DATA.ram.used)+' / '+num(DATA.ram.alloc)+' GB','RAM (kull./atanan)')
+                +kpi(num(DATA.disk.used)+' / '+num(DATA.disk.alloc)+' GB','Disk (kull./atanan)')
+                +kpi(u.h24+'% / '+u.d7+'%','Uptime (24s / 7g)');
+
+            // OS pie
+            const os = DATA.osKind||[];
+            osCh = osCh || echarts.init(document.getElementById('osChart'));
+            osCh.setOption({ animation:false, tooltip:{trigger:'item',formatter:'{b}: {c} (%{d})'},
+                legend:{bottom:0}, series:[{type:'pie',radius:['40%','70%'],data:os.map((d,i)=>({name:d.name,value:d.value})),label:{show:false}}] });
+
+            // fleet trend (son N gün)
+            const f = (DATA.fleet||[]).slice(-days);
+            fleetCh = fleetCh || echarts.init(document.getElementById('fleetChart'));
+            fleetCh.setOption({ animation:false, tooltip:{trigger:'axis'}, legend:{bottom:0,data:['CPU','RAM','Disk']},
+                grid:{left:34,right:12,top:10,bottom:30},
+                xAxis:{type:'category',data:f.map(p=>p.day)}, yAxis:{type:'value',max:100},
+                series:[
+                    {name:'CPU',type:'line',smooth:true,data:f.map(p=>p.cpu),itemStyle:{color:'#ed1c24'}},
+                    {name:'RAM',type:'line',smooth:true,data:f.map(p=>p.ram),itemStyle:{color:'#8b5cf6'}},
+                    {name:'Disk',type:'line',smooth:true,data:f.map(p=>p.disk),itemStyle:{color:'#14b8a6'}}
+                ] });
+
+            // capacity table (son gün)
+            const cap = (DATA.capacity||[]);
+            const last = cap.length ? cap[cap.length-1] : null;
+            document.getElementById('capTbl').innerHTML =
+                '<thead><tr><th>Kaynak</th><th>Kullanılan</th><th>Atanan</th><th>Kullanım</th></tr></thead><tbody>'
+                + (last ? [['CPU (çekirdek)',last.cpuUsed,last.cpuAlloc],['RAM (GB)',last.ramUsed,last.ramAlloc],['Disk (GB)',last.diskUsed,last.diskAlloc]]
+                    .map(r=>'<tr><td>'+r[0]+'</td><td>'+num(r[1])+'</td><td>'+num(r[2])+'</td><td>'+(r[2]>0?Math.round(100*r[1]/r[2]):0)+'%</td></tr>').join('')
+                    : '<tr><td colspan="4" class="muted">Veri yok.</td></tr>') + '</tbody>';
+
+            const topTbl = (arr)=>'<thead><tr><th>Sunucu</th><th>İşletim Sistemi</th><th>Kullanım</th></tr></thead><tbody>'
+                + ((arr||[]).map(d=>'<tr><td>'+esc(d.name)+'</td><td>'+esc(d.os||'')+'</td><td>'+pct(d.value)+'</td></tr>').join('') || '<tr><td colspan="3" class="muted">Veri yok.</td></tr>')+'</tbody>';
+            document.getElementById('topCpu').innerHTML = topTbl(DATA.top&&DATA.top.cpu);
+            document.getElementById('topDisk').innerHTML = topTbl(DATA.top&&DATA.top.disk);
+
+            const o = DATA.outages||{count:0,minutes:0,worst:[]};
+            document.getElementById('outageSummary').innerHTML = '<b>'+o.count+'</b> kesinti · toplam <b>'+o.minutes+'</b> dakika';
+            document.getElementById('worstTbl').innerHTML = '<thead><tr><th>En çok kesinti yaşayan</th><th>Adet</th></tr></thead><tbody>'
+                + ((o.worst||[]).map(w=>'<tr><td>'+esc(w.name)+'</td><td>'+w.value+'</td></tr>').join('') || '<tr><td colspan="2" class="muted">Kesinti yok.</td></tr>')+'</tbody>';
+
+            const eol = DATA.osEol||{count:0,items:[]};
+            document.getElementById('eolTbl').innerHTML = '<thead><tr><th>İşletim Sistemi (EOL)</th><th>Adet</th></tr></thead><tbody>'
+                + ((eol.items||[]).map(e=>'<tr><td>'+esc(e.name)+'</td><td>'+e.value+'</td></tr>').join('') || '<tr><td colspan="2" class="muted">Destek sonu işletim sistemi yok.</td></tr>')+'</tbody>';
+        }
+
+        async function load(){
+            try { DATA = await (await fetch('@Url.Action("Data")')).json(); } catch(e){ DATA=null; }
+            render(parseInt(document.getElementById('range').value,10));
+        }
+        document.getElementById('range').addEventListener('change', ()=> render(parseInt(document.getElementById('range').value,10)));
+        load();
+    })();
+    </script>
+</body>
+</html>

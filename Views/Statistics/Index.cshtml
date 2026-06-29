@@ -39,7 +39,8 @@
     .stbl { width:100%; font-size:.82rem; border-collapse:collapse; }
     .stbl th, .stbl td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
     .dark .stbl th, .dark .stbl td { border-color:#334155; }
-    .stbl th { color:#64748b; font-weight:600; position:sticky; top:0; background:inherit; }
+    .stbl th { color:#64748b; font-weight:600; position:sticky; top:0; z-index:2; background:#fff; box-shadow:inset 0 -1px 0 #e2e8f0; }
+    .dark .stbl th { background:#1e293b; box-shadow:inset 0 -1px 0 #334155; }
     /* Kategori dökümü (breakdown) barlari */
     .brk-list { display:flex; flex-direction:column; gap:.35rem; }
     .brk-row { display:grid; grid-template-columns:12rem 1fr 3.2rem; align-items:center; gap:.7rem; width:100%; text-align:left; padding:.4rem .55rem; border-radius:.55rem; background:transparent; border:0; cursor:pointer; }
@@ -59,6 +60,7 @@
     </div>
     <div class="flex items-center gap-2">
         <span id="lastUpd" class="text-xs text-slate-400 hidden sm:inline"></span>
+        <a href="@Url.Action("Report")" target="_blank" class="btn btn-outline btn-sm" title="Yazdırılabilir PDF rapor (yönetim)"><i class="bi bi-file-earmark-pdf"></i> PDF Rapor</a>
         <button id="btnExport" class="btn btn-outline btn-sm" title="Özet CSV indir"><i class="bi bi-filetype-csv"></i></button>
         <button id="btnFull" class="btn btn-outline btn-sm" title="Tam ekran"><i class="bi bi-arrows-fullscreen"></i></button>
         <button id="btnRefresh" class="btn btn-outline btn-sm"><i class="bi bi-arrow-clockwise"></i> <span data-i18n="stats.refresh">Yenile</span></button>
@@ -421,6 +423,7 @@
                 yAxis:{ type:'value', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[{ type:'bar', barWidth:'50%', data:(o.daily||[]).map(p=>p.value), itemStyle:{ color:meta.color, borderRadius:[4,4,0,0] } }]
             });
+            ch.off('click').on('click', p => { const d = (o.daily||[])[p.dataIndex]; if (d && d.date) openOutageDay(d.date); });
             return;
         }
         if (type === 'rising') {
@@ -670,6 +673,28 @@
     document.querySelectorAll('#smRange .sm-range').forEach(b => {
         b.addEventListener('click', () => renderDetail(parseInt(b.dataset.days,10), false));
     });
+    window.openOutageDay = async function(date){
+        document.querySelector('#smTitle span').textContent = 'Kesintiler — ' + date;
+        document.getElementById('smTrend').classList.add('hidden');
+        document.getElementById('smRange').classList.add('hidden');
+        if (modalChart) { modalChart.dispose(); modalChart = null; }
+        document.getElementById('smTableWrap').innerHTML = '<div class="stat-sub">Yükleniyor…</div>';
+        document.getElementById('smodal').classList.add('open');
+        let d;
+        try { d = await (await fetch('@Url.Action("OutageDay")?date=' + encodeURIComponent(date))).json(); }
+        catch(e){ document.getElementById('smTableWrap').innerHTML = '<div class="stat-sub">Veri alınamadı.</div>'; return; }
+        const fmtDt = s => s ? new Date(s).toLocaleString('tr-TR') : '—';
+        const rows = (d.items||[]).map(o=>'<tr>'
+            +'<td>'+esc(o.name)+'</td>'
+            +'<td>'+fmtDt(o.start)+'</td>'
+            +'<td>'+(o.ongoing?'<span style="color:#ef4444;font-weight:600">Sürüyor</span>':fmtDt(o.end))+'</td>'
+            +'<td>'+o.minutes+' dk</td>'
+            +'<td class="text-slate-400">'+esc(o.error||'')+'</td></tr>').join('');
+        document.getElementById('smTableWrap').innerHTML =
+            '<table class="stbl"><thead><tr><th>Sunucu</th><th>Başlangıç</th><th>Bitiş</th><th>Süre</th><th>Hata</th></tr></thead><tbody>'
+            + (rows || '<tr><td colspan="5" class="stat-sub">O gün kesinti yok.</td></tr>') + '</tbody></table>'
+            + '<div class="stat-sub mt-2">Toplam ' + (d.count||0) + ' kesinti.</div>';
+    };
     window.closeDetail = function(){
         document.getElementById('smodal').classList.remove('open');
         if (modalChart) { modalChart.dispose(); modalChart = null; }
