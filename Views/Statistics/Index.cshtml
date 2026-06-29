@@ -438,9 +438,17 @@
             return;
         }
         if (type === 'os_eol') {
-            const e = DATA.osEol || { count:0, items:[] };
-            const list = (e.items||[]).map(d=>'<div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-700"><span class="truncate" title="'+esc(d.name)+'">'+esc(d.name)+'</span><span class="badge pill-error ml-2">'+d.value+'</span></div>').join('') || '<div class="stat-sub">EOL sürüm yok 👍</div>';
-            body.innerHTML = header(meta) + '<div class="stat-num" style="color:#ef4444">'+e.count+'</div><div class="stat-sub mb-2">destek sonu sunucu</div><div style="overflow:auto;flex:1">'+list+'</div>';
+            const e = DATA.osEol || { count:0, soonCount:0, items:[], real:false };
+            const fmtD = s => s ? new Date(s).toLocaleDateString('tr-TR') : '';
+            const list = (e.items||[]).map(d=>{
+                const right = d.status === 'soon'
+                    ? '<span class="ml-2" style="background:#fef3c7;color:#b45309;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:600" title="'+fmtD(d.eol)+'">'+(d.days!=null?d.days+' gün':'yakında')+'</span>'
+                    : '<span class="badge pill-error ml-2" title="'+fmtD(d.eol)+'">EOL'+(d.value>1?' ×'+d.value:'')+'</span>';
+                return '<div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-700"><span class="truncate" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'+right+'</div>';
+            }).join('') || '<div class="stat-sub">EOL/yaklaşan sürüm yok 👍</div>';
+            const soon = (e.soonCount||0) > 0 ? '<div class="stat-sub" style="color:#f59e0b">Yakında EOL: '+e.soonCount+'</div>' : '';
+            const srcNote = e.real ? '' : '<div class="stat-sub" style="font-size:.65rem">statik liste — Ayarlar\'dan EOL API\'yi açın</div>';
+            body.innerHTML = header(meta) + '<div class="stat-num" style="color:#ef4444">'+e.count+'</div><div class="stat-sub">destek sonu sunucu</div>'+soon+srcNote+'<div class="mt-1.5" style="overflow:auto;flex:1">'+list+'</div>';
             return;
         }
         if (type === 'heatmap') {

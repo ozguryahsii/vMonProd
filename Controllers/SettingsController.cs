@@ -13,7 +13,8 @@ public class SettingsController : Controller
     private readonly AuditService _audit;
     private readonly BackupService _backup;
     private readonly IHostApplicationLifetime _life;
-    public SettingsController(SettingsService settings, IWebHostEnvironment env, AppDbContext db, AuditService audit, BackupService backup, IHostApplicationLifetime life)
+    private readonly EolService _eol;
+    public SettingsController(SettingsService settings, IWebHostEnvironment env, AppDbContext db, AuditService audit, BackupService backup, IHostApplicationLifetime life, EolService eol)
     {
         _settings = settings;
         _env = env;
@@ -21,6 +22,7 @@ public class SettingsController : Controller
         _audit = audit;
         _backup = backup;
         _life = life;
+        _eol = eol;
     }
 
     /// <summary>Admin değilse (ve oturum açık modundaysa) erişimi reddet.</summary>
@@ -45,7 +47,36 @@ public class SettingsController : Controller
         await LoadCredentialsAsync();
         ViewBag.BackupIsSqlite = _backup.IsSqlite;
         ViewBag.Backups = _backup.List(settings.BackupPath);
+        ViewBag.EolSyncedAt = _eol.SyncedAt;
+        ViewBag.EolHasCache = _eol.HasCache;
         return View(settings);
+    }
+
+    // ---------------- Destek Sonu (EOL) ----------------
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> EolSyncNow()
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        var (ok, msg) = await _eol.SyncAsync(settings.EolProxyUrl);
+        if (ok) { TempData["Message"] = "EOL verisi güncellendi: " + msg; await _audit.LogAsync("eol.sync", null, msg); }
+        else TempData["Error"] = "EOL senkronizasyonu başarısız: " + msg;
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> EolImport(IFormFile? eolFile)
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        if (eolFile == null || eolFile.Length == 0) { TempData["Error"] = "Dosya seçilmedi."; return RedirectToAction(nameof(Index)); }
+        using var sr = new StreamReader(eolFile.OpenReadStream());
+        var json = await sr.ReadToEndAsync();
+        var (ok, msg) = _eol.Import(json);
+        TempData[ok ? "Message" : "Error"] = (ok ? "EOL verisi içe aktarıldı: " : "İçe aktarma başarısız: ") + msg;
+        return RedirectToAction(nameof(Index));
     }
 
     // ---------------- Yedekleme (SQLite) ----------------

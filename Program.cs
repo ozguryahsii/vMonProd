@@ -127,6 +127,7 @@ builder.Services.AddScoped<SmsService>();
 builder.Services.AddScoped<WhatsappService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<BackupService>();
+builder.Services.AddSingleton<EolService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<CheckRunner>();
 builder.Services.AddScoped<AuditService>();

@@ -55,6 +55,14 @@ public class MonitorSettings
     /// <summary>Saklanacak yedek sayısı (eskiler silinir). 0 = sınırsız.</summary>
     public int BackupRetentionCount { get; set; } = 14;
 
+    // --- Destek Sonu (EOL) — endoflife.date entegrasyonu ---
+    /// <summary>EOL kontrolü açık mı? Açıkken OS sürümlerinin gerçek destek-sonu tarihleri kullanılır (kapalıyken statik liste).</summary>
+    public bool EolEnabled { get; set; } = false;
+    /// <summary>Bu kadar gün içinde EOL olacaklar "yakında" olarak uyarılır.</summary>
+    public int EolWarnDays { get; set; } = 90;
+    /// <summary>İsteğe bağlı giden HTTP proxy (örn. http://proxy:8080). Boşsa doğrudan bağlanır.</summary>
+    public string EolProxyUrl { get; set; } = "";
+
     /// <summary>Kullanıcı senkronizasyonunda kullanılacak kimlik bilgisi (Kimlik Bilgileri ekranından, Vault destekli olabilir).</summary>
     public int? LdapSyncCredentialId { get; set; }
 
@@ -166,6 +174,9 @@ public class SettingsService
         if (dict.TryGetValue("BackupHour", out v) && int.TryParse(v, out var bh)) s.BackupHour = Math.Clamp(bh, 0, 23);
         if (dict.TryGetValue("BackupMinute", out v) && int.TryParse(v, out var bm)) s.BackupMinute = Math.Clamp(bm, 0, 59);
         if (dict.TryGetValue("BackupRetentionCount", out v) && int.TryParse(v, out var br)) s.BackupRetentionCount = Math.Max(0, br);
+        if (dict.TryGetValue("EolEnabled", out v)) s.EolEnabled = v == "true";
+        if (dict.TryGetValue("EolWarnDays", out v) && int.TryParse(v, out var ew)) s.EolWarnDays = Math.Clamp(ew, 1, 3650);
+        if (dict.TryGetValue("EolProxyUrl", out v)) s.EolProxyUrl = v ?? "";
         if (dict.TryGetValue("LdapSyncCredentialId", out v) && int.TryParse(v, out var ci) && ci > 0) s.LdapSyncCredentialId = ci;
         if (dict.TryGetValue("TrustInternalTlsCertificates", out v)) s.TrustInternalTlsCertificates = v == "true";
         if (dict.TryGetValue("MaxLoginAttempts", out v) && int.TryParse(v, out i) && i > 0) s.MaxLoginAttempts = Math.Min(i, 10);
@@ -220,6 +231,9 @@ public class SettingsService
             ["BackupHour"] = s.BackupHour.ToString(),
             ["BackupMinute"] = s.BackupMinute.ToString(),
             ["BackupRetentionCount"] = s.BackupRetentionCount.ToString(),
+            ["EolEnabled"] = s.EolEnabled ? "true" : "false",
+            ["EolWarnDays"] = s.EolWarnDays.ToString(),
+            ["EolProxyUrl"] = s.EolProxyUrl,
             ["LdapSyncCredentialId"] = s.LdapSyncCredentialId?.ToString() ?? "",
             ["TrustInternalTlsCertificates"] = s.TrustInternalTlsCertificates ? "true" : "false",
             ["MaxLoginAttempts"] = s.MaxLoginAttempts.ToString(),

@@ -99,6 +99,19 @@ public class MonitoringBackgroundService : BackgroundService
             }
         }
 
+        // EOL verisi: açıksa ve cache 7 günden eskiyse (veya yoksa) haftada bir tazele
+        if (settings.EolEnabled)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var eol = scope.ServiceProvider.GetRequiredService<EolService>();
+            if (eol.SyncedAt == null || (DateTime.UtcNow - eol.SyncedAt.Value).TotalDays >= 7)
+            {
+                var (ok, msg) = await eol.SyncAsync(settings.EolProxyUrl, ct);
+                if (ok) _logger.LogInformation("EOL verisi tazelendi: {Msg}", msg);
+                else _logger.LogWarning("EOL tazeleme başarısız: {Msg}", msg);
+            }
+        }
+
         // Günlük temizlik
         if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromHours(24))
         {

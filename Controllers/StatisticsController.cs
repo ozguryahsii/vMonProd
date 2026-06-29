@@ -12,9 +12,10 @@ public class StatisticsController : Controller
 {
     private readonly AppDbContext _db;
     private readonly Services.SettingsService _settings;
+    private readonly Services.EolService _eol;
     private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
-    public StatisticsController(AppDbContext db, Services.SettingsService settings, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
-    { _db = db; _settings = settings; _cache = cache; }
+    public StatisticsController(AppDbContext db, Services.SettingsService settings, Services.EolService eol, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
+    { _db = db; _settings = settings; _eol = eol; _cache = cache; }
 
     private bool CanView() => User.Can(Perms.DashboardsView);
     private bool CanEdit() => User.IsAppAdmin();
@@ -96,9 +97,28 @@ public class StatisticsController : Controller
         int[] Band(Func<MonitoredService, double?> sel)
         { var b = new int[5]; foreach (var s in svc) { var v = sel(s); if (v.HasValue) b[Math.Min(4, (int)(v.Value / 20))]++; } return b; }
 
-        // OS EOL (destek sonu) — basit kalıp eşleşmesi
-        var eol = svc.Where(s => !string.IsNullOrWhiteSpace(s.OsName) && EolPatterns.Any(p => s.OsName!.Contains(p, StringComparison.OrdinalIgnoreCase)))
-            .GroupBy(s => s.OsName!).Select(g => new { name = g.Key, value = g.Count() }).OrderByDescending(x => x.value).ToList();
+        // OS EOL (destek sonu): EOL açık + cache varsa endoflife.date verisiyle gerçek tarih; aksi halde statik kalıp listesi.
+        var st = await _settings.GetAsync();
+        object osEol;
+        if (st.EolEnabled && _eol.HasCache)
+        {
+            var evals = svc.Where(s => !string.IsNullOrWhiteSpace(s.OsName))
+                .Select(s => _eol.Evaluate(s.OsName, st.EolWarnDays))
+                .Where(r => r != null && (r!.Status == "eol" || r.Status == "soon"))
+                .Select(r => r!).ToList();
+            var items = evals.GroupBy(r => r.OsName).Select(g => new
+            {
+                name = g.Key, value = g.Count(), status = g.First().Status,
+                eol = g.First().Eol, days = g.First().DaysLeft
+            }).OrderBy(x => x.days).ToList();
+            osEol = new { real = true, count = evals.Count(r => r.Status == "eol"), soonCount = evals.Count(r => r.Status == "soon"), items };
+        }
+        else
+        {
+            var eolStatic = svc.Where(s => !string.IsNullOrWhiteSpace(s.OsName) && EolPatterns.Any(p => s.OsName!.Contains(p, StringComparison.OrdinalIgnoreCase)))
+                .GroupBy(s => s.OsName!).Select(g => new { name = g.Key, value = g.Count(), status = "eol", eol = (DateTime?)null, days = (int?)null }).OrderByDescending(x => x.value).ToList();
+            osEol = new { real = false, count = eolStatic.Sum(x => x.value), soonCount = 0, items = eolStatic };
+        }
 
         // Uptime — satır yüklemeden COUNT sorgularıyla (indeksli, hızlı)
         var since24 = now.AddDays(-1);
@@ -207,7 +227,7 @@ public class StatisticsController : Controller
             top = new { cpu = Top(s => s.LastCpuPercent), ram = Top(s => s.LastRamPercent), disk = Top(s => s.LastMaxDiskPercent) },
             critical = new { diskFull, breach },
             histogram = new { cpu = Band(s => s.LastCpuPercent), ram = Band(s => s.LastRamPercent), disk = Band(s => s.LastMaxDiskPercent) },
-            osEol = new { count = eol.Sum(x => x.value), items = eol },
+            osEol,
             uptime = new { h24 = upH24, d7 = upD7 },
             outages = new { count = outs.Count, minutes = Math.Round(outMin), daily = outDaily, worst },
             fleet,

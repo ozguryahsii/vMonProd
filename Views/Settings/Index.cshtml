@@ -133,6 +133,24 @@
     </div>
 
     <div class="card mt-5">
+        <div class="card-head"><i class="bi bi-shield-exclamation text-brand-500"></i> Destek Sonu (EOL) — endoflife.date</div>
+        <div class="card-body space-y-4">
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input asp-for="EolEnabled" class="switch" /> İşletim sistemi destek-sonu kontrolünü etkinleştir (gerçek tarihler)
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-3"><label class="label">"Yakında EOL" eşiği (gün)</label><input asp-for="EolWarnDays" type="number" min="1" class="input" /></div>
+                <div class="md:col-span-6"><label class="label">Giden Proxy (opsiyonel)</label><input asp-for="EolProxyUrl" class="input mono" placeholder="http://proxy:8080" /></div>
+            </div>
+            <div class="hint">
+                Açıkken OS sürümlerinin <b>gerçek destek-sonu tarihleri</b> kullanılır (kapalıyken yerleşik statik liste).
+                <b>Gizlilik:</b> sunucu envanteriniz dışarı gönderilmez — yalnız <code>endoflife.date</code>'ten genel sürüm tabloları indirilir, eşleştirme tamamen yerelde yapılır.
+                İnternet kapalı (air-gapped) ortamda aşağıdan <b>JSON içe aktarma</b> ile çalışır. Verisi haftada bir otomatik tazelenir.
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-5">
         <div class="card-head"><i class="bi bi-shield-check text-brand-500"></i> Güvenlik ve Uyumluluk</div>
         <div class="card-body space-y-5">
             <label class="flex items-start gap-3 text-sm text-slate-700">
@@ -212,6 +230,34 @@
         <button class="btn btn-primary"><i class="bi bi-save"></i> Kaydet</button>
     </div>
 </form>
+
+@{
+    var eolSynced = ViewBag.EolSyncedAt as DateTime?;
+}
+<div class="card mt-5">
+    <div class="card-head">
+        <span><i class="bi bi-arrow-repeat text-brand-500"></i> EOL Verisi</span>
+        <form method="post" asp-action="EolSyncNow" class="inline">
+            @Html.AntiForgeryToken()
+            <button class="btn btn-primary btn-sm"><i class="bi bi-cloud-arrow-down"></i> Şimdi Senkronize Et</button>
+        </form>
+    </div>
+    <div class="card-body space-y-3">
+        <div class="text-sm text-slate-600">
+            Son senkron: <b>@(eolSynced.HasValue ? eolSynced.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Henüz yok")</b>
+            @if (ViewBag.EolHasCache != true) { <span class="text-amber-600">— veri yok, "Şimdi Senkronize Et" ya da JSON içe aktarın.</span> }
+        </div>
+        <div>
+            <div class="font-medium text-slate-700 mb-1.5"><i class="bi bi-upload"></i> Offline içe aktarma (air-gapped)</div>
+            <form method="post" asp-action="EolImport" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+                @Html.AntiForgeryToken()
+                <input type="file" name="eolFile" accept=".json" required class="input !py-1.5 max-w-sm" />
+                <button class="btn btn-outline btn-sm"><i class="bi bi-upload"></i> JSON Yükle</button>
+            </form>
+            <div class="hint mt-1">İnternet erişimi olan bir makinede <code>{"oracle-linux":{"9":"2032-07-01"},...}</code> biçiminde hazırlanmış cache JSON'unu yükleyin (eşleştirme yerelde yapılır).</div>
+        </div>
+    </div>
+</div>
 
 @{
     var backups = ViewBag.Backups as List<vMonitor.Services.BackupFile> ?? new List<vMonitor.Services.BackupFile>();
