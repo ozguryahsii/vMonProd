@@ -65,12 +65,25 @@ public class CheckRunner
                 CpuPercent = outcome.Metrics.Cpu,
                 RamPercent = outcome.Metrics.Ram,
                 MaxDiskPercent = outcome.Metrics.MaxDisk,
-                DiskDetail = outcome.Metrics.DiskDetail
+                DiskDetail = outcome.Metrics.DiskDetail,
+                CpuCores = outcome.Metrics.CpuCores,
+                RamTotalGb = outcome.Metrics.RamTotalGb,
+                RamUsedGb = outcome.Metrics.RamUsedGb,
+                DiskTotalGb = outcome.Metrics.DiskTotalGb,
+                DiskUsedGb = outcome.Metrics.DiskUsedGb
             });
             svc.LastCpuPercent = outcome.Metrics.Cpu;
             svc.LastRamPercent = outcome.Metrics.Ram;
             svc.LastMaxDiskPercent = outcome.Metrics.MaxDisk;
             if (outcome.Metrics.Capacity != null) svc.CapacityInfo = outcome.Metrics.Capacity;
+            // İstatistikler için yapısal son değerler + OS
+            if (outcome.Metrics.CpuCores.HasValue) svc.LastCpuCores = outcome.Metrics.CpuCores;
+            if (outcome.Metrics.RamTotalGb.HasValue) svc.LastRamTotalGb = outcome.Metrics.RamTotalGb;
+            if (outcome.Metrics.RamUsedGb.HasValue) svc.LastRamUsedGb = outcome.Metrics.RamUsedGb;
+            if (outcome.Metrics.DiskTotalGb.HasValue) svc.LastDiskTotalGb = outcome.Metrics.DiskTotalGb;
+            if (outcome.Metrics.DiskUsedGb.HasValue) svc.LastDiskUsedGb = outcome.Metrics.DiskUsedGb;
+            if (!string.IsNullOrWhiteSpace(outcome.Metrics.OsName)) svc.OsName = outcome.Metrics.OsName;
+            if (!string.IsNullOrWhiteSpace(outcome.Metrics.OsKind)) svc.OsKind = outcome.Metrics.OsKind;
         }
 
         svc.LastCheckedAt = now;

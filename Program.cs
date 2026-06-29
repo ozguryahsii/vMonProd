@@ -169,7 +169,8 @@ using (var scope = app.Services.CreateScope())
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Database.EnsureCreated();   // sıfır kurulum: model'den tam şema (tüm sağlayıcılar)
 
-            // GÜVENLİ yükseltme: model'de olup DB'de eksik olan kolonları ekle (tüm sağlayıcılar; yalnız EKLEME → veri kaybı yok)
+            // GÜVENLİ yükseltme: önce eksik TABLOLARI oluştur (yeni özellik tablosu), sonra eksik KOLONLARI ekle
+            SchemaSync.EnsureTablesAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
             SchemaSync.EnsureColumnsAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
 
             if (bcfg.Provider == DbProviderKind.Sqlite)

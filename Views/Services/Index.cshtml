@@ -80,7 +80,7 @@
             @foreach (var t in usedTypes) { <option value="@t">@(typeNames.GetValueOrDefault(t, t.ToString()))</option> }
         </select>
         <select id="fKeyword" class="input !w-auto !py-1.5">
-            <option value="">Tüm Keyword'ler</option>
+            <option value="">Tüm Etiketler</option>
             @foreach (var k in allKeywords) { <option value="@k.ToLowerInvariant()">@k</option> }
         </select>
         <span id="fCount" class="text-slate-400 text-xs"></span>
@@ -157,10 +157,10 @@
                 </div>
 
                 <div>
-                    <h6 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Keyword</h6>
-                    <label class="label">Keyword ekle (mevcuda eklenir, virgülle ayırın)</label>
+                    <h6 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Etiket</h6>
+                    <label class="label">Etiket ekle (mevcuda eklenir, virgülle ayırın)</label>
                     <input type="text" name="addKeywords" class="input" placeholder="örn. kritik, prod" />
-                    <div class="hint">Mevcut keyword'ler korunur; yazılanlar listeye eklenir (tekrarlar atlanır).</div>
+                    <div class="hint">Mevcut etiketler korunur; yazılanlar listeye eklenir (tekrarlar atlanır).</div>
                 </div>
             </div>
             <div class="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
@@ -182,7 +182,7 @@
             <thead>
                 <tr>
                     <th class="w-8"><input type="checkbox" class="cbx" id="selAll" /></th>
-                    <th>Ad</th><th>Tip</th><th>Hedef</th><th>Keyword</th><th>Kimlik</th><th>Aralık</th><th>Durum</th><th></th>
+                    <th>Ad</th><th>Tip</th><th>Hedef</th><th>Etiket</th><th>Kimlik</th><th>Aralık</th><th>Durum</th><th></th>
                 </tr>
             </thead>
             <tbody id="svcRows">

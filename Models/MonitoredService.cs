@@ -119,4 +119,15 @@ public class MonitoredService
 
     /// <summary>Donanım kapasitesi, örn. "8 CPU · 16 GB RAM · C: 237 GB". Sağlık kontrolünde güncellenir.</summary>
     public string? CapacityInfo { get; set; }
+
+    // --- İstatistikler için yapısal son değerler (sağlık kontrolünde güncellenir) ---
+    /// <summary>İşletim sistemi tam adı, örn. "Windows Server 2019 Standard (10.0.17763)" / "Ubuntu 22.04.3 LTS (kernel 5.15.0)".</summary>
+    public string? OsName { get; set; }
+    /// <summary>İşletim sistemi ailesi: "Windows" / "Linux". İstatistik gruplaması için.</summary>
+    public string? OsKind { get; set; }
+    public int? LastCpuCores { get; set; }
+    public double? LastRamTotalGb { get; set; }
+    public double? LastRamUsedGb { get; set; }
+    public double? LastDiskTotalGb { get; set; }
+    public double? LastDiskUsedGb { get; set; }
 }

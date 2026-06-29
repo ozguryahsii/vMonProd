@@ -1,6 +1,9 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using vMonitor.Models;
 
 namespace vMonitor.Data;
@@ -11,6 +14,52 @@ namespace vMonitor.Data;
 /// (Klasik EF Migrations'ın çoklu-sağlayıcı karmaşası olmadan, bu uygulamanın eklemeli değişim deseni için.)</summary>
 public static class SchemaSync
 {
+    /// <summary>Model'de olup veritabanında EKSİK olan TABLOLARI oluşturur (yeni özellikler yeni tablo getirdiğinde).
+    /// EF'in kendi migration SQL üreticisini kullanır → 5 sağlayıcıda da doğru DDL. Var olan tabloya dokunmaz.</summary>
+    public static async Task EnsureTablesAsync(AppDbContext ctx, DbProviderKind provider, ILogger logger, CancellationToken ct = default)
+    {
+        DbConnection conn = ctx.Database.GetDbConnection();
+        bool opened = false;
+        try
+        {
+            if (conn.State != System.Data.ConnectionState.Open) { await conn.OpenAsync(ct); opened = true; }
+
+            // Eksik tabloları tespit et
+            var missing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var et in ctx.Model.GetEntityTypes())
+            {
+                var table = et.GetTableName();
+                if (string.IsNullOrEmpty(table)) continue;
+                HashSet<string> cols;
+                try { cols = await GetColumnsAsync(conn, provider, table, ct); }
+                catch { continue; }
+                if (cols.Count == 0) missing.Add(table);
+            }
+            if (missing.Count == 0) return;
+
+            var differ = ctx.GetService<IMigrationsModelDiffer>();
+            var sqlGen = ctx.GetService<IMigrationsSqlGenerator>();
+            var target = ctx.GetService<IDesignTimeModel>().Model.GetRelationalModel();
+            var ops = differ.GetDifferences(null, target);
+            var createOps = ops.OfType<CreateTableOperation>()
+                .Where(o => missing.Contains(o.Name))
+                .Cast<MigrationOperation>().ToList();
+            if (createOps.Count == 0) return;
+
+            foreach (var cmd in sqlGen.Generate(createOps, ctx.Model))
+            {
+                try
+                {
+                    await ctx.Database.ExecuteSqlRawAsync(cmd.CommandText, ct);
+                    logger.LogInformation("Şema senkron: tablo oluşturuldu/komut çalıştı");
+                }
+                catch (Exception ex) { logger.LogDebug(ex, "Tablo oluşturma adımı atlandı"); }
+            }
+        }
+        catch (Exception ex) { logger.LogError(ex, "Tablo senkronu başarısız (atlandı)."); }
+        finally { if (opened) try { await conn.CloseAsync(); } catch { } }
+    }
+
     public static async Task EnsureColumnsAsync(AppDbContext ctx, DbProviderKind provider, ILogger logger, CancellationToken ct = default)
     {
         DbConnection conn = ctx.Database.GetDbConnection();

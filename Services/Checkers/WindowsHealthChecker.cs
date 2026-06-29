@@ -39,10 +39,11 @@ public class WindowsHealthChecker : CheckerBase
                     if (mo["PercentProcessorTime"] != null) cpu = Math.Round(Convert.ToDouble(mo["PercentProcessorTime"]), 1);
             }
 
-            // RAM (TotalVisibleMemorySize KB cinsindendir)
-            double? ram = null, totalRamGb = null;
+            // RAM (TotalVisibleMemorySize KB cinsindendir) + İşletim sistemi (tam sürüm)
+            double? ram = null, totalRamGb = null, ramUsedGb = null;
+            string? osName = null;
             using (var searcher = new ManagementObjectSearcher(scope,
-                new ObjectQuery("SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem")))
+                new ObjectQuery("SELECT TotalVisibleMemorySize, FreePhysicalMemory, Caption, Version FROM Win32_OperatingSystem")))
             {
                 foreach (ManagementObject mo in searcher.Get())
                 {
@@ -52,7 +53,12 @@ public class WindowsHealthChecker : CheckerBase
                     {
                         ram = Math.Round(100.0 * (total - free) / total, 1);
                         totalRamGb = Math.Round(total / 1048576.0, 0);
+                        ramUsedGb = Math.Round((total - free) / 1048576.0, 1);
                     }
+                    var caption = mo["Caption"]?.ToString()?.Replace("Microsoft ", "").Trim();
+                    var version = mo["Version"]?.ToString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(caption))
+                        osName = string.IsNullOrWhiteSpace(version) ? caption : $"{caption} ({version})";
                 }
             }
 
@@ -68,6 +74,7 @@ public class WindowsHealthChecker : CheckerBase
 
             // Diskler (yalnızca sabit diskler, DriveType=3)
             double? maxDisk = null;
+            double diskTotalBytes = 0, diskUsedBytes = 0;
             var diskParts = new List<string>();
             var diskCapacities = new List<string>();
             var disks = new List<(string id, double used)>();
@@ -84,6 +91,8 @@ public class WindowsHealthChecker : CheckerBase
                     diskParts.Add($"{id} %{used.ToString("0.#", CultureInfo.InvariantCulture)}");
                     diskCapacities.Add($"{id} {FormatGb(size)}");
                     disks.Add((id, used));
+                    diskTotalBytes += size;
+                    diskUsedBytes += size - freeSpace;
                     if (maxDisk == null || used > maxDisk) maxDisk = used;
                 }
             }
@@ -95,7 +104,11 @@ public class WindowsHealthChecker : CheckerBase
 
             CollectedMetrics = new HealthMetricsData(cpu, ram, maxDisk,
                 diskParts.Count > 0 ? string.Join(" · ", diskParts) : null,
-                capacityParts.Count > 0 ? string.Join(" · ", capacityParts) : null);
+                capacityParts.Count > 0 ? string.Join(" · ", capacityParts) : null,
+                CpuCores: cores, RamTotalGb: totalRamGb, RamUsedGb: ramUsedGb,
+                DiskTotalGb: diskTotalBytes > 0 ? Math.Round(diskTotalBytes / 1073741824.0, 1) : null,
+                DiskUsedGb: diskTotalBytes > 0 ? Math.Round(diskUsedBytes / 1073741824.0, 1) : null,
+                OsName: osName, OsKind: "Windows");
 
             // Ulaşıldı; eşik aşıldıysa bu bir DOWN değil ERROR durumudur
             var thresholdErr = BuildThresholdError(service, cpu, ram, maxDisk, disks);
