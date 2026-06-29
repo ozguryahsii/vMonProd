@@ -87,10 +87,11 @@ public class UsersController : MvcBase
             }
         }
 
-        // Gruptan düşenleri pasifleştir (silmeyiz — denetim izi ve geçmiş için saklanır)
+        // Gruptan düşenleri pasifleştir (silmeyiz — denetim izi ve geçmiş için saklanır).
+        // YEREL kullanıcılara (kurulumdaki admin gibi) DOKUNULMAZ — onlar AD grubuna bağlı değildir.
         int deactivated = 0;
         foreach (var u in existing.Values)
-            if (u.IsActive && !inGroup.Contains(u.Sam)) { u.IsActive = false; deactivated++; }
+            if (u.IsActive && !u.IsLocal && !inGroup.Contains(u.Sam)) { u.IsActive = false; deactivated++; }
 
         await _db.SaveChangesAsync();
         await _audit.LogAsync("user.sync", null,
