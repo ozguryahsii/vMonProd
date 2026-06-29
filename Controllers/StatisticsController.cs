@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using vMonitor.Data;
 using vMonitor.Models;
 
@@ -242,9 +243,9 @@ public class StatisticsController : Controller
         // Histogram bandı: source "hist_cpu|hist_ram|hist_disk", value "40-60"
         if (source.StartsWith("hist_"))
         {
-            var metric = source[5..];
-            Func<MonitoredService, double?> hsel = metric == "ram" ? s => s.LastRamPercent
-                : metric == "disk" ? s => s.LastMaxDiskPercent : s => s.LastCpuPercent;
+            var hmetric = source[5..];
+            Func<MonitoredService, double?> hsel = hmetric == "ram" ? s => s.LastRamPercent
+                : hmetric == "disk" ? s => s.LastMaxDiskPercent : s => s.LastCpuPercent;
             var parts = (value ?? "").Split('-');
             int lo = 0, hi = 100;
             if (parts.Length == 2) { int.TryParse(parts[0], out lo); int.TryParse(parts[1], out hi); }
