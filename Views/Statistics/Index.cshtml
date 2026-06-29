@@ -19,6 +19,27 @@
     .stats-editing .wremove { display:inline-flex; }
     .stats-editing .grid-stack-item-content { outline:2px dashed #cbd5e1; cursor:move; }
     .grid-stack-item-content::-webkit-scrollbar { display:none; }
+    .stat-card { cursor:pointer; }
+    .stat-card:hover { box-shadow:0 4px 14px rgba(15,23,42,.08); }
+    /* Koyu tema */
+    .dark .stat-card { background:#1e293b; border-color:#334155; box-shadow:none; }
+    .dark .stat-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.4); }
+    .dark .stat-card h3 { color:#94a3b8; }
+    .dark .stat-sub { color:#64748b; }
+    .dark .stat-bar { background:#334155; }
+    .dark .stats-editing .grid-stack-item-content { outline-color:#475569; }
+    /* Detay modalı */
+    .smodal { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:60; display:none; align-items:center; justify-content:center; padding:1rem; }
+    .smodal.open { display:flex; }
+    .smodal-panel { background:#fff; border-radius:1rem; width:100%; max-width:56rem; max-height:86vh; display:flex; flex-direction:column; overflow:hidden; }
+    .dark .smodal-panel { background:#1e293b; color:#e2e8f0; }
+    .smodal-head { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #e2e8f0; }
+    .dark .smodal-head { border-color:#334155; }
+    .smodal-body { padding:1rem 1.25rem; overflow:auto; }
+    .stbl { width:100%; font-size:.82rem; border-collapse:collapse; }
+    .stbl th, .stbl td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    .dark .stbl th, .dark .stbl td { border-color:#334155; }
+    .stbl th { color:#64748b; font-weight:600; position:sticky; top:0; background:inherit; }
 </style>
 
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -84,6 +105,19 @@
     }
 </div>
 
+<div id="smodal" class="smodal">
+    <div class="smodal-panel">
+        <div class="smodal-head">
+            <h3 id="smTitle" class="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i class="bi bi-list-ul text-brand-500"></i> <span>Detay</span></h3>
+            <button onclick="closeDetail()" class="btn btn-outline btn-sm"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="smodal-body">
+            <div id="smTrend" class="hidden mb-4" style="height:200px;"></div>
+            <div id="smTableWrap" class="overflow-auto" style="max-height:48vh;"></div>
+        </div>
+    </div>
+</div>
+
 <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
 <script src="~/lib/gridstack/gridstack-all.js" asp-append-version="true"></script>
 <script src="~/lib/countup/countUp.umd.js" asp-append-version="true"></script>
@@ -109,6 +143,20 @@
     const charts = {};   // elId -> echarts instance
     let DATA = null;
     let editing = false;
+    const isDark = () => document.documentElement.classList.contains('dark');
+    const txtColor = () => isDark() ? '#cbd5e1' : '#334155';
+    const trackColor = () => isDark() ? '#334155' : '#f1f5f9';
+    let modalChart = null;
+    const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const pct = v => (v==null?'—':(Math.round(v*10)/10)+'%');
+    function statusBadge(s){
+        const c = s==='Up'?'#10b981': s==='Down'?'#ef4444': s==='Hata'?'#f59e0b':'#94a3b8';
+        return '<span style="color:'+c+';font-weight:600">'+esc(s)+'</span>';
+    }
+    function bindCardClick(item, source){
+        const card = item.querySelector('.stat-card');
+        if (card) card.onclick = () => { if (!editing) openDetail(source, null); };
+    }
 
     const grid = GridStack.init({ column:12, cellHeight:70, margin:6, float:true,
         disableDrag:true, disableResize:true, handle:'.grid-stack-item-content' });
@@ -136,10 +184,12 @@
         if (!DATA) { body.innerHTML = header(meta)+'<div class="stat-sub mt-2">Yükleniyor…</div>'; return; }
 
         if (type === 'counter') {
-            const v = (DATA.counts||{})[source] ?? 0;
+            const cmap = { total_servers:'total', up:'up', down:'down', error:'error' };
+            const v = (DATA.counts||{})[cmap[source]||source] ?? 0;
             body.innerHTML = header(meta) + '<div class="flex-1 flex items-center"><div class="stat-num" style="color:'+meta.color+'">0</div></div>';
             const num = body.querySelector('.stat-num');
             new countUp.CountUp(num, v, { duration:1.2, separator:'.' }).start();
+            bindCardClick(item, source);
             return;
         }
         if (type === 'resource') {
@@ -156,6 +206,7 @@
             num.textContent = '0';
             new countUp.CountUp(num, r.used, { duration:1.2, decimalPlaces:(r.used%1?1:0), separator:'.' }).start();
             requestAnimationFrame(()=>{ body.querySelector('.stat-bar>div').style.width = pct+'%'; });
+            bindCardClick(item, source);
             return;
         }
         if (type === 'pie') {
@@ -170,17 +221,19 @@
             const host = body.querySelector('.stat-chart');
             const ch = chartFor(host);
             ch.setOption({
-                tooltip:{ trigger:'item', formatter:'{b}: {c} (%{d})' },
-                legend:{ type:'scroll', bottom:0, left:'center', textStyle:{fontSize:10,color:'#64748b'} },
+                tooltip:{ trigger:'item', formatter:'{b}: {c} (%{d})', appendToBody:true, confine:false },
+                legend:{ type:'scroll', bottom:0, left:'center', textStyle:{fontSize:10,color:txtColor()},
+                         pageTextStyle:{color:txtColor()} },
                 series:[{ type:'pie', radius:['45%','72%'], center:['50%','46%'], avoidLabelOverlap:true,
-                    itemStyle:{ borderColor:'#fff', borderWidth:2, borderRadius:4 },
+                    itemStyle:{ borderColor: isDark()?'#1e293b':'#fff', borderWidth:2, borderRadius:4 },
                     label:{ show:false }, labelLine:{show:false},
                     data: arr.length ? arr.map((d,i)=>({ name:d.name, value:d.value, itemStyle:{color:PALETTE[i%PALETTE.length]} }))
                                      : [{name:'Veri yok',value:1, itemStyle:{color:'#e2e8f0'}}],
                     animationType:'scale', animationEasing:'elasticOut'
                 }],
-                graphic: total ? [{ type:'text', left:'center', top:'40%', style:{ text:total, fontSize:22, fontWeight:'bold', fill:'#334155' }}] : []
+                graphic: total ? [{ type:'text', left:'center', top:'40%', style:{ text:total, fontSize:22, fontWeight:'bold', fill:txtColor() }}] : []
             });
+            if (arr.length) ch.off('click').on('click', p => { openDetail(source, p.name); });
             return;
         }
         if (type === 'gauge') {
@@ -192,7 +245,7 @@
             ch.setOption({
                 series:[{ type:'gauge', startAngle:210, endAngle:-30, min:0, max:100, radius:'92%', center:['50%','58%'],
                     progress:{ show:true, width:12, itemStyle:{color:meta.color} },
-                    axisLine:{ lineStyle:{ width:12, color:[[1,'#f1f5f9']] } },
+                    axisLine:{ lineStyle:{ width:12, color:[[1,trackColor()]] } },
                     axisTick:{show:false}, splitLine:{show:false}, axisLabel:{show:false}, pointer:{show:false},
                     anchor:{show:false},
                     detail:{ valueAnimation:true, fontSize:26, fontWeight:'bolder', offsetCenter:[0,'0%'], color:meta.color,
@@ -200,6 +253,7 @@
                     data:[{ value: v==null?0:v }]
                 }]
             });
+            ch.off('click').on('click', () => openDetail(source, null));
             return;
         }
         body.innerHTML = header(meta)+'<div class="stat-sub mt-2">Bilinmeyen widget</div>';
@@ -273,6 +327,52 @@
             if (r.ok) { location.reload(); } else { alert('Kaydedilemedi.'); }
         });
     }
+
+    window.openDetail = async function(source, value){
+        const modal = document.getElementById('smodal');
+        const meta = META[source] || { label: source };
+        document.querySelector('#smTitle span').textContent = (meta.label || source) + (value ? ' — ' + value : '');
+        document.getElementById('smTableWrap').innerHTML = '<div class="stat-sub">Yükleniyor…</div>';
+        const trendDiv = document.getElementById('smTrend');
+        trendDiv.classList.add('hidden');
+        if (modalChart) { modalChart.dispose(); modalChart = null; }
+        modal.classList.add('open');
+
+        let d;
+        try {
+            const u = '@Url.Action("Detail")?source=' + encodeURIComponent(source) + '&value=' + encodeURIComponent(value || '');
+            d = await (await fetch(u)).json();
+        } catch (e) { document.getElementById('smTableWrap').innerHTML = '<div class="stat-sub">Veri alınamadı.</div>'; return; }
+
+        if (d.trend && d.trend.points && d.trend.points.length) {
+            trendDiv.classList.remove('hidden');
+            modalChart = echarts.init(trendDiv);
+            const mlabel = ({cpu:'CPU %', ram:'RAM %', disk:'Disk %'})[d.trend.metric] || '';
+            modalChart.setOption({
+                title:{ text:'Son 7 gün — '+mlabel, left:'center', textStyle:{fontSize:12,color:txtColor()} },
+                tooltip:{ trigger:'axis' }, grid:{ left:42, right:18, top:36, bottom:28 },
+                xAxis:{ type:'category', data:d.trend.points.map(p=>p.day), axisLabel:{color:txtColor()} },
+                yAxis:{ type:'value', max:100, axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
+                series:[{ type:'line', smooth:true, areaStyle:{opacity:.15}, data:d.trend.points.map(p=>p.value),
+                          itemStyle:{color:'#ed1c24'}, lineStyle:{color:'#ed1c24'} }]
+            });
+        }
+        const rows = (d.servers||[]).map(s=>'<tr>'+
+            '<td>'+esc(s.name)+'<div class="text-slate-400" style="font-size:.72rem">'+esc(s.target||'')+'</div></td>'+
+            '<td>'+esc(s.os||'')+'</td><td>'+statusBadge(s.status)+'</td>'+
+            '<td>'+pct(s.cpu)+'</td><td>'+pct(s.ram)+'</td><td>'+pct(s.disk)+'</td>'+
+            '<td class="text-slate-400">'+esc(s.capacity||'')+'</td></tr>').join('');
+        document.getElementById('smTableWrap').innerHTML =
+            '<table class="stbl"><thead><tr><th>Sunucu</th><th>İşletim Sistemi</th><th>Durum</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Kapasite</th></tr></thead><tbody>'
+            + (rows || '<tr><td colspan="7" class="stat-sub">Kayıt yok.</td></tr>') + '</tbody></table>'
+            + '<div class="stat-sub mt-2">Toplam ' + (d.count||0) + ' sunucu.</div>';
+    };
+    window.closeDetail = function(){
+        document.getElementById('smodal').classList.remove('open');
+        if (modalChart) { modalChart.dispose(); modalChart = null; }
+    };
+    document.getElementById('smodal').addEventListener('click', e => { if (e.target.id === 'smodal') closeDetail(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
     load();
     setInterval(load, 60000); // 1 dk'da bir tazele

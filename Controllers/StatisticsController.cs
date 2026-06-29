@@ -35,7 +35,8 @@ public class StatisticsController : Controller
     public async Task<IActionResult> Data()
     {
         if (!CanView()) return Forbid();
-        var svc = await _db.Services.AsNoTracking().Where(s => s.Enabled).ToListAsync();
+        // TÜM istatistikler yalnız sağlık ile izlenen sunuculardan (Windows Health + Linux Health) gelir.
+        var svc = await HealthServicesAsync();
 
         int total = svc.Count;
         int up = svc.Count(s => s.LastStatus == 0);
@@ -75,6 +76,71 @@ public class StatisticsController : Controller
             osVersion,
             tags
         });
+    }
+
+    private async Task<List<MonitoredService>> HealthServicesAsync() =>
+        await _db.Services.AsNoTracking()
+            .Where(s => s.Enabled && (s.Type == ServiceType.WindowsHealth || s.Type == ServiceType.LinuxHealth))
+            .ToListAsync();
+
+    /// <summary>Bir widget'a/pasta dilimine tıklanınca: ilgili sunucu listesini + (kaynak metrikse) 7 günlük trendi döner.</summary>
+    [HttpGet]
+    public async Task<IActionResult> Detail(string source, string? value)
+    {
+        if (!CanView()) return Forbid();
+        var all = await HealthServicesAsync();
+        source = (source ?? "").ToLowerInvariant();
+
+        IEnumerable<MonitoredService> sel = source switch
+        {
+            "up" => all.Where(s => s.LastStatus == 0),
+            "down" => all.Where(s => s.LastStatus == 1),
+            "error" => all.Where(s => s.LastStatus == 2),
+            "os_kind" => all.Where(s => string.Equals(s.OsKind, value, StringComparison.OrdinalIgnoreCase)),
+            "os_version" => all.Where(s => string.Equals(s.OsName, value, StringComparison.OrdinalIgnoreCase)),
+            "tag" => all.Where(s => MonitoredService.SplitKeywords(s.Keyword).Any(t => string.Equals(t, value, StringComparison.OrdinalIgnoreCase))),
+            _ => all   // total_servers, cpu, ram, disk, avg_* → tüm sağlık sunucuları
+        };
+
+        var statusText = new[] { "Up", "Down", "Hata" };
+        var servers = sel.OrderBy(s => s.Name).Select(s => new
+        {
+            name = s.Name,
+            target = s.Target,
+            os = s.OsName ?? (s.Type == ServiceType.WindowsHealth ? "Windows" : "Linux"),
+            status = s.LastStatus >= 0 && s.LastStatus < 3 ? statusText[s.LastStatus] : "?",
+            cpu = s.LastCpuPercent,
+            ram = s.LastRamPercent,
+            disk = s.LastMaxDiskPercent,
+            capacity = s.CapacityInfo,
+            lastChecked = s.LastCheckedAt
+        }).ToList();
+
+        // 7 günlük trend (yalnız kaynak/ortalama widget'larında anlamlı)
+        object? trend = null;
+        var metric = source.StartsWith("avg_") ? source[4..] : source; // cpu/ram/disk
+        if (metric is "cpu" or "ram" or "disk")
+        {
+            var ids = sel.Select(s => s.Id).ToHashSet();
+            var since = DateTime.UtcNow.AddDays(-7);
+            var rows = await _db.HealthMetrics.AsNoTracking()
+                .Where(m => m.CheckedAt >= since && ids.Contains(m.ServiceId))
+                .Select(m => new { m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent })
+                .ToListAsync();
+            var byDay = rows.GroupBy(r => r.CheckedAt.ToLocalTime().Date).OrderBy(g => g.Key).Select(g => new
+            {
+                day = g.Key.ToString("dd.MM"),
+                value = Math.Round(metric switch
+                {
+                    "cpu" => g.Where(x => x.CpuPercent.HasValue).Select(x => x.CpuPercent!.Value).DefaultIfEmpty(0).Average(),
+                    "ram" => g.Where(x => x.RamPercent.HasValue).Select(x => x.RamPercent!.Value).DefaultIfEmpty(0).Average(),
+                    _ => g.Where(x => x.MaxDiskPercent.HasValue).Select(x => x.MaxDiskPercent!.Value).DefaultIfEmpty(0).Average()
+                }, 1)
+            }).ToList();
+            if (byDay.Count > 0) trend = new { metric, points = byDay };
+        }
+
+        return Json(new { count = servers.Count, servers, trend });
     }
 
     public record WidgetDto(int Id, string Type, string Source, string? Title, string? ConfigJson, int X, int Y, int W, int H);
