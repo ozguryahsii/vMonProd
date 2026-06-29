@@ -3,7 +3,6 @@
     ViewData["Title"] = "Ayarlar";
 }
 <style>
-    html { scroll-behavior: smooth; }
     /* Kompakt ayar görünümü */
     .set .card-head { padding:.55rem .9rem; font-size:.9rem; }
     .set .card-body { padding:.8rem .9rem; }
@@ -12,135 +11,17 @@
     .set .label { margin-bottom:.15rem; font-size:.78rem; font-weight:500; color:#475569; }
     .set .hint { font-size:.72rem; margin-top:.1rem; line-height:1.25; }
     .set textarea.input { min-height:2.4rem; }
-    .sec-h { scroll-margin-top:84px; font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; margin:.2rem 0 -.1rem; }
-    .snav { position:sticky; top:0; z-index:30; background:rgba(248,250,252,.92); backdrop-filter:blur(6px); }
-    .dark .snav { background:rgba(15,23,42,.92); }
-    .snav a { display:inline-flex; align-items:center; gap:.3rem; padding:.4rem .7rem; border-radius:.5rem; font-size:.8rem; font-weight:500; color:#64748b; white-space:nowrap; }
-    .snav a:hover { color:#334155; background:#eef2f7; }
-    .dark .snav a:hover { background:#1e293b; color:#cbd5e1; }
-    .snav a.active { color:#ed1c24; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.06); }
-    .dark .snav a.active { background:#1e293b; }
 </style>
 
 <div class="set">
-<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-3"><i class="bi bi-gear text-brand-500"></i> Ayarlar</h1>
-
-<div class="snav mb-4 py-2 border-b border-slate-200 dark:border-slate-700">
-    <div class="flex flex-wrap gap-1">
-        <a href="#s-izleme"><i class="bi bi-stopwatch"></i> İzleme</a>
-        <a href="#s-bildirim"><i class="bi bi-bell"></i> Bildirimler</a>
-        <a href="#s-erisim"><i class="bi bi-shield-lock"></i> Erişim &amp; Oturum</a>
-        <a href="#s-guvenlik"><i class="bi bi-shield-check"></i> Güvenlik</a>
-        <a href="#s-veri"><i class="bi bi-hdd-stack"></i> Veri</a>
-        <a href="#s-islemler"><i class="bi bi-tools"></i> Yönetim &amp; İşlemler</a>
-    </div>
-</div>
+<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-4"><i class="bi bi-gear text-brand-500"></i> Ayarlar</h1>
 
 <form method="post" asp-action="Save">
     @Html.AntiForgeryToken()
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
 
-        <!-- SOL KOLON -->
+        <!-- KOLON 1 -->
         <div class="space-y-4">
-            <h2 id="s-izleme" class="sec-h">İzleme</h2>
-            <div class="card">
-                <div class="card-head"><i class="bi bi-stopwatch text-brand-500"></i> İzleme</div>
-                <div class="card-body">
-                    <div>
-                        <label class="label">Global Kontrol Aralığı (dakika)</label>
-                        <input asp-for="CheckIntervalMinutes" type="number" min="1" class="input" />
-                        <div class="hint">Servis bazında ayrıca özelleştirilebilir.</div>
-                    </div>
-                    <div>
-                        <label class="label">Bildirim Eşiği (ardışık hata sayısı)</label>
-                        <input asp-for="FailureThreshold" type="number" min="1" class="input" />
-                        <div class="hint">Bu kadar ardışık başarısız kontrol sonrası DOWN maili gönderilir.</div>
-                    </div>
-                    <div>
-                        <label class="label">Geçmiş Saklama Süresi (gün)</label>
-                        <input asp-for="HistoryRetentionDays" type="number" min="1" class="input" />
-                        <div class="hint">Daha eski kontrol kayıtları otomatik silinir.</div>
-                    </div>
-                </div>
-            </div>
-
-            <h2 id="s-bildirim" class="sec-h">Bildirimler</h2>
-            <div class="card">
-                <div class="card-head"><i class="bi bi-envelope text-brand-500"></i> Email (SMTP Relay)</div>
-                <div class="card-body">
-                    <label class="flex items-center gap-2 text-sm text-slate-700">
-                        <input asp-for="EmailEnabled" class="switch" /> Email bildirimleri aktif
-                    </label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div class="col-span-2"><label class="label">SMTP Sunucusu</label><input asp-for="SmtpHost" class="input mono" placeholder="smtp-relay.firma.local" /></div>
-                        <div><label class="label">Port</label><input asp-for="SmtpPort" type="number" class="input" /></div>
-                    </div>
-                    <div><label class="label">Gönderen Adres</label><input asp-for="MailFrom" class="input mono" placeholder="vmon@firma.com" /></div>
-                    <div>
-                        <label class="label">Alıcılar</label>
-                        <textarea asp-for="MailRecipients" class="input mono" rows="2" placeholder="ops@firma.com, admin@firma.com"></textarea>
-                        <div class="hint">Virgül veya noktalı virgül ile ayırın.</div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" id="btnTestEmail" class="btn btn-outline btn-sm"><i class="bi bi-send"></i> Test Maili Gönder</button>
-                        <span id="testEmailResult" class="text-sm"></span>
-                    </div>
-                    <div class="hint">Relay tabanlı gönderim. Test <b>kayıtlı</b> ayarlarla yapılır — önce kaydedin.</div>
-                </div>
-            </div>
-
-            <h2 id="s-veri" class="sec-h">Veri &amp; Yedekleme</h2>
-            <div class="card">
-                <div class="card-head"><i class="bi bi-shield-exclamation text-brand-500"></i> Destek Sonu (EOL)</div>
-                <div class="card-body">
-                    <label class="flex items-center gap-2 text-sm text-slate-700">
-                        <input asp-for="EolEnabled" class="switch" /> EOL kontrolünü etkinleştir (gerçek tarihler)
-                    </label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div><label class="label">"Yakında" eşiği (gün)</label><input asp-for="EolWarnDays" type="number" min="1" class="input" /></div>
-                        <div><label class="label">Giden Proxy (ops.)</label><input asp-for="EolProxyUrl" class="input mono" placeholder="http://proxy:8080" /></div>
-                    </div>
-                    <div class="hint">Açıkken OS'lerin gerçek destek-sonu tarihleri kullanılır. Envanteriniz dışarı gönderilmez (yalnız genel tablolar indirilir). Senkron/JSON içe aktarma: <b>Yönetim &amp; İşlemler</b>.</div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-head"><i class="bi bi-hdd-stack text-brand-500"></i> Yedekleme (SQLite)</div>
-                <div class="card-body">
-                    @if (ViewBag.BackupIsSqlite == false)
-                    {
-                        <div class="alert-warn text-sm"><i class="bi bi-info-circle"></i> Bu özellik <b>SQLite</b> içindir. Farklı bir DB sağlayıcısında kendi araçlarınızı kullanın.</div>
-                    }
-                    <label class="flex items-center gap-2 text-sm text-slate-700">
-                        <input asp-for="BackupEnabled" class="switch" /> Zamanlanmış otomatik yedek (günlük)
-                    </label>
-                    <div><label class="label">Yedek klasörü (sunucu tarafı)</label><input asp-for="BackupPath" class="input mono" placeholder="D:\vMon-Backups" /></div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div><label class="label">Saat</label><input asp-for="BackupHour" type="number" min="0" max="23" class="input" /></div>
-                        <div><label class="label">Dakika</label><input asp-for="BackupMinute" type="number" min="0" max="59" class="input" /></div>
-                        <div><label class="label">Adet</label><input asp-for="BackupRetentionCount" type="number" min="0" class="input" /></div>
-                    </div>
-                    <div class="hint">Elle yedek alma / geri yükleme: <b>Yönetim &amp; İşlemler</b> bölümü.</div>
-                </div>
-            </div>
-
-            <h2 class="sec-h">Diğer</h2>
-            <div class="card">
-                <div class="card-head"><i class="bi bi-clipboard-data text-brand-500"></i> Mutabakat</div>
-                <div class="card-body">
-                    <label class="flex items-start gap-2 text-sm text-slate-700">
-                        <input asp-for="MutabakatEnabled" class="switch mt-0.5" />
-                        <span><span class="font-medium">Mutabakat sekmesini etkinleştir</span>
-                        <span class="block hint">Kapalıyken sekme kimseye görünmez. Açıkken yalnızca <b>"Mutabakat görüntüle"</b> yetkisi olanlar görür (<a class="text-brand-600 hover:underline" asp-controller="Users" asp-action="Index">Kullanıcılar</a>).</span></span>
-                    </label>
-                    <div><label class="label">Bizim firma adı</label><input asp-for="MutabakatOwnCompany" class="input" placeholder="örn. Şirketimiz A.Ş." /></div>
-                    <div><label class="label">Hizmet aldığımız firma adı</label><input asp-for="MutabakatVendorCompany" class="input" placeholder="örn. Hizmet Sağlayıcı" /></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SAĞ KOLON -->
-        <div class="space-y-4">
-            <h2 id="s-erisim" class="sec-h">Erişim &amp; Oturum</h2>
             <div class="card">
                 <div class="card-head"><i class="bi bi-shield-lock text-brand-500"></i> Oturum Açma (LDAP / Active Directory)</div>
                 <div class="card-body">
@@ -187,6 +68,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="card">
                 <div class="card-head"><i class="bi bi-shield-lock-fill text-brand-500"></i> İki Adımlı Doğrulama (OTP)</div>
                 <div class="card-body">
@@ -207,8 +89,71 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            <h2 id="s-guvenlik" class="sec-h">Güvenlik</h2>
+        <!-- KOLON 2 -->
+        <div class="space-y-4">
+            <div class="card">
+                <div class="card-head"><i class="bi bi-stopwatch text-brand-500"></i> İzleme</div>
+                <div class="card-body">
+                    <div>
+                        <label class="label">Global Kontrol Aralığı (dakika)</label>
+                        <input asp-for="CheckIntervalMinutes" type="number" min="1" class="input" />
+                        <div class="hint">Servis bazında ayrıca özelleştirilebilir.</div>
+                    </div>
+                    <div>
+                        <label class="label">Bildirim Eşiği (ardışık hata sayısı)</label>
+                        <input asp-for="FailureThreshold" type="number" min="1" class="input" />
+                        <div class="hint">Bu kadar ardışık başarısız kontrol sonrası DOWN maili gönderilir.</div>
+                    </div>
+                    <div>
+                        <label class="label">Geçmiş Saklama Süresi (gün)</label>
+                        <input asp-for="HistoryRetentionDays" type="number" min="1" class="input" />
+                        <div class="hint">Daha eski kontrol kayıtları otomatik silinir.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><i class="bi bi-envelope text-brand-500"></i> Email (SMTP Relay)</div>
+                <div class="card-body">
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input asp-for="EmailEnabled" class="switch" /> Email bildirimleri aktif
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2"><label class="label">SMTP Sunucusu</label><input asp-for="SmtpHost" class="input mono" placeholder="smtp-relay.firma.local" /></div>
+                        <div><label class="label">Port</label><input asp-for="SmtpPort" type="number" class="input" /></div>
+                    </div>
+                    <div><label class="label">Gönderen Adres</label><input asp-for="MailFrom" class="input mono" placeholder="vmon@firma.com" /></div>
+                    <div>
+                        <label class="label">Alıcılar</label>
+                        <textarea asp-for="MailRecipients" class="input mono" rows="2" placeholder="ops@firma.com, admin@firma.com"></textarea>
+                        <div class="hint">Virgül veya noktalı virgül ile ayırın.</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="btnTestEmail" class="btn btn-outline btn-sm"><i class="bi bi-send"></i> Test Maili Gönder</button>
+                        <span id="testEmailResult" class="text-sm"></span>
+                    </div>
+                    <div class="hint">Relay tabanlı gönderim. Test <b>kayıtlı</b> ayarlarla yapılır — önce kaydedin.</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><i class="bi bi-clipboard-data text-brand-500"></i> Mutabakat</div>
+                <div class="card-body">
+                    <label class="flex items-start gap-2 text-sm text-slate-700">
+                        <input asp-for="MutabakatEnabled" class="switch mt-0.5" />
+                        <span><span class="font-medium">Mutabakat sekmesini etkinleştir</span>
+                        <span class="block hint">Kapalıyken sekme kimseye görünmez. Açıkken yalnızca <b>"Mutabakat görüntüle"</b> yetkisi olanlar görür (<a class="text-brand-600 hover:underline" asp-controller="Users" asp-action="Index">Kullanıcılar</a>).</span></span>
+                    </label>
+                    <div><label class="label">Bizim firma adı</label><input asp-for="MutabakatOwnCompany" class="input" placeholder="örn. Şirketimiz A.Ş." /></div>
+                    <div><label class="label">Hizmet aldığımız firma adı</label><input asp-for="MutabakatVendorCompany" class="input" placeholder="örn. Hizmet Sağlayıcı" /></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KOLON 3 -->
+        <div class="space-y-4">
             <div class="card">
                 <div class="card-head"><i class="bi bi-shield-check text-brand-500"></i> Güvenlik ve Uyumluluk</div>
                 <div class="card-body">
@@ -225,6 +170,40 @@
                     <div class="alert-info text-sm">
                         <i class="bi bi-info-circle"></i> Boşta kalma zaman aşımı <b>15 dk</b> sabittir (PCI 8.2.8). İşlemler <a class="text-brand-600 hover:underline" asp-controller="Audit" asp-action="Index">Denetim Kaydı</a>'nda izlenir.
                     </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><i class="bi bi-shield-exclamation text-brand-500"></i> Destek Sonu (EOL)</div>
+                <div class="card-body">
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input asp-for="EolEnabled" class="switch" /> EOL kontrolünü etkinleştir (gerçek tarihler)
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="label">"Yakında" eşiği (gün)</label><input asp-for="EolWarnDays" type="number" min="1" class="input" /></div>
+                        <div><label class="label">Giden Proxy (ops.)</label><input asp-for="EolProxyUrl" class="input mono" placeholder="http://proxy:8080" /></div>
+                    </div>
+                    <div class="hint">Açıkken OS'lerin gerçek destek-sonu tarihleri kullanılır. Envanteriniz dışarı gönderilmez. Senkron/JSON içe aktarma aşağıda.</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><i class="bi bi-hdd-stack text-brand-500"></i> Yedekleme (SQLite)</div>
+                <div class="card-body">
+                    @if (ViewBag.BackupIsSqlite == false)
+                    {
+                        <div class="alert-warn text-sm"><i class="bi bi-info-circle"></i> Bu özellik <b>SQLite</b> içindir. Farklı bir DB sağlayıcısında kendi araçlarınızı kullanın.</div>
+                    }
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input asp-for="BackupEnabled" class="switch" /> Zamanlanmış otomatik yedek (günlük)
+                    </label>
+                    <div><label class="label">Yedek klasörü (sunucu tarafı)</label><input asp-for="BackupPath" class="input mono" placeholder="D:\vMon-Backups" /></div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="label">Saat</label><input asp-for="BackupHour" type="number" min="0" max="23" class="input" /></div>
+                        <div><label class="label">Dakika</label><input asp-for="BackupMinute" type="number" min="0" max="59" class="input" /></div>
+                        <div><label class="label">Adet</label><input asp-for="BackupRetentionCount" type="number" min="0" class="input" /></div>
+                    </div>
+                    <div class="hint">Elle yedek alma / geri yükleme: aşağıdaki "Yedek Al / Geri Yükle".</div>
                 </div>
             </div>
         </div>
@@ -249,38 +228,35 @@
     var settingsReturn = Url.Action("Index", "Settings");
 }
 
-<h2 id="s-islemler" class="sec-h mt-5">Yönetim &amp; İşlemler</h2>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start mt-1">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start mt-4">
 
-    <!-- SOL: Bildirim Kanalları + EOL Verisi -->
+    <!-- KOLON 1: Bildirim Kanalları -->
     <div class="space-y-4">
         <div class="card">
             <div class="card-head">
-                <span><i class="bi bi-plug text-brand-500"></i> Bildirim Kanalları (Entegrasyonlar)</span>
+                <span><i class="bi bi-plug text-brand-500"></i> Bildirim Kanalları</span>
                 <a class="btn btn-primary btn-sm" asp-controller="SmsProviders" asp-action="Create"><i class="bi bi-plus-lg"></i> Yeni</a>
             </div>
             <div class="card-body">
                 <div class="flex flex-wrap gap-2">
-                    <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Sms"><i class="bi bi-chat-dots"></i> SMS ekle</a>
-                    <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Whatsapp"><i class="bi bi-whatsapp"></i> WhatsApp ekle</a>
-                    <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Ivr"><i class="bi bi-telephone"></i> Sesli/IVR ekle</a>
+                    <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Sms"><i class="bi bi-chat-dots"></i> SMS</a>
+                    <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Whatsapp"><i class="bi bi-whatsapp"></i> WhatsApp</a>
+                    <a class="btn btn-outline btn-sm" asp-controller="SmsProviders" asp-action="Create" asp-route-kind="Ivr"><i class="bi bi-telephone"></i> Sesli/IVR</a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="tbl">
-                        <thead><tr><th>Tür</th><th>Ad</th><th>URL</th><th>Alıcılar</th><th>Aktif</th><th></th></tr></thead>
+                        <thead><tr><th>Tür</th><th>Ad</th><th>Aktif</th><th></th></tr></thead>
                         <tbody>
                         @if (integrations.Count == 0)
                         {
-                            <tr><td colspan="6" class="text-center text-slate-400 py-5">Henüz entegrasyon yok. Yukarıdaki düğmelerle ekleyin.</td></tr>
+                            <tr><td colspan="4" class="text-center text-slate-400 py-5">Henüz entegrasyon yok.</td></tr>
                         }
                         @foreach (var p in integrations)
                         {
                             var km = kindMeta.GetValueOrDefault(p.Kind ?? "Sms", (l: p.Kind ?? "?", cls: "pill-type"));
                             <tr>
                                 <td><span class="badge @km.cls">@km.l</span></td>
-                                <td class="font-semibold text-slate-800">@p.Name</td>
-                                <td class="mono text-slate-500 truncate max-w-[14rem]" title="@p.Url">@p.Url</td>
-                                <td class="mono text-slate-400 truncate max-w-[9rem]" title="@p.Recipients">@(string.IsNullOrWhiteSpace(p.Recipients) ? "(global)" : p.Recipients)</td>
+                                <td class="font-semibold text-slate-800 truncate max-w-[10rem]" title="@p.Url">@p.Name</td>
                                 <td>
                                     <form method="post" asp-controller="SmsProviders" asp-action="Toggle" asp-route-id="@p.Id">
                                         @Html.AntiForgeryToken()
@@ -302,31 +278,9 @@
                 </div>
             </div>
         </div>
-
-        <div class="card">
-            <div class="card-head">
-                <span><i class="bi bi-arrow-repeat text-brand-500"></i> EOL Verisi</span>
-                <form method="post" asp-action="EolSyncNow" class="inline">
-                    @Html.AntiForgeryToken()
-                    <button class="btn btn-primary btn-sm"><i class="bi bi-cloud-arrow-down"></i> Senkronize Et</button>
-                </form>
-            </div>
-            <div class="card-body">
-                <div class="text-sm text-slate-600">
-                    Son senkron: <b>@(eolSynced.HasValue ? eolSynced.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Henüz yok")</b>
-                    @if (ViewBag.EolHasCache != true) { <span class="text-amber-600">— veri yok.</span> }
-                </div>
-                <form method="post" asp-action="EolImport" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
-                    @Html.AntiForgeryToken()
-                    <input type="file" name="eolFile" accept=".json" required class="input !py-1 max-w-xs" />
-                    <button class="btn btn-outline btn-sm"><i class="bi bi-upload"></i> JSON Yükle (offline)</button>
-                </form>
-                <div class="hint">Air-gapped: <code>{"oracle-linux":{"9":"2032-07-01"}}</code> biçimli cache JSON'unu yükleyin.</div>
-            </div>
-        </div>
     </div>
 
-    <!-- SAĞ: Yedek Al/Restore + Logo -->
+    <!-- KOLON 2: Yedek Al / Geri Yükle -->
     <div class="space-y-4">
         <div class="card">
             <div class="card-head">
@@ -335,7 +289,7 @@
                 {
                     <form method="post" asp-action="BackupNow" class="inline">
                         @Html.AntiForgeryToken()
-                        <button class="btn btn-primary btn-sm"><i class="bi bi-download"></i> Şimdi Yedek Al</button>
+                        <button class="btn btn-primary btn-sm"><i class="bi bi-download"></i> Şimdi Al</button>
                     </form>
                 }
             </div>
@@ -344,18 +298,17 @@
                 {
                     <div class="overflow-x-auto">
                         <table class="tbl">
-                            <thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th></th></tr></thead>
+                            <thead><tr><th>Dosya</th><th>Boyut</th><th></th></tr></thead>
                             <tbody>
                             @if (backups.Count == 0)
                             {
-                                <tr><td colspan="4" class="text-center text-slate-400 py-5">Henüz yedek yok.</td></tr>
+                                <tr><td colspan="3" class="text-center text-slate-400 py-5">Henüz yedek yok.</td></tr>
                             }
                             @foreach (var b in backups)
                             {
                                 <tr>
-                                    <td class="mono text-slate-700">@b.Name</td>
+                                    <td class="mono text-slate-700 truncate max-w-[10rem]" title="@b.ModifiedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")">@b.Name</td>
                                     <td class="text-slate-500">@b.SizeMb MB</td>
-                                    <td class="text-slate-500">@b.ModifiedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                                     <td class="text-right whitespace-nowrap">
                                         <a class="btn btn-outline btn-sm" asp-action="DownloadBackup" asp-route-file="@b.Name"><i class="bi bi-download"></i></a>
                                         <form method="post" asp-action="RestoreExisting" class="inline" onsubmit="return confirm('DİKKAT: @b.Name aktif DB üzerine yazılacak ve uygulama yeniden başlatılacak. Devam?');">
@@ -380,26 +333,50 @@
                         <form method="post" asp-action="RestoreUpload" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2"
                               onsubmit="return confirm('DİKKAT: Seçilen .db aktif DB üzerine yazılacak ve uygulama yeniden başlatılacak. Devam?');">
                             @Html.AntiForgeryToken()
-                            <input type="file" name="dbFile" accept=".db" required class="input !py-1 max-w-xs" />
-                            <button class="btn btn-outline btn-sm"><i class="bi bi-arrow-counterclockwise"></i> Yükle &amp; Geri Yükle</button>
+                            <input type="file" name="dbFile" accept=".db" required class="input !py-1 max-w-[12rem]" />
+                            <button class="btn btn-outline btn-sm"><i class="bi bi-arrow-counterclockwise"></i> Yükle</button>
                         </form>
-                        <div class="hint mt-1">Büyük dosyada aşağıdaki <b>sunucu yolu</b> daha hızlıdır. Şifreli sırlar başka makinede çözülmez, yeniden girilir.</div>
                     </div>
                     <div>
-                        <div class="font-medium text-slate-700 text-sm mb-1"><i class="bi bi-folder2-open"></i> Sunucudaki yoldan geri yükle</div>
+                        <div class="font-medium text-slate-700 text-sm mb-1"><i class="bi bi-folder2-open"></i> Sunucu yolundan geri yükle</div>
                         <form method="post" asp-action="RestoreServerPath" class="flex flex-wrap items-center gap-2"
                               onsubmit="return confirm('DİKKAT: Belirtilen dosya aktif DB üzerine yazılacak ve uygulama yeniden başlatılacak. Devam?');">
                             @Html.AntiForgeryToken()
-                            <input type="text" name="serverPath" required class="input mono !py-1 max-w-xs" placeholder="C:\Temp\monitoring.db" />
+                            <input type="text" name="serverPath" required class="input mono !py-1 max-w-[12rem]" placeholder="C:\Temp\monitoring.db" />
                             <button class="btn btn-outline btn-sm"><i class="bi bi-arrow-counterclockwise"></i> Geri Yükle</button>
                         </form>
-                        <div class="hint mt-1">Dosyayı sunucuya kopyalayıp tam yolunu girin. Yükleme limiti yok.</div>
+                        <div class="hint mt-1">Büyük DB için önerilir; yükleme limiti yok. Şifreli sırlar başka makinede çözülmez.</div>
                     </div>
                 }
                 else
                 {
                     <p class="text-sm text-slate-400">Aktif veritabanı SQLite değil — devre dışı.</p>
                 }
+            </div>
+        </div>
+    </div>
+
+    <!-- KOLON 3: EOL Verisi + Logo -->
+    <div class="space-y-4">
+        <div class="card">
+            <div class="card-head">
+                <span><i class="bi bi-arrow-repeat text-brand-500"></i> EOL Verisi</span>
+                <form method="post" asp-action="EolSyncNow" class="inline">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-primary btn-sm"><i class="bi bi-cloud-arrow-down"></i> Senkronize Et</button>
+                </form>
+            </div>
+            <div class="card-body">
+                <div class="text-sm text-slate-600">
+                    Son senkron: <b>@(eolSynced.HasValue ? eolSynced.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Henüz yok")</b>
+                    @if (ViewBag.EolHasCache != true) { <span class="text-amber-600">— veri yok.</span> }
+                </div>
+                <form method="post" asp-action="EolImport" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+                    @Html.AntiForgeryToken()
+                    <input type="file" name="eolFile" accept=".json" required class="input !py-1 max-w-[12rem]" />
+                    <button class="btn btn-outline btn-sm"><i class="bi bi-upload"></i> JSON Yükle</button>
+                </form>
+                <div class="hint">Air-gapped: <code>{"oracle-linux":{"9":"2032-07-01"}}</code> biçimli cache JSON'unu yükleyin.</div>
             </div>
         </div>
 
@@ -465,19 +442,5 @@ function clearTestFields() {
 clearTestFields();
 window.addEventListener("pageshow", clearTestFields);
 setTimeout(clearTestFields, 200);
-
-// Bölüm menüsü: yumuşak kaydırma + scroll-spy. Hiçbir kart gizlenmez.
-(function () {
-    const links = Array.from(document.querySelectorAll('.snav a'));
-    const map = {}; links.forEach(a => map[a.getAttribute('href').slice(1)] = a);
-    const headings = Object.keys(map).map(id => document.getElementById(id)).filter(Boolean);
-    if (!('IntersectionObserver' in window) || headings.length === 0) return;
-    const obs = new IntersectionObserver(entries => {
-        entries.forEach(e => {
-            if (e.isIntersecting) { links.forEach(l => l.classList.remove('active')); if (map[e.target.id]) map[e.target.id].classList.add('active'); }
-        });
-    }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
-    headings.forEach(h => obs.observe(h));
-})();
 </script>
 }
