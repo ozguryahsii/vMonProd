@@ -112,8 +112,15 @@
             <button onclick="closeDetail()" class="btn btn-outline btn-sm"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="smodal-body">
-            <div id="smTrend" class="hidden mb-4" style="height:200px;"></div>
-            <div id="smTableWrap" class="overflow-auto" style="max-height:48vh;"></div>
+            <div id="smRange" class="hidden flex flex-wrap gap-1.5 mb-2">
+                <button class="btn btn-outline btn-sm sm-range" data-days="7">7 gün</button>
+                <button class="btn btn-outline btn-sm sm-range" data-days="30">1 ay</button>
+                <button class="btn btn-outline btn-sm sm-range" data-days="90">3 ay</button>
+                <button class="btn btn-outline btn-sm sm-range" data-days="180">6 ay</button>
+                <button class="btn btn-outline btn-sm sm-range" data-days="365">1 yıl</button>
+            </div>
+            <div id="smTrend" class="hidden mb-4" style="height:220px;"></div>
+            <div id="smTableWrap" class="overflow-auto" style="max-height:42vh;"></div>
         </div>
     </div>
 </div>
@@ -328,45 +335,71 @@
         });
     }
 
+    let detailState = { source:null, value:null };
+    const rangeLabel = { 7:'7 gün', 30:'1 ay', 90:'3 ay', 180:'6 ay', 365:'1 yıl' };
+
     window.openDetail = async function(source, value){
-        const modal = document.getElementById('smodal');
+        detailState = { source, value };
         const meta = META[source] || { label: source };
         document.querySelector('#smTitle span').textContent = (meta.label || source) + (value ? ' — ' + value : '');
         document.getElementById('smTableWrap').innerHTML = '<div class="stat-sub">Yükleniyor…</div>';
-        const trendDiv = document.getElementById('smTrend');
-        trendDiv.classList.add('hidden');
+        document.getElementById('smTrend').classList.add('hidden');
+        document.getElementById('smRange').classList.add('hidden');
         if (modalChart) { modalChart.dispose(); modalChart = null; }
-        modal.classList.add('open');
+        document.getElementById('smodal').classList.add('open');
+        await renderDetail(7, true);
+    };
 
+    async function renderDetail(days, withTable){
         let d;
         try {
-            const u = '@Url.Action("Detail")?source=' + encodeURIComponent(source) + '&value=' + encodeURIComponent(value || '');
+            const u = '@Url.Action("Detail")?source=' + encodeURIComponent(detailState.source)
+                + '&value=' + encodeURIComponent(detailState.value || '') + '&days=' + days;
             d = await (await fetch(u)).json();
         } catch (e) { document.getElementById('smTableWrap').innerHTML = '<div class="stat-sub">Veri alınamadı.</div>'; return; }
 
+        if (withTable) {
+            const rows = (d.servers||[]).map(s=>'<tr>'+
+                '<td>'+esc(s.name)+'<div class="text-slate-400" style="font-size:.72rem">'+esc(s.target||'')+'</div></td>'+
+                '<td>'+esc(s.os||'')+'</td><td>'+statusBadge(s.status)+'</td>'+
+                '<td>'+pct(s.cpu)+'</td><td>'+pct(s.ram)+'</td><td>'+pct(s.disk)+'</td>'+
+                '<td class="text-slate-400">'+esc(s.capacity||'')+'</td></tr>').join('');
+            document.getElementById('smTableWrap').innerHTML =
+                '<table class="stbl"><thead><tr><th>Sunucu</th><th>İşletim Sistemi</th><th>Durum</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Kapasite</th></tr></thead><tbody>'
+                + (rows || '<tr><td colspan="7" class="stat-sub">Kayıt yok.</td></tr>') + '</tbody></table>'
+                + '<div class="stat-sub mt-2">Toplam ' + (d.count||0) + ' sunucu.</div>';
+        }
+
+        const trendDiv = document.getElementById('smTrend');
+        const rangeBar = document.getElementById('smRange');
         if (d.trend && d.trend.points && d.trend.points.length) {
+            rangeBar.classList.remove('hidden');
             trendDiv.classList.remove('hidden');
+            rangeBar.querySelectorAll('.sm-range').forEach(b => {
+                const on = parseInt(b.dataset.days,10) === (d.trend.days || days);
+                b.classList.toggle('btn-primary', on); b.classList.toggle('btn-outline', !on);
+            });
+            if (modalChart) modalChart.dispose();
             modalChart = echarts.init(trendDiv);
             const mlabel = ({cpu:'CPU %', ram:'RAM %', disk:'Disk %'})[d.trend.metric] || '';
             modalChart.setOption({
-                title:{ text:'Son 7 gün — '+mlabel, left:'center', textStyle:{fontSize:12,color:txtColor()} },
+                title:{ text:(rangeLabel[d.trend.days]||'') + ' — ' + mlabel, left:'center', textStyle:{fontSize:12,color:txtColor()} },
                 tooltip:{ trigger:'axis' }, grid:{ left:42, right:18, top:36, bottom:28 },
                 xAxis:{ type:'category', data:d.trend.points.map(p=>p.day), axisLabel:{color:txtColor()} },
                 yAxis:{ type:'value', max:100, axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[{ type:'line', smooth:true, areaStyle:{opacity:.15}, data:d.trend.points.map(p=>p.value),
                           itemStyle:{color:'#ed1c24'}, lineStyle:{color:'#ed1c24'} }]
             });
+        } else {
+            rangeBar.classList.add('hidden');
+            trendDiv.classList.add('hidden');
+            if (modalChart) { modalChart.dispose(); modalChart = null; }
         }
-        const rows = (d.servers||[]).map(s=>'<tr>'+
-            '<td>'+esc(s.name)+'<div class="text-slate-400" style="font-size:.72rem">'+esc(s.target||'')+'</div></td>'+
-            '<td>'+esc(s.os||'')+'</td><td>'+statusBadge(s.status)+'</td>'+
-            '<td>'+pct(s.cpu)+'</td><td>'+pct(s.ram)+'</td><td>'+pct(s.disk)+'</td>'+
-            '<td class="text-slate-400">'+esc(s.capacity||'')+'</td></tr>').join('');
-        document.getElementById('smTableWrap').innerHTML =
-            '<table class="stbl"><thead><tr><th>Sunucu</th><th>İşletim Sistemi</th><th>Durum</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Kapasite</th></tr></thead><tbody>'
-            + (rows || '<tr><td colspan="7" class="stat-sub">Kayıt yok.</td></tr>') + '</tbody></table>'
-            + '<div class="stat-sub mt-2">Toplam ' + (d.count||0) + ' sunucu.</div>';
-    };
+    }
+
+    document.querySelectorAll('#smRange .sm-range').forEach(b => {
+        b.addEventListener('click', () => renderDetail(parseInt(b.dataset.days,10), false));
+    });
     window.closeDetail = function(){
         document.getElementById('smodal').classList.remove('open');
         if (modalChart) { modalChart.dispose(); modalChart = null; }

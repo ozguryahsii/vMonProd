@@ -85,8 +85,9 @@ public class StatisticsController : Controller
 
     /// <summary>Bir widget'a/pasta dilimine tıklanınca: ilgili sunucu listesini + (kaynak metrikse) 7 günlük trendi döner.</summary>
     [HttpGet]
-    public async Task<IActionResult> Detail(string source, string? value)
+    public async Task<IActionResult> Detail(string source, string? value, int days = 7)
     {
+        days = days switch { <= 7 => 7, <= 31 => 30, <= 92 => 90, <= 186 => 180, _ => 365 };
         if (!CanView()) return Forbid();
         var all = await HealthServicesAsync();
         source = (source ?? "").ToLowerInvariant();
@@ -122,14 +123,21 @@ public class StatisticsController : Controller
         if (metric is "cpu" or "ram" or "disk")
         {
             var ids = sel.Select(s => s.Id).ToHashSet();
-            var since = DateTime.UtcNow.AddDays(-7);
+            var since = DateTime.UtcNow.AddDays(-days);
             var rows = await _db.HealthMetrics.AsNoTracking()
                 .Where(m => m.CheckedAt >= since && ids.Contains(m.ServiceId))
                 .Select(m => new { m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent })
                 .ToListAsync();
-            var byDay = rows.GroupBy(r => r.CheckedAt.ToLocalTime().Date).OrderBy(g => g.Key).Select(g => new
+
+            // Aralığa göre gruplama: <=30 gün → günlük, <=180 → haftalık, daha uzun → aylık
+            DateTime BucketStart(DateTime d) => days <= 30 ? d.Date
+                : days <= 180 ? d.Date.AddDays(-(((int)d.DayOfWeek + 6) % 7))   // haftanın başı (Pzt)
+                : new DateTime(d.Year, d.Month, 1);
+            string Label(DateTime d) => days <= 180 ? d.ToString("dd.MM") : d.ToString("MM.yyyy");
+
+            var points = rows.GroupBy(r => BucketStart(r.CheckedAt.ToLocalTime())).OrderBy(g => g.Key).Select(g => new
             {
-                day = g.Key.ToString("dd.MM"),
+                day = Label(g.Key),
                 value = Math.Round(metric switch
                 {
                     "cpu" => g.Where(x => x.CpuPercent.HasValue).Select(x => x.CpuPercent!.Value).DefaultIfEmpty(0).Average(),
@@ -137,7 +145,7 @@ public class StatisticsController : Controller
                     _ => g.Where(x => x.MaxDiskPercent.HasValue).Select(x => x.MaxDiskPercent!.Value).DefaultIfEmpty(0).Average()
                 }, 1)
             }).ToList();
-            if (byDay.Count > 0) trend = new { metric, points = byDay };
+            if (points.Count > 0) trend = new { metric, days, points };
         }
 
         return Json(new { count = servers.Count, servers, trend });
