@@ -11,12 +11,16 @@ public class SettingsController : Controller
     private readonly IWebHostEnvironment _env;
     private readonly AppDbContext _db;
     private readonly AuditService _audit;
-    public SettingsController(SettingsService settings, IWebHostEnvironment env, AppDbContext db, AuditService audit)
+    private readonly BackupService _backup;
+    private readonly IHostApplicationLifetime _life;
+    public SettingsController(SettingsService settings, IWebHostEnvironment env, AppDbContext db, AuditService audit, BackupService backup, IHostApplicationLifetime life)
     {
         _settings = settings;
         _env = env;
         _db = db;
         _audit = audit;
+        _backup = backup;
+        _life = life;
     }
 
     /// <summary>Admin değilse (ve oturum açık modundaysa) erişimi reddet.</summary>
@@ -39,7 +43,86 @@ public class SettingsController : Controller
         var settings = await _settings.GetAsync();
         if (!IsAllowed(settings)) return Denied();
         await LoadCredentialsAsync();
+        ViewBag.BackupIsSqlite = _backup.IsSqlite;
+        ViewBag.Backups = _backup.List(settings.BackupPath);
         return View(settings);
+    }
+
+    // ---------------- Yedekleme (SQLite) ----------------
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> BackupNow()
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        var (file, error) = await _backup.BackupNowAsync(settings.BackupPath, settings.BackupRetentionCount);
+        if (error != null) { TempData["Error"] = "Yedek alınamadı: " + error; }
+        else { TempData["Message"] = "Yedek alındı: " + file; await _audit.LogAsync("backup.create", null, file); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadBackup(string file)
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        var path = _backup.SafeBackupPath(settings.BackupPath, file);
+        if (path == null) return NotFound();
+        await _audit.LogAsync("backup.download", null, Path.GetFileName(path));
+        return PhysicalFile(path, "application/octet-stream", Path.GetFileName(path));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteBackup(string file)
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        var path = _backup.SafeBackupPath(settings.BackupPath, file);
+        if (path != null) { try { System.IO.File.Delete(path); await _audit.LogAsync("backup.delete", null, Path.GetFileName(path)); } catch { } }
+        TempData["Message"] = "Yedek silindi.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Klasördeki bir yedeği aktif DB'nin üzerine geri yükler, sonra uygulamayı yeniden başlatır.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreExisting(string file)
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        var path = _backup.SafeBackupPath(settings.BackupPath, file);
+        if (path == null) { TempData["Error"] = "Yedek bulunamadı."; return RedirectToAction(nameof(Index)); }
+        return await DoRestore(path, Path.GetFileName(path));
+    }
+
+    /// <summary>Yüklenen bir .db dosyasını aktif DB'nin üzerine geri yükler (eski makineden taşıma için).</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    [RequestSizeLimit(1_073_741_824)]
+    public async Task<IActionResult> RestoreUpload(IFormFile? dbFile)
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        if (dbFile == null || dbFile.Length == 0) { TempData["Error"] = "Dosya seçilmedi."; return RedirectToAction(nameof(Index)); }
+        var temp = Path.Combine(Path.GetTempPath(), "vmon-restore-" + Guid.NewGuid().ToString("N") + ".db");
+        try
+        {
+            using (var fs = System.IO.File.Create(temp)) await dbFile.CopyToAsync(fs);
+            return await DoRestore(temp, dbFile.FileName);
+        }
+        finally { try { if (System.IO.File.Exists(temp)) System.IO.File.Delete(temp); } catch { } }
+    }
+
+    private async Task<IActionResult> DoRestore(string sourcePath, string label)
+    {
+        var (ok, error) = await _backup.RestoreAsync(sourcePath);
+        if (!ok) { TempData["Error"] = "Geri yükleme başarısız: " + error; return RedirectToAction(nameof(Index)); }
+        await _audit.LogAsync("backup.restore", null, label, true);
+        // Geri yüklemeden sonra önbellekler/şema güncel olsun diye yeniden başlat
+        if (Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService())
+            _ = Task.Run(async () => { await Task.Delay(1500); Environment.Exit(1); });
+        else
+            _ = Task.Run(async () => { await Task.Delay(1500); _life.StopApplication(); });
+        TempData["Message"] = $"Geri yükleme tamam ({label}). Uygulama yeniden başlatılıyor — birkaç saniye içinde tekrar deneyin.";
+        return RedirectToAction(nameof(Index));
     }
 
     private async Task LoadCredentialsAsync()

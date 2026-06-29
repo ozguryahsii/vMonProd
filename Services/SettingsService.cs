@@ -43,6 +43,18 @@ public class MonitorSettings
     /// <summary>OTP kodunun gönderileceği kanal: "Email" / "Sms" / "Whatsapp".</summary>
     public string OtpChannel { get; set; } = "Email";
 
+    // --- Yedekleme (yalnızca SQLite) ---
+    /// <summary>Zamanlanmış otomatik yedek açık mı?</summary>
+    public bool BackupEnabled { get; set; } = false;
+    /// <summary>Yedeklerin yazılacağı sunucu-tarafı klasör (örn. D:\vMon-Backups).</summary>
+    public string BackupPath { get; set; } = "";
+    /// <summary>Günlük otomatik yedek saati (0-23).</summary>
+    public int BackupHour { get; set; } = 2;
+    /// <summary>Günlük otomatik yedek dakikası (0-59).</summary>
+    public int BackupMinute { get; set; } = 0;
+    /// <summary>Saklanacak yedek sayısı (eskiler silinir). 0 = sınırsız.</summary>
+    public int BackupRetentionCount { get; set; } = 14;
+
     /// <summary>Kullanıcı senkronizasyonunda kullanılacak kimlik bilgisi (Kimlik Bilgileri ekranından, Vault destekli olabilir).</summary>
     public int? LdapSyncCredentialId { get; set; }
 
@@ -149,6 +161,11 @@ public class SettingsService
         if (dict.TryGetValue("CompanyName", out v)) s.CompanyName = v ?? "";
         if (dict.TryGetValue("OtpEnabled", out v)) s.OtpEnabled = v == "true";
         if (dict.TryGetValue("OtpChannel", out v) && !string.IsNullOrWhiteSpace(v)) s.OtpChannel = v;
+        if (dict.TryGetValue("BackupEnabled", out v)) s.BackupEnabled = v == "true";
+        if (dict.TryGetValue("BackupPath", out v)) s.BackupPath = v ?? "";
+        if (dict.TryGetValue("BackupHour", out v) && int.TryParse(v, out var bh)) s.BackupHour = Math.Clamp(bh, 0, 23);
+        if (dict.TryGetValue("BackupMinute", out v) && int.TryParse(v, out var bm)) s.BackupMinute = Math.Clamp(bm, 0, 59);
+        if (dict.TryGetValue("BackupRetentionCount", out v) && int.TryParse(v, out var br)) s.BackupRetentionCount = Math.Max(0, br);
         if (dict.TryGetValue("LdapSyncCredentialId", out v) && int.TryParse(v, out var ci) && ci > 0) s.LdapSyncCredentialId = ci;
         if (dict.TryGetValue("TrustInternalTlsCertificates", out v)) s.TrustInternalTlsCertificates = v == "true";
         if (dict.TryGetValue("MaxLoginAttempts", out v) && int.TryParse(v, out i) && i > 0) s.MaxLoginAttempts = Math.Min(i, 10);
@@ -198,6 +215,11 @@ public class SettingsService
             ["CompanyName"] = s.CompanyName,
             ["OtpEnabled"] = s.OtpEnabled ? "true" : "false",
             ["OtpChannel"] = s.OtpChannel,
+            ["BackupEnabled"] = s.BackupEnabled ? "true" : "false",
+            ["BackupPath"] = s.BackupPath,
+            ["BackupHour"] = s.BackupHour.ToString(),
+            ["BackupMinute"] = s.BackupMinute.ToString(),
+            ["BackupRetentionCount"] = s.BackupRetentionCount.ToString(),
             ["LdapSyncCredentialId"] = s.LdapSyncCredentialId?.ToString() ?? "",
             ["TrustInternalTlsCertificates"] = s.TrustInternalTlsCertificates ? "true" : "false",
             ["MaxLoginAttempts"] = s.MaxLoginAttempts.ToString(),

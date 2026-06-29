@@ -10,6 +10,7 @@ public class MonitoringBackgroundService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MonitoringBackgroundService> _logger;
     private DateTime _lastCleanup = DateTime.MinValue;
+    private DateTime _lastScheduledBackup = DateTime.MinValue;
 
     public MonitoringBackgroundService(IServiceScopeFactory scopeFactory, ILogger<MonitoringBackgroundService> logger)
     {
@@ -80,6 +81,22 @@ public class MonitoringBackgroundService : BackgroundService
                 finally { throttle.Release(); }
             });
             await Task.WhenAll(tasks);
+        }
+
+        // Zamanlanmış yedek (yalnızca SQLite): yerel saatte günde bir kez, ayarlanan saat:dakika geçilince
+        if (settings.BackupEnabled && !string.IsNullOrWhiteSpace(settings.BackupPath))
+        {
+            var nowLocal = DateTime.Now;
+            var dueToday = new DateTime(nowLocal.Year, nowLocal.Month, nowLocal.Day, settings.BackupHour, settings.BackupMinute, 0);
+            if (nowLocal >= dueToday && _lastScheduledBackup.Date < nowLocal.Date)
+            {
+                _lastScheduledBackup = nowLocal;
+                using var scope = _scopeFactory.CreateScope();
+                var backup = scope.ServiceProvider.GetRequiredService<BackupService>();
+                var (file, err) = await backup.BackupNowAsync(settings.BackupPath, settings.BackupRetentionCount, ct);
+                if (err != null) _logger.LogError("Zamanlanmış yedek başarısız: {Err}", err);
+                else _logger.LogInformation("Zamanlanmış yedek alındı: {File}", file);
+            }
         }
 
         // Günlük temizlik
