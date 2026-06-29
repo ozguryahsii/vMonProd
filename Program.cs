@@ -126,6 +126,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<SmsService>();
 builder.Services.AddScoped<WhatsappService>();
 builder.Services.AddScoped<OtpService>();
+builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<CheckRunner>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MutabakatService>();
