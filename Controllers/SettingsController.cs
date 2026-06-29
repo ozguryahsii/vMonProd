@@ -159,6 +159,25 @@ public class SettingsController : Controller
         // güvenli aralığa kırpılır. (Aksi halde her yeni ayar alanı eklendiğinde Kaydet sessizce başarısız oluyordu.)
         ModelState.Clear();
 
+        // OTP koruması: OTP zorunluysa, seçili kanal için iletişim bilgisi (e-posta/telefon) olan en az bir
+        // AKTİF ADMIN kullanıcı yoksa kaydı ENGELLE — aksi halde kimse giriş yapamaz hale gelir (kilitlenme).
+        if (model.OtpEnabled)
+        {
+            var needEmail = string.Equals(model.OtpChannel, "Email", StringComparison.OrdinalIgnoreCase);
+            var adminList = (model.AdminUsers ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var users = await _db.AppUsers.AsNoTracking().Where(u => u.IsActive).ToListAsync();
+            bool IsAdminSam(string sam) => adminList.Length == 0 || adminList.Any(a => string.Equals(a, sam, StringComparison.OrdinalIgnoreCase));
+            var hasContact = users.Any(u => IsAdminSam(u.Sam) &&
+                (needEmail ? !string.IsNullOrWhiteSpace(u.Email) : !string.IsNullOrWhiteSpace(u.Phone)));
+            if (!hasContact)
+            {
+                TempData["Error"] = needEmail
+                    ? "OTP açılamadı: E-posta kanalı için en az bir admin kullanıcının e-posta adresi olmalı. Önce Kullanıcılar ekranından (veya AD girişiyle) e-posta ekleyin."
+                    : "OTP açılamadı: SMS/WhatsApp kanalı için en az bir admin kullanıcının telefon numarası olmalı. Önce Kullanıcılar ekranından ekleyin.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
         // Logo alanı bu formda taşınmaz (ayrı yükleme formu) — mevcut değeri koru
         model.LoginLogoFile = current.LoginLogoFile;
 

@@ -148,6 +148,8 @@ public class AccountController : Controller
         }
 
         appUser.DisplayName = result.DisplayName ?? username;
+        // LDAP'tan gelen e-postayı sakla (OTP e-posta kanalı + Kullanıcılar ekranı). Elle girilmişse koru/güncelle.
+        if (!string.IsNullOrWhiteSpace(result.Email)) appUser.Email = result.Email;
         return await ProceedAsync(appUser, isAdmin, result.DisplayName ?? username, returnUrl, settings);
     }
 

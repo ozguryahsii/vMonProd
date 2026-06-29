@@ -4,7 +4,7 @@ using vMonitor.Models;
 
 namespace vMonitor.Services;
 
-public record LdapAuthResult(bool Success, string? Error = null, string? DisplayName = null, string? Sam = null);
+public record LdapAuthResult(bool Success, string? Error = null, string? DisplayName = null, string? Sam = null, string? Email = null);
 
 /// <summary>LDAP/Active Directory ile oturum doğrulama. Kullanıcı kendi kimliğiyle
 /// bind eder (şifre doğrulanır), ardından izin verilen güvenlik grubunun üyesi mi
@@ -45,6 +45,20 @@ public class LdapAuthService
 
             conn.Bind(); // hatalı şifrede LdapException fırlatır
 
+            // Kullanıcının displayName + mail bilgisini çek (OTP e-postası ve Kullanıcılar ekranı için)
+            string? display = null, email = null;
+            if (!string.IsNullOrWhiteSpace(s.LdapAuthBaseDn))
+            {
+                var ureq = new SearchRequest(s.LdapAuthBaseDn, $"(sAMAccountName={EscapeFilter(sam)})",
+                    SearchScope.Subtree, "displayName", "mail");
+                var uresp = (SearchResponse)conn.SendRequest(ureq);
+                if (uresp.Entries.Count > 0)
+                {
+                    display = uresp.Entries[0].Attributes["displayName"]?[0]?.ToString();
+                    email = uresp.Entries[0].Attributes["mail"]?[0]?.ToString();
+                }
+            }
+
             // Grup üyeliği kontrolü (boşsa: geçerli kimlikli herkes girebilir)
             if (!string.IsNullOrWhiteSpace(s.LdapAuthGroupDn))
             {
@@ -54,18 +68,15 @@ public class LdapAuthService
                 // memberOf zincir kuralı (1.2.840.113556.1.4.1941) → iç içe grup üyeliğini de yakalar
                 var filter = $"(&(sAMAccountName={EscapeFilter(sam)})" +
                              $"(memberOf:1.2.840.113556.1.4.1941:={EscapeFilter(s.LdapAuthGroupDn)}))";
-                var req = new SearchRequest(s.LdapAuthBaseDn, filter, SearchScope.Subtree,
-                    "displayName", "distinguishedName");
+                var req = new SearchRequest(s.LdapAuthBaseDn, filter, SearchScope.Subtree, "distinguishedName");
                 var resp = (SearchResponse)conn.SendRequest(req);
 
                 if (resp.Entries.Count == 0)
                     return new(false, "Bu uygulamaya erişim yetkiniz yok (gerekli güvenlik grubunda değilsiniz).");
-
-                var display = resp.Entries[0].Attributes["displayName"]?[0]?.ToString();
-                return new(true, null, string.IsNullOrWhiteSpace(display) ? sam : display, sam);
             }
 
-            return new(true, null, sam, sam);
+            return new(true, null, string.IsNullOrWhiteSpace(display) ? sam : display, sam,
+                string.IsNullOrWhiteSpace(email) ? null : email.Trim());
         }
         catch (LdapException ex) when (ex.ErrorCode == 49) // invalid credentials
         {
