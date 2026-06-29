@@ -94,6 +94,7 @@
                         <option value="uptime|uptime">Erişilebilirlik (uptime)</option>
                         <option value="histogram|histogram">Kullanım dağılımı</option>
                         <option value="capacity|capacity">Kapasite (kullanılan/atanan)</option>
+                        <option value="rising|rising">Kapasite kullanımı artan</option>
                         <option value="outage|outage">Kesinti özeti</option>
                         <option value="os_eol|os_eol">Destek sonu (EOL) OS</option>
                         <option value="heatmap|heatmap">CPU ısı haritası</option>
@@ -177,6 +178,7 @@
         uptime:   { label:'Erişilebilirlik (Uptime)', icon:'bi-shield-check', color:'#10b981' },
         histogram:{ label:'Kullanım Dağılımı', icon:'bi-bar-chart-steps', color:'#8b5cf6' },
         capacity: { label:'Kapasite (kullanılan / atanan)', icon:'bi-hdd-stack', color:'#14b8a6' },
+        rising:   { label:'Kapasite Kullanımı Artan (7g, >%10)', icon:'bi-graph-up-arrow', color:'#ef4444' },
         outage:   { label:'Kesinti Özeti (7 gün)', icon:'bi-plug', color:'#f59e0b' },
         os_eol:   { label:'Destek Sonu (EOL) OS', icon:'bi-shield-exclamation', color:'#ef4444' },
         heatmap:  { label:'CPU Isı Haritası (24s)', icon:'bi-grid-3x3', color:'#3b82f6' },
@@ -381,18 +383,20 @@
             return;
         }
         if (type === 'capacity') {
-            const t = item.__cTab || 'ram';
+            const t = item.__cTab || 'cpu';
             const cap = DATA.capacity || [];
-            const used = cap.map(p => t==='ram'?p.ramUsed:p.diskUsed);
-            const alloc = cap.map(p => t==='ram'?p.ramAlloc:p.diskAlloc);
-            body.innerHTML = header(meta) + tabRow(['ram','disk'], t) + '<div class="stat-chart"></div>';
+            const pick = (p, kind) => t==='cpu' ? p['cpu'+kind] : t==='ram' ? p['ram'+kind] : p['disk'+kind];
+            const used = cap.map(p => pick(p,'Used'));
+            const alloc = cap.map(p => pick(p,'Alloc'));
+            const unit = t==='cpu' ? 'çekirdek' : 'GB';
+            body.innerHTML = header(meta) + tabRow(['cpu','ram','disk'], t) + '<div class="stat-chart"></div>';
             bindTabs(body, item, '__cTab');
             const ch = chartFor(body.querySelector('.stat-chart'));
             ch.setOption({
                 tooltip:{ trigger:'axis' }, legend:{ bottom:0, data:['Atanan','Kullanılan'], textStyle:{color:txtColor()} },
                 grid:{ left:46, right:14, top:12, bottom:30 },
                 xAxis:{ type:'category', data:cap.map(p=>p.day), axisLabel:{color:txtColor()} },
-                yAxis:{ type:'value', name:'GB', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
+                yAxis:{ type:'value', name:unit, axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[
                     { name:'Atanan', type:'line', smooth:true, areaStyle:{opacity:.08}, data:alloc, itemStyle:{color:'#94a3b8'}, lineStyle:{color:'#94a3b8'} },
                     { name:'Kullanılan', type:'line', smooth:true, areaStyle:{opacity:.22}, data:used, itemStyle:{color:meta.color}, lineStyle:{color:meta.color} }
@@ -413,6 +417,17 @@
                 yAxis:{ type:'value', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[{ type:'bar', barWidth:'50%', data:(o.daily||[]).map(p=>p.value), itemStyle:{ color:meta.color, borderRadius:[4,4,0,0] } }]
             });
+            return;
+        }
+        if (type === 'rising') {
+            const t = item.__rTab || 'cpu';
+            const arr = (DATA.rising && DATA.rising[t]) || [];
+            const rows = arr.length ? arr.map(d=>'<div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 dark:border-slate-700">'
+                +'<span class="truncate" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'
+                +'<span class="whitespace-nowrap ml-2"><span class="text-slate-400">%'+d.from+' → %'+d.to+'</span> <span class="badge pill-error ml-1">+'+d.delta+'</span></span></div>').join('')
+                : '<div class="stat-sub">Son 7 günde %10\'dan fazla artış yok 👍</div>';
+            body.innerHTML = header(meta) + tabRow(['cpu','ram','disk'], t) + '<div style="overflow:auto;flex:1">'+rows+'</div>';
+            bindTabs(body, item, '__rTab');
             return;
         }
         if (type === 'os_eol') {
@@ -511,7 +526,7 @@
             const [type, source] = document.getElementById('addType').value.split('|');
             const SIZE = { counter:[3,2], resource:[4,3], pie:[4,4], gauge:[4,3],
                 fleet:[12,4], top:[6,5], critical:[6,2], uptime:[6,3], histogram:[6,4],
-                capacity:[6,4], outage:[6,4], os_eol:[3,4], heatmap:[12,5] };
+                capacity:[6,4], rising:[6,4], outage:[6,4], os_eol:[3,4], heatmap:[12,5] };
             const [w, h] = SIZE[type] || [4,3];
             const el = document.createElement('div');
             el.className = 'grid-stack-item';

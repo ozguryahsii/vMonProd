@@ -105,9 +105,9 @@ public class StatisticsController : Controller
         // Zaman serileri (HealthMetrics, son 30g) — filo trendi, kapasite, ısı haritası
         var hm = (await _db.HealthMetrics.AsNoTracking()
             .Where(m => ids.Contains(m.ServiceId) && m.CheckedAt >= now.AddDays(-30))
-            .Select(m => new { m.ServiceId, m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent, m.RamUsedGb, m.RamTotalGb, m.DiskUsedGb, m.DiskTotalGb })
+            .Select(m => new { m.ServiceId, m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent, m.CpuCores, m.RamUsedGb, m.RamTotalGb, m.DiskUsedGb, m.DiskTotalGb })
             .ToListAsync())
-            .Select(m => new { m.ServiceId, Local = m.CheckedAt.ToLocalTime(), m.CpuPercent, m.RamPercent, m.MaxDiskPercent, m.RamUsedGb, m.RamTotalGb, m.DiskUsedGb, m.DiskTotalGb })
+            .Select(m => new { m.ServiceId, Local = m.CheckedAt.ToLocalTime(), m.CpuPercent, m.RamPercent, m.MaxDiskPercent, m.CpuCores, m.RamUsedGb, m.RamTotalGb, m.DiskUsedGb, m.DiskTotalGb })
             .ToList();
 
         var fleet = hm.GroupBy(x => x.Local.Date).OrderBy(g => g.Key).Select(g => new
@@ -124,11 +124,37 @@ public class StatisticsController : Controller
             .GroupBy(x => x.Local.Date).OrderBy(g => g.Key).Select(g => new
             {
                 day = g.Key.ToString("dd.MM"),
+                cpuUsed = Math.Round(g.Sum(x => (x.CpuCores ?? 0) * (x.CpuPercent ?? 0) / 100.0), 1),
+                cpuAlloc = g.Sum(x => x.CpuCores ?? 0),
                 ramUsed = Math.Round(g.Sum(x => x.RamUsedGb ?? 0), 1),
                 ramAlloc = Math.Round(g.Sum(x => x.RamTotalGb ?? 0), 1),
                 diskUsed = Math.Round(g.Sum(x => x.DiskUsedGb ?? 0), 1),
                 diskAlloc = Math.Round(g.Sum(x => x.DiskTotalGb ?? 0), 1)
             }).ToList();
+
+        // Kapasite kullanımı ARTAN: ~7 gün öncesine göre kullanım oranı +%10'dan fazla artan sunucular (metrik bazında)
+        var recentSince = now.AddDays(-1).ToLocalTime();
+        var pastFrom = now.AddDays(-8).ToLocalTime();
+        var pastTo = now.AddDays(-6).ToLocalTime();
+        List<object> RisingTriples(IEnumerable<(int id, DateTime t, double v)> rows)
+        {
+            var tmp = new List<(string name, double from, double to, double delta)>();
+            foreach (var g in rows.GroupBy(r => r.id))
+            {
+                var recent = g.Where(r => r.t >= recentSince).Select(r => r.v).ToList();
+                var past = g.Where(r => r.t >= pastFrom && r.t < pastTo).Select(r => r.v).ToList();
+                if (recent.Count == 0 || past.Count == 0) continue;
+                double rr = recent.Average(), pp = past.Average(), d = rr - pp;
+                if (d >= 10) tmp.Add((idName.GetValueOrDefault(g.Key, "?"), Math.Round(pp, 1), Math.Round(rr, 1), Math.Round(d, 1)));
+            }
+            return tmp.OrderByDescending(x => x.delta).Select(x => (object)new { name = x.name, from = x.from, to = x.to, delta = x.delta }).ToList();
+        }
+        var rising = new
+        {
+            cpu = RisingTriples(hm.Where(x => x.CpuPercent.HasValue).Select(x => (x.ServiceId, x.Local, x.CpuPercent!.Value))),
+            ram = RisingTriples(hm.Where(x => x.RamPercent.HasValue).Select(x => (x.ServiceId, x.Local, x.RamPercent!.Value))),
+            disk = RisingTriples(hm.Where(x => x.MaxDiskPercent.HasValue).Select(x => (x.ServiceId, x.Local, x.MaxDiskPercent!.Value)))
+        };
 
         // Isı haritası: son 24s, en yoğun 24 sunucu × saat (ort. CPU)
         var hm24 = hm.Where(x => x.Local >= since24.ToLocalTime() && x.CpuPercent.HasValue).ToList();
@@ -159,6 +185,7 @@ public class StatisticsController : Controller
             outages = new { count = outs.Count, minutes = Math.Round(outMin), daily = outDaily, worst },
             fleet,
             capacity,
+            rising,
             heatmap = new { rows = heatRows, data = heatData }
         });
     }
@@ -305,7 +332,8 @@ public class StatisticsController : Controller
         new() { Type="histogram",Source="histogram",     X=0, Y=21, W=6, H=4, SortOrder=17 },
         new() { Type="capacity", Source="capacity",      X=6, Y=21, W=6, H=4, SortOrder=18 },
         new() { Type="outage",   Source="outage",        X=0, Y=25, W=6, H=4, SortOrder=19 },
-        new() { Type="os_eol",   Source="os_eol",        X=6, Y=25, W=3, H=4, SortOrder=20 },
-        new() { Type="heatmap",  Source="heatmap",       X=0, Y=29, W=12, H=5, SortOrder=21 },
+        new() { Type="rising",   Source="rising",        X=6, Y=25, W=6, H=4, SortOrder=20 },
+        new() { Type="os_eol",   Source="os_eol",        X=0, Y=29, W=3, H=4, SortOrder=21 },
+        new() { Type="heatmap",  Source="heatmap",       X=3, Y=29, W=9, H=5, SortOrder=22 },
     };
 }
