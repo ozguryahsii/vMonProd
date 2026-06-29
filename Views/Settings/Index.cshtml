@@ -3,13 +3,29 @@
     ViewData["Title"] = "Ayarlar";
 }
 
-<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-5"><i class="bi bi-gear text-brand-500"></i> Ayarlar</h1>
+<style>
+    .set-tab { display:inline-flex; align-items:center; gap:.4rem; padding:.5rem .9rem; border-radius:.6rem; font-size:.875rem; font-weight:500; color:#64748b; background:transparent; border:1px solid transparent; cursor:pointer; }
+    .set-tab:hover { color:#334155; }
+    .set-tab.active { background:#fff; color:#ed1c24; border-color:#e2e8f0; box-shadow:0 1px 2px rgba(15,23,42,.06); }
+    .dark .set-tab.active { background:#1e293b; border-color:#334155; }
+    [data-sec].hidden { display:none !important; }
+</style>
+
+<h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-4"><i class="bi bi-gear text-brand-500"></i> Ayarlar</h1>
+
+<div id="setTabs" class="flex flex-wrap gap-1 mb-5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 w-fit">
+    <button type="button" class="set-tab" data-sec="izleme"><i class="bi bi-stopwatch"></i> İzleme</button>
+    <button type="button" class="set-tab" data-sec="bildirim"><i class="bi bi-bell"></i> Bildirimler</button>
+    <button type="button" class="set-tab" data-sec="erisim"><i class="bi bi-shield-lock"></i> Erişim &amp; Oturum</button>
+    <button type="button" class="set-tab" data-sec="guvenlik"><i class="bi bi-shield-check"></i> Güvenlik</button>
+    <button type="button" class="set-tab" data-sec="veri"><i class="bi bi-hdd-stack"></i> Veri &amp; Yedekleme</button>
+    <button type="button" class="set-tab" data-sec="diger"><i class="bi bi-sliders"></i> Diğer</button>
+</div>
 
 <form method="post" asp-action="Save">
     @Html.AntiForgeryToken()
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div class="card">
-            <div class="card-head"><i class="bi bi-stopwatch text-brand-500"></i> İzleme</div>
+    <div class="card" data-sec="izleme">
+        <div class="card-head"><i class="bi bi-stopwatch text-brand-500"></i> İzleme</div>
             <div class="card-body space-y-4">
                 <div>
                     <label class="label">Global Kontrol Aralığı (dakika)</label>
@@ -29,8 +45,8 @@
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-head"><i class="bi bi-envelope text-brand-500"></i> Email (SMTP Relay)</div>
+    <div class="card mt-5" data-sec="bildirim">
+        <div class="card-head"><i class="bi bi-envelope text-brand-500"></i> Email (SMTP Relay)</div>
             <div class="card-body space-y-4">
                 <label class="flex items-center gap-2 text-sm text-slate-700">
                     <input asp-for="EmailEnabled" class="switch" /> Email bildirimleri aktif
@@ -52,9 +68,8 @@
                 <div class="hint">Relay tabanlı gönderim. Test <b>kayıtlı</b> ayarlarla yapılır — önce kaydedin.</div>
             </div>
         </div>
-    </div>
 
-    <div class="card mt-5">
+    <div class="card mt-5" data-sec="erisim">
         <div class="card-head"><i class="bi bi-shield-lock text-brand-500"></i> Oturum Açma (LDAP / Active Directory)</div>
         <div class="card-body space-y-4">
             <label class="flex items-center gap-2 text-sm text-slate-700">
@@ -108,7 +123,7 @@
         </div>
     </div>
 
-    <div class="card mt-5">
+    <div class="card mt-5" data-sec="erisim">
         <div class="card-head"><i class="bi bi-shield-lock-fill text-brand-500"></i> İki Adımlı Doğrulama (OTP)</div>
         <div class="card-body space-y-4">
             <label class="flex items-center gap-2 text-sm text-slate-700">
@@ -132,7 +147,7 @@
         </div>
     </div>
 
-    <div class="card mt-5">
+    <div class="card mt-5" data-sec="veri">
         <div class="card-head"><i class="bi bi-shield-exclamation text-brand-500"></i> Destek Sonu (EOL) — endoflife.date</div>
         <div class="card-body space-y-4">
             <label class="flex items-center gap-2 text-sm text-slate-700">
@@ -150,7 +165,7 @@
         </div>
     </div>
 
-    <div class="card mt-5">
+    <div class="card mt-5" data-sec="guvenlik">
         <div class="card-head"><i class="bi bi-shield-check text-brand-500"></i> Güvenlik ve Uyumluluk</div>
         <div class="card-body space-y-5">
             <label class="flex items-start gap-3 text-sm text-slate-700">
@@ -186,7 +201,7 @@
         </div>
     </div>
 
-    <div class="card mt-5">
+    <div class="card mt-5" data-sec="diger">
         <div class="card-head"><i class="bi bi-clipboard-data text-brand-500"></i> Mutabakat (Envanter Karşılaştırma)</div>
         <div class="card-body space-y-4">
             <label class="flex items-start gap-3 text-sm text-slate-700">
@@ -206,7 +221,7 @@
         </div>
     </div>
 
-    <div class="card mt-5">
+    <div class="card mt-5" data-sec="veri">
         <div class="card-head"><i class="bi bi-hdd-stack text-brand-500"></i> Yedekleme (SQLite)</div>
         <div class="card-body space-y-4">
             @if (ViewBag.BackupIsSqlite == false)
@@ -226,15 +241,16 @@
         </div>
     </div>
 
-    <div class="mt-5">
-        <button class="btn btn-primary"><i class="bi bi-save"></i> Kaydet</button>
+    <div class="sticky bottom-0 z-20 mt-6 py-3 px-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+        <span class="text-xs text-slate-400 hidden sm:inline"><i class="bi bi-info-circle"></i> Tüm sekmelerdeki ayarlar tek seferde kaydedilir.</span>
+        <button class="btn btn-primary"><i class="bi bi-save"></i> Ayarları Kaydet</button>
     </div>
 </form>
 
 @{
     var eolSynced = ViewBag.EolSyncedAt as DateTime?;
 }
-<div class="card mt-5">
+<div class="card mt-5" data-sec="veri">
     <div class="card-head">
         <span><i class="bi bi-arrow-repeat text-brand-500"></i> EOL Verisi</span>
         <form method="post" asp-action="EolSyncNow" class="inline">
@@ -262,7 +278,7 @@
 @{
     var backups = ViewBag.Backups as List<vMonitor.Services.BackupFile> ?? new List<vMonitor.Services.BackupFile>();
 }
-<div class="card mt-5">
+<div class="card mt-5" data-sec="veri">
     <div class="card-head">
         <span><i class="bi bi-database-down text-brand-500"></i> Yedek Al / Geri Yükle</span>
         @if (ViewBag.BackupIsSqlite == true)
@@ -348,7 +364,7 @@
     };
     var settingsReturn = Url.Action("Index", "Settings");
 }
-<div class="card mt-5">
+<div class="card mt-5" data-sec="bildirim">
     <div class="card-head">
         <span><i class="bi bi-plug text-brand-500"></i> Bildirim Kanalları (Entegrasyonlar)</span>
         <a class="btn btn-primary btn-sm" asp-controller="SmsProviders" asp-action="Create"><i class="bi bi-plus-lg"></i> Yeni Entegrasyon</a>
@@ -401,7 +417,7 @@
     </div>
 </div>
 
-<div class="card mt-5 max-w-2xl">
+<div class="card mt-5 max-w-2xl" data-sec="diger">
     <div class="card-head"><i class="bi bi-image text-brand-500"></i> Giriş Ekranı Logosu</div>
     <div class="card-body space-y-4">
         @if (!string.IsNullOrWhiteSpace(Model.LoginLogoFile))
@@ -466,5 +482,21 @@ function clearTestFields() {
 clearTestFields();
 window.addEventListener("pageshow", clearTestFields);
 setTimeout(clearTestFields, 200); // bazı tarayıcıların gecikmeli autofill'ini de temizle
+
+// Ayarlar sekmeleri (gruplanmış görünüm) — fonksiyon değişmez, yalnız ilgili kartlar gösterilir/gizlenir.
+(function () {
+    const tabs = Array.from(document.querySelectorAll('#setTabs .set-tab'));
+    const valid = tabs.map(t => t.dataset.sec);
+    function show(sec) {
+        if (!valid.includes(sec)) sec = valid[0];
+        document.querySelectorAll('[data-sec]').forEach(el => el.classList.toggle('hidden', el.getAttribute('data-sec') !== sec));
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.sec === sec));
+        try { localStorage.setItem('vmon_settings_tab', sec); } catch (e) {}
+    }
+    tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.sec)));
+    let initial = 'izleme';
+    try { initial = localStorage.getItem('vmon_settings_tab') || 'izleme'; } catch (e) {}
+    show(initial);
+})();
 </script>
 }
