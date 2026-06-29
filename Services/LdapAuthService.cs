@@ -92,7 +92,7 @@ public class LdapAuthService
         }
     }
 
-    public record GroupMember(string Sam, string? DisplayName);
+    public record GroupMember(string Sam, string? DisplayName, string? Email = null);
 
     /// <summary>Ayarlardaki güvenlik grubunun üyelerini (iç içe gruplar dahil) seçilen kimlikle listeler.
     /// Kimlik bilgisi Vault destekli olabilir (kullanıcı/şifre Vault'tan çözülür).</summary>
@@ -134,14 +134,16 @@ public class LdapAuthService
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             while (true)
             {
-                var req = new SearchRequest(s.LdapAuthBaseDn, filter, SearchScope.Subtree, "sAMAccountName", "displayName");
+                var req = new SearchRequest(s.LdapAuthBaseDn, filter, SearchScope.Subtree, "sAMAccountName", "displayName", "mail");
                 req.Controls.Add(pageControl);
                 var resp = (SearchResponse)conn.SendRequest(req);
                 foreach (SearchResultEntry e in resp.Entries)
                 {
                     var sam = e.Attributes["sAMAccountName"]?[0]?.ToString();
                     if (string.IsNullOrWhiteSpace(sam) || !seen.Add(sam)) continue;
-                    list.Add(new GroupMember(sam, e.Attributes["displayName"]?[0]?.ToString()));
+                    var mail = e.Attributes["mail"]?[0]?.ToString();
+                    list.Add(new GroupMember(sam, e.Attributes["displayName"]?[0]?.ToString(),
+                        string.IsNullOrWhiteSpace(mail) ? null : mail.Trim()));
                 }
                 var prc = resp.Controls.OfType<PageResultResponseControl>().FirstOrDefault();
                 if (prc == null || prc.Cookie.Length == 0) break;

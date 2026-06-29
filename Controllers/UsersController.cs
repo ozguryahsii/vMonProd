@@ -78,11 +78,12 @@ public class UsersController : MvcBase
             if (existing.TryGetValue(m.Sam, out var u))
             {
                 if (!string.IsNullOrWhiteSpace(m.DisplayName)) u.DisplayName = m.DisplayName;
+                if (!string.IsNullOrWhiteSpace(m.Email)) u.Email = m.Email;
                 if (!u.IsActive) { u.IsActive = true; reactivated++; }
             }
             else
             {
-                _db.AppUsers.Add(new AppUser { Sam = m.Sam, DisplayName = m.DisplayName, PermissionsCsv = Perms.DashboardsView, IsActive = true });
+                _db.AppUsers.Add(new AppUser { Sam = m.Sam, DisplayName = m.DisplayName, Email = m.Email, PermissionsCsv = Perms.DashboardsView, IsActive = true });
                 added++;
             }
         }
