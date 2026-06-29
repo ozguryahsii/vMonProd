@@ -176,6 +176,16 @@ using (var scope = app.Services.CreateScope())
             if (bcfg.Provider == DbProviderKind.Sqlite)
                 DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları: legacy CREATE/ALTER + veri-fix (idempotent)
 
+            // KENDİ KENDİNE İYİLEŞME: Yerel kullanıcılar (kurulumdaki admin) AD senkronuyla yanlışlıkla pasife
+            // düşmüş olabilir → her açılışta tekrar aktif et. Yerel kullanıcı AD grubuna bağlı değildir; kilitlenmemeli.
+            try
+            {
+                var healed = db.AppUsers.Where(u => u.IsLocal && !u.IsActive)
+                    .ExecuteUpdate(s => s.SetProperty(u => u.IsActive, true));
+                if (healed > 0) logger.LogWarning("{N} yerel kullanıcı yeniden aktifleştirildi (pasife düşmüştü).", healed);
+            }
+            catch (Exception ex) { logger.LogDebug(ex, "Yerel kullanıcı iyileştirme atlandı."); }
+
             try
             {
                 TwilioChannelMigration.RunAsync(db, scope.ServiceProvider.GetRequiredService<SettingsService>(), logger)
