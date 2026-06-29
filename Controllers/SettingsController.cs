@@ -94,9 +94,22 @@ public class SettingsController : Controller
         return await DoRestore(path, Path.GetFileName(path));
     }
 
+    /// <summary>Sunucudaki bir .db yolundan geri yükler (dosya zaten sunucudaysa — büyük DB'ler için en sağlamı).</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreServerPath(string serverPath)
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        serverPath = (serverPath ?? "").Trim().Trim('"');
+        if (string.IsNullOrWhiteSpace(serverPath) || !System.IO.File.Exists(serverPath))
+        { TempData["Error"] = "Sunucuda bu yolda dosya bulunamadı: " + serverPath; return RedirectToAction(nameof(Index)); }
+        return await DoRestore(serverPath, Path.GetFileName(serverPath));
+    }
+
     /// <summary>Yüklenen bir .db dosyasını aktif DB'nin üzerine geri yükler (eski makineden taşıma için).</summary>
     [HttpPost, ValidateAntiForgeryToken]
-    [RequestSizeLimit(1_073_741_824)]
+    [RequestSizeLimit(2_147_483_648)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 2_147_483_648)]
     public async Task<IActionResult> RestoreUpload(IFormFile? dbFile)
     {
         var settings = await _settings.GetAsync();

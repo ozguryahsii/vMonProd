@@ -272,7 +272,18 @@
                     <input type="file" name="dbFile" accept=".db" required class="input !py-1.5 max-w-sm" />
                     <button class="btn btn-outline btn-sm"><i class="bi bi-arrow-counterclockwise"></i> Yükle ve Geri Yükle</button>
                 </form>
-                <div class="hint mt-1">Eski kurulumdaki <code>monitoring.db</code> dosyasını seçin. Şifreli sırlar (kimlik parolaları, token'lar) farklı makinede çözülemez; bunları yeniden girmeniz gerekir.</div>
+                <div class="hint mt-1">Eski kurulumdaki <code>monitoring.db</code> dosyasını seçin. Tarayıcı yüklemesi büyük dosyalarda yavaş olabilir — dosya zaten sunucudaysa aşağıdaki <b>sunucu yolu</b> seçeneğini kullanın. Şifreli sırlar (kimlik parolaları, token'lar) farklı makinede çözülemez; yeniden girmeniz gerekir.</div>
+            </div>
+
+            <div>
+                <div class="font-medium text-slate-700 mb-1.5"><i class="bi bi-folder2-open"></i> Sunucudaki yoldan geri yükle (büyük DB için önerilir)</div>
+                <form method="post" asp-action="RestoreServerPath" class="flex flex-wrap items-center gap-2"
+                      onsubmit="return confirm('DİKKAT: Belirtilen sunucu dosyası aktif veritabanının ÜZERİNE yazılacak ve uygulama yeniden başlatılacak. Devam edilsin mi?');">
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="serverPath" required class="input mono !py-1.5 max-w-md" placeholder="C:\Temp\monitoring.db" />
+                    <button class="btn btn-outline btn-sm"><i class="bi bi-arrow-counterclockwise"></i> Bu yoldan Geri Yükle</button>
+                </form>
+                <div class="hint mt-1">Dosyayı sunucuya kopyalayıp (örn. <code>C:\Temp\monitoring.db</code>) tam yolunu girin. Yükleme limiti yok.</div>
             </div>
         }
         else
