@@ -11,7 +11,9 @@ public class StatisticsController : Controller
 {
     private readonly AppDbContext _db;
     private readonly Services.SettingsService _settings;
-    public StatisticsController(AppDbContext db, Services.SettingsService settings) { _db = db; _settings = settings; }
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
+    public StatisticsController(AppDbContext db, Services.SettingsService settings, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
+    { _db = db; _settings = settings; _cache = cache; }
 
     private bool CanView() => User.Can(Perms.DashboardsView);
     private bool CanEdit() => User.IsAppAdmin();
@@ -30,11 +32,22 @@ public class StatisticsController : Controller
         return View(widgets);
     }
 
-    /// <summary>Tüm istatistik verisini tek seferde döner; widget'lar buradan beslenir.</summary>
+    /// <summary>Tüm istatistik verisini tek seferde döner; widget'lar buradan beslenir. Sonuç ~20 sn önbelleklenir
+    /// (ağır toplama her istekte değil, en çok 20 sn'de bir çalışır → sayfa hızlı açılır, çok sekme/yenileme ucuzdur).</summary>
     [HttpGet]
     public async Task<IActionResult> Data()
     {
         if (!CanView()) return Forbid();
+        var payload = await _cache.GetOrCreateAsync("stats:data", entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(20);
+            return BuildDataAsync();
+        });
+        return Json(payload);
+    }
+
+    private async Task<object> BuildDataAsync()
+    {
         // TÜM istatistikler yalnız sağlık ile izlenen sunuculardan (Windows Health + Linux Health) gelir.
         var svc = await HealthServicesAsync();
 
@@ -86,11 +99,15 @@ public class StatisticsController : Controller
         var eol = svc.Where(s => !string.IsNullOrWhiteSpace(s.OsName) && EolPatterns.Any(p => s.OsName!.Contains(p, StringComparison.OrdinalIgnoreCase)))
             .GroupBy(s => s.OsName!).Select(g => new { name = g.Key, value = g.Count() }).OrderByDescending(x => x.value).ToList();
 
-        // Uptime (CheckResults, son 7g)
-        var cr = await _db.CheckResults.AsNoTracking().Where(r => ids.Contains(r.ServiceId) && r.CheckedAt >= now.AddDays(-7))
-            .Select(r => new { r.CheckedAt, r.Status }).ToListAsync();
-        double Pct(List<int> st) => st.Count == 0 ? 100 : Math.Round(100.0 * st.Count(x => x == 0) / st.Count, 2);
+        // Uptime — satır yüklemeden COUNT sorgularıyla (indeksli, hızlı)
         var since24 = now.AddDays(-1);
+        var since7 = now.AddDays(-7);
+        int total7 = await _db.CheckResults.CountAsync(r => ids.Contains(r.ServiceId) && r.CheckedAt >= since7);
+        int up7 = await _db.CheckResults.CountAsync(r => ids.Contains(r.ServiceId) && r.CheckedAt >= since7 && r.Status == 0);
+        int total24 = await _db.CheckResults.CountAsync(r => ids.Contains(r.ServiceId) && r.CheckedAt >= since24);
+        int up24 = await _db.CheckResults.CountAsync(r => ids.Contains(r.ServiceId) && r.CheckedAt >= since24 && r.Status == 0);
+        double upH24 = total24 == 0 ? 100 : Math.Round(100.0 * up24 / total24, 2);
+        double upD7 = total7 == 0 ? 100 : Math.Round(100.0 * up7 / total7, 2);
 
         // Kesinti özeti (Outages, son 7g)
         var outs = await _db.Outages.AsNoTracking()
@@ -102,47 +119,52 @@ public class StatisticsController : Controller
         var worst = outs.GroupBy(o => o.ServiceId).Select(g => new { name = idName.GetValueOrDefault(g.Key, "?"), value = g.Count() })
             .OrderByDescending(x => x.value).Take(5).ToList();
 
-        // Zaman serileri (HealthMetrics, son 30g) — filo trendi, kapasite, ısı haritası
-        var hm = (await _db.HealthMetrics.AsNoTracking()
-            .Where(m => ids.Contains(m.ServiceId) && m.CheckedAt >= now.AddDays(-30))
-            .Select(m => new { m.ServiceId, m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent, m.CpuCores, m.RamUsedGb, m.RamTotalGb, m.DiskUsedGb, m.DiskTotalGb })
-            .ToListAsync())
-            .Select(m => new { m.ServiceId, Local = m.CheckedAt.ToLocalTime(), m.CpuPercent, m.RamPercent, m.MaxDiskPercent, m.CpuCores, m.RamUsedGb, m.RamTotalGb, m.DiskUsedGb, m.DiskTotalGb })
-            .ToList();
+        // Zaman serileri — DB-TARAFI toplama (satırları belleğe yüklemeden). Gün × sunucu özeti.
+        var since30 = now.AddDays(-30);
+        var daily = await _db.HealthMetrics.AsNoTracking()
+            .Where(m => ids.Contains(m.ServiceId) && m.CheckedAt >= since30)
+            .GroupBy(m => new { m.ServiceId, Day = m.CheckedAt.Date })
+            .Select(g => new
+            {
+                g.Key.ServiceId,
+                g.Key.Day,
+                Cpu = g.Average(x => x.CpuPercent),
+                Ram = g.Average(x => x.RamPercent),
+                Disk = g.Average(x => x.MaxDiskPercent),
+                Cores = g.Max(x => x.CpuCores),
+                RamUsed = g.Average(x => x.RamUsedGb),
+                RamTotal = g.Max(x => x.RamTotalGb),
+                DiskUsed = g.Average(x => x.DiskUsedGb),
+                DiskTotal = g.Max(x => x.DiskTotalGb)
+            }).ToListAsync();
 
-        var fleet = hm.GroupBy(x => x.Local.Date).OrderBy(g => g.Key).Select(g => new
+        var fleet = daily.GroupBy(x => x.Day).OrderBy(g => g.Key).Select(g => new
         {
             day = g.Key.ToString("dd.MM"),
-            cpu = Math.Round(g.Where(x => x.CpuPercent.HasValue).Select(x => x.CpuPercent!.Value).DefaultIfEmpty(0).Average(), 1),
-            ram = Math.Round(g.Where(x => x.RamPercent.HasValue).Select(x => x.RamPercent!.Value).DefaultIfEmpty(0).Average(), 1),
-            disk = Math.Round(g.Where(x => x.MaxDiskPercent.HasValue).Select(x => x.MaxDiskPercent!.Value).DefaultIfEmpty(0).Average(), 1)
+            cpu = Math.Round(g.Where(x => x.Cpu.HasValue).Select(x => x.Cpu!.Value).DefaultIfEmpty(0).Average(), 1),
+            ram = Math.Round(g.Where(x => x.Ram.HasValue).Select(x => x.Ram!.Value).DefaultIfEmpty(0).Average(), 1),
+            disk = Math.Round(g.Where(x => x.Disk.HasValue).Select(x => x.Disk!.Value).DefaultIfEmpty(0).Average(), 1)
         }).ToList();
 
-        // Kapasite: gün başına, her sunucunun O GÜNKÜ SON ölçümü → toplam
-        var capacity = hm.GroupBy(x => new { x.ServiceId, Day = x.Local.Date })
-            .Select(g => g.OrderByDescending(x => x.Local).First())
-            .GroupBy(x => x.Local.Date).OrderBy(g => g.Key).Select(g => new
-            {
-                day = g.Key.ToString("dd.MM"),
-                cpuUsed = Math.Round(g.Sum(x => (x.CpuCores ?? 0) * (x.CpuPercent ?? 0) / 100.0), 1),
-                cpuAlloc = g.Sum(x => x.CpuCores ?? 0),
-                ramUsed = Math.Round(g.Sum(x => x.RamUsedGb ?? 0), 1),
-                ramAlloc = Math.Round(g.Sum(x => x.RamTotalGb ?? 0), 1),
-                diskUsed = Math.Round(g.Sum(x => x.DiskUsedGb ?? 0), 1),
-                diskAlloc = Math.Round(g.Sum(x => x.DiskTotalGb ?? 0), 1)
-            }).ToList();
+        var capacity = daily.GroupBy(x => x.Day).OrderBy(g => g.Key).Select(g => new
+        {
+            day = g.Key.ToString("dd.MM"),
+            cpuUsed = Math.Round(g.Sum(x => (x.Cores ?? 0) * (x.Cpu ?? 0) / 100.0), 1),
+            cpuAlloc = g.Sum(x => x.Cores ?? 0),
+            ramUsed = Math.Round(g.Sum(x => x.RamUsed ?? 0), 1),
+            ramAlloc = Math.Round(g.Sum(x => x.RamTotal ?? 0), 1),
+            diskUsed = Math.Round(g.Sum(x => x.DiskUsed ?? 0), 1),
+            diskAlloc = Math.Round(g.Sum(x => x.DiskTotal ?? 0), 1)
+        }).ToList();
 
-        // Kapasite kullanımı ARTAN: ~7 gün öncesine göre kullanım oranı +%10'dan fazla artan sunucular (metrik bazında)
-        var recentSince = now.AddDays(-1).ToLocalTime();
-        var pastFrom = now.AddDays(-8).ToLocalTime();
-        var pastTo = now.AddDays(-6).ToLocalTime();
-        List<object> RisingTriples(IEnumerable<(int id, DateTime t, double v)> rows)
+        // Kapasite kullanımı ARTAN: son ~2 gün ort. vs ~7 gün önce ort.; +%10 puandan fazla
+        List<object> Rising(IEnumerable<(int id, DateTime day, double v)> rows)
         {
             var tmp = new List<(string name, double from, double to, double delta)>();
             foreach (var g in rows.GroupBy(r => r.id))
             {
-                var recent = g.Where(r => r.t >= recentSince).Select(r => r.v).ToList();
-                var past = g.Where(r => r.t >= pastFrom && r.t < pastTo).Select(r => r.v).ToList();
+                var recent = g.Where(r => r.day >= now.AddDays(-2).Date).Select(r => r.v).ToList();
+                var past = g.Where(r => r.day <= now.AddDays(-6).Date && r.day >= now.AddDays(-9).Date).Select(r => r.v).ToList();
                 if (recent.Count == 0 || past.Count == 0) continue;
                 double rr = recent.Average(), pp = past.Average(), d = rr - pp;
                 if (d >= 10) tmp.Add((idName.GetValueOrDefault(g.Key, "?"), Math.Round(pp, 1), Math.Round(rr, 1), Math.Round(d, 1)));
@@ -151,22 +173,26 @@ public class StatisticsController : Controller
         }
         var rising = new
         {
-            cpu = RisingTriples(hm.Where(x => x.CpuPercent.HasValue).Select(x => (x.ServiceId, x.Local, x.CpuPercent!.Value))),
-            ram = RisingTriples(hm.Where(x => x.RamPercent.HasValue).Select(x => (x.ServiceId, x.Local, x.RamPercent!.Value))),
-            disk = RisingTriples(hm.Where(x => x.MaxDiskPercent.HasValue).Select(x => (x.ServiceId, x.Local, x.MaxDiskPercent!.Value)))
+            cpu = Rising(daily.Where(x => x.Cpu.HasValue).Select(x => (x.ServiceId, x.Day, x.Cpu!.Value))),
+            ram = Rising(daily.Where(x => x.Ram.HasValue).Select(x => (x.ServiceId, x.Day, x.Ram!.Value))),
+            disk = Rising(daily.Where(x => x.Disk.HasValue).Select(x => (x.ServiceId, x.Day, x.Disk!.Value)))
         };
 
-        // Isı haritası: son 24s, en yoğun 24 sunucu × saat (ort. CPU)
-        var hm24 = hm.Where(x => x.Local >= since24.ToLocalTime() && x.CpuPercent.HasValue).ToList();
-        var topIds = hm24.GroupBy(x => x.ServiceId).Select(g => new { id = g.Key, avg = g.Average(x => x.CpuPercent!.Value) })
+        // Isı haritası: son 24s, saat bazında DB-tarafı ortalama; en yoğun 24 sunucu
+        var hourly = await _db.HealthMetrics.AsNoTracking()
+            .Where(m => ids.Contains(m.ServiceId) && m.CheckedAt >= since24 && m.CpuPercent != null)
+            .GroupBy(m => new { m.ServiceId, Hour = m.CheckedAt.Hour })
+            .Select(g => new { g.Key.ServiceId, g.Key.Hour, Cpu = g.Average(x => x.CpuPercent) })
+            .ToListAsync();
+        var topIds = hourly.GroupBy(x => x.ServiceId).Select(g => new { id = g.Key, avg = g.Average(x => x.Cpu ?? 0) })
             .OrderByDescending(x => x.avg).Take(24).Select(x => x.id).ToList();
         var heatRows = topIds.Select(id => idName.GetValueOrDefault(id, "?")).ToList();
         var heatData = new List<int[]>();
         for (int yi = 0; yi < topIds.Count; yi++)
-            foreach (var hg in hm24.Where(x => x.ServiceId == topIds[yi]).GroupBy(x => x.Local.Hour))
-                heatData.Add(new[] { hg.Key, yi, (int)Math.Round(hg.Average(x => x.CpuPercent!.Value)) });
+            foreach (var hg in hourly.Where(x => x.ServiceId == topIds[yi]))
+                heatData.Add(new[] { hg.Hour, yi, (int)Math.Round(hg.Cpu ?? 0) });
 
-        return Json(new
+        return new
         {
             lastUpdated = now,
             counts = new { total, up, down, error },
@@ -181,13 +207,13 @@ public class StatisticsController : Controller
             critical = new { diskFull, breach },
             histogram = new { cpu = Band(s => s.LastCpuPercent), ram = Band(s => s.LastRamPercent), disk = Band(s => s.LastMaxDiskPercent) },
             osEol = new { count = eol.Sum(x => x.value), items = eol },
-            uptime = new { h24 = Pct(cr.Where(x => x.CheckedAt >= since24).Select(x => x.Status).ToList()), d7 = Pct(cr.Select(x => x.Status).ToList()) },
+            uptime = new { h24 = upH24, d7 = upD7 },
             outages = new { count = outs.Count, minutes = Math.Round(outMin), daily = outDaily, worst },
             fleet,
             capacity,
             rising,
             heatmap = new { rows = heatRows, data = heatData }
-        });
+        };
     }
 
     // Destek sonu (EOL) OS kalıpları — basit ve genişletilebilir
@@ -212,6 +238,30 @@ public class StatisticsController : Controller
         if (!CanView()) return Forbid();
         var all = await HealthServicesAsync();
         source = (source ?? "").ToLowerInvariant();
+
+        // Histogram bandı: source "hist_cpu|hist_ram|hist_disk", value "40-60"
+        if (source.StartsWith("hist_"))
+        {
+            var metric = source[5..];
+            Func<MonitoredService, double?> hsel = metric == "ram" ? s => s.LastRamPercent
+                : metric == "disk" ? s => s.LastMaxDiskPercent : s => s.LastCpuPercent;
+            var parts = (value ?? "").Split('-');
+            int lo = 0, hi = 100;
+            if (parts.Length == 2) { int.TryParse(parts[0], out lo); int.TryParse(parts[1], out hi); }
+            var inBand = all.Where(s => hsel(s).HasValue && hsel(s)!.Value >= lo && (hi >= 100 ? hsel(s)!.Value <= hi : hsel(s)!.Value < hi)).ToList();
+            return Json(new
+            {
+                count = inBand.Count,
+                servers = inBand.OrderByDescending(hsel).Select(s => new
+                {
+                    name = s.Name, target = s.Target, os = s.OsName ?? (s.Type == ServiceType.WindowsHealth ? "Windows" : "Linux"),
+                    status = s.LastStatus is >= 0 and < 3 ? new[] { "Up", "Down", "Hata" }[s.LastStatus] : "?",
+                    cpu = s.LastCpuPercent, ram = s.LastRamPercent, disk = s.LastMaxDiskPercent,
+                    capacity = s.CapacityInfo, lastChecked = s.LastCheckedAt
+                }).ToList(),
+                trend = (object?)null
+            });
+        }
 
         IEnumerable<MonitoredService> sel = source switch
         {

@@ -127,6 +127,7 @@ builder.Services.AddScoped<SmsService>();
 builder.Services.AddScoped<WhatsappService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<BackupService>();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<CheckRunner>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MutabakatService>();
@@ -174,6 +175,8 @@ using (var scope = app.Services.CreateScope())
             SchemaSync.EnsureColumnsAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
             // Eski DB geri yüklenince yeni non-null kolonlar NULL kalabilir → EF okurken çöker. NULL'ları varsayılanla doldur.
             SchemaSync.BackfillNonNullableAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
+            // Performans: zaman-serisi tablolarına indeks (yoksa) — İstatistik/Rapor sorguları hızlansın.
+            SchemaSync.EnsureIndexesAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
 
             if (bcfg.Provider == DbProviderKind.Sqlite)
                 DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları: legacy CREATE/ALTER + veri-fix (idempotent)

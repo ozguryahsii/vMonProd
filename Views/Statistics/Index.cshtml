@@ -183,6 +183,9 @@
         os_eol:   { label:'Destek Sonu (EOL) OS', icon:'bi-shield-exclamation', color:'#ef4444' },
         heatmap:  { label:'CPU Isı Haritası (24s)', icon:'bi-grid-3x3', color:'#3b82f6' },
         disk_full:{ label:'Diski Dolmak Üzere (%85+)', icon:'bi-device-hdd-fill', color:'#ef4444' },
+        hist_cpu: { label:'CPU Kullanım Bandı', icon:'bi-cpu', color:'#3b82f6' },
+        hist_ram: { label:'RAM Kullanım Bandı', icon:'bi-memory', color:'#10b981' },
+        hist_disk:{ label:'Disk Kullanım Bandı', icon:'bi-device-hdd', color:'#f59e0b' },
     };
     const charts = {};   // elId -> echarts instance
     let DATA = null;
@@ -380,6 +383,7 @@
                 yAxis:{ type:'value', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[{ type:'bar', barWidth:'55%', data:arr.map((v,i)=>({ value:v, itemStyle:{ color:PALETTE[i], borderRadius:[4,4,0,0] } })) }]
             });
+            ch.off('click').on('click', p => openDetail('hist_'+t, p.name));
             return;
         }
         if (type === 'capacity') {

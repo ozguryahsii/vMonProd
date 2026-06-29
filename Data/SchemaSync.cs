@@ -168,6 +168,29 @@ public static class SchemaSync
         return null; // Guid vb. → atla
     }
 
+    /// <summary>Performans için sık taranan zaman-serisi tablolarına indeks ekler (yoksa). İşlevsellik değişmez,
+    /// yalnız sorgular hızlanır. Var olan indeks hatası yutulur (idempotent).</summary>
+    public static async Task EnsureIndexesAsync(AppDbContext ctx, DbProviderKind provider, ILogger logger, CancellationToken ct = default)
+    {
+        var idx = new (string Name, string Table, string Cols)[]
+        {
+            ("IX_HealthMetrics_Svc_Chk", "HealthMetrics", "ServiceId, CheckedAt"),
+            ("IX_HealthMetrics_Chk",     "HealthMetrics", "CheckedAt"),
+            ("IX_CheckResults_Svc_Chk",  "CheckResults",  "ServiceId, CheckedAt"),
+            ("IX_CheckResults_Chk",      "CheckResults",  "CheckedAt"),
+            ("IX_Outages_Svc_Start",     "Outages",       "ServiceId, StartedAt"),
+        };
+        string Q(string id) => provider switch { DbProviderKind.MySql => $"`{id}`", DbProviderKind.SqlServer => $"[{id}]", _ => $"\"{id}\"" };
+        foreach (var (name, table, cols) in idx)
+        {
+            var colList = string.Join(", ", cols.Split(',', StringSplitOptions.TrimEntries).Select(Q));
+            var ifne = provider is DbProviderKind.Sqlite or DbProviderKind.PostgreSql ? "IF NOT EXISTS " : "";
+            var sql = $"CREATE INDEX {ifne}{Q(name)} ON {Q(table)} ({colList})";
+            try { await ctx.Database.ExecuteSqlRawAsync(sql, ct); }
+            catch (Exception ex) { logger.LogDebug(ex, "İndeks atlandı (muhtemelen zaten var): {Name}", name); }
+        }
+    }
+
     private static async Task<HashSet<string>> GetColumnsAsync(DbConnection conn, DbProviderKind p, string table, CancellationToken ct)
     {
         // Tablo adı modelden gelir (kullanıcı girdisi değil) → gömülü kullanımı güvenli.
