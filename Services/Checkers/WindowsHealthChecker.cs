@@ -27,17 +27,25 @@ public class WindowsHealthChecker : CheckerBase
             var scope = new ManagementScope($"\\\\{service.Target}\\root\\cimv2", options);
             scope.Connect();
 
-            // CPU — performans sayacından anlık toplam yük.
-            // NOT: Win32_Processor.LoadPercentage KULLANILMAZ; o, her çekirdeği ~1 sn
-            // örnekler ve çok çekirdekli sunucularda saniyelerce sürer. PerfFormattedData
-            // _Total değeri sistem tarafından önceden hesaplanır ve anında döner.
-            double? cpu = null;
-            using (var searcher = new ManagementObjectSearcher(scope,
-                new ObjectQuery("SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor WHERE Name='_Total'")))
+            // CPU — performans sayacından toplam yük (Win32_Processor.LoadPercentage KULLANILMAZ; yavaş).
+            // GÜVENİLİRLİK: PerfFormattedData _Total bazı durumlarda taze WMI bağlantısında "cold" (0/eski) dönebilir.
+            // Bu yüzden iki kez okuyup (kısa aralıkla) İKİNCİ taze değeri kullanırız; ikisi de geçerliyse ortalamalarını.
+            double? ReadCpuTotal()
             {
+                using var searcher = new ManagementObjectSearcher(scope,
+                    new ObjectQuery("SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor WHERE Name='_Total'"));
                 foreach (ManagementObject mo in searcher.Get())
-                    if (mo["PercentProcessorTime"] != null) cpu = Math.Round(Convert.ToDouble(mo["PercentProcessorTime"]), 1);
+                    if (mo["PercentProcessorTime"] != null) return Convert.ToDouble(mo["PercentProcessorTime"]);
+                return null;
             }
+            var cpu1 = ReadCpuTotal();
+            System.Threading.Thread.Sleep(600);
+            var cpu2 = ReadCpuTotal();
+            double? cpu;
+            if (cpu1.HasValue && cpu2.HasValue) cpu = Math.Round((cpu1.Value + cpu2.Value) / 2.0, 1);
+            else if (cpu2.HasValue) cpu = Math.Round(cpu2.Value, 1);
+            else if (cpu1.HasValue) cpu = Math.Round(cpu1.Value, 1);
+            else cpu = null;
 
             // RAM (TotalVisibleMemorySize KB cinsindendir) + İşletim sistemi (tam sürüm)
             double? ram = null, totalRamGb = null, ramUsedGb = null;

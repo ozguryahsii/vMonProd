@@ -338,7 +338,7 @@
             ch.setOption({
                 tooltip:{ trigger:'axis' },
                 legend:{ bottom:0, data:['CPU','RAM','Disk'], textStyle:{color:txtColor()} },
-                grid:{ left:38, right:16, top:14, bottom:30 },
+                grid:{ left:38, right:16, top:14, bottom:48 },
                 xAxis:{ type:'category', data:f.map(p=>p.day), axisLabel:{color:txtColor()} },
                 yAxis:{ type:'value', max:100, axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[
@@ -400,7 +400,7 @@
             const ch = chartFor(body.querySelector('.stat-chart'));
             ch.setOption({
                 tooltip:{ trigger:'axis' }, legend:{ bottom:0, data:['Atanan','Kullanılan'], textStyle:{color:txtColor()} },
-                grid:{ left:46, right:14, top:12, bottom:30 },
+                grid:{ left:46, right:14, top:12, bottom:48 },
                 xAxis:{ type:'category', data:cap.map(p=>p.day), axisLabel:{color:txtColor()} },
                 yAxis:{ type:'value', name:unit, axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
                 series:[
