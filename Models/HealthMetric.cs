@@ -12,4 +12,11 @@ public class HealthMetric
 
     /// <summary>Disk detayı, örn. "C: %71 · D: %35" veya "/: %80 · /data: %45".</summary>
     public string? DiskDetail { get; set; }
+
+    // --- Yapısal mutlak değerler (istatistik/trend için) ---
+    public int? CpuCores { get; set; }
+    public double? RamTotalGb { get; set; }
+    public double? RamUsedGb { get; set; }
+    public double? DiskTotalGb { get; set; }
+    public double? DiskUsedGb { get; set; }
 }

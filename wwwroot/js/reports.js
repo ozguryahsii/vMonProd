@@ -97,7 +97,7 @@ function buildKeywordFilter() {
     const sel = document.getElementById("filterKeyword");
     const current = sel.value;
     const keywords = [...new Set(lastSummary.services.flatMap(s => splitKeywords(s.keyword)))].sort();
-    sel.innerHTML = `<option value="">${rt("Tüm Keyword'ler", "All Keywords")}</option>` +
+    sel.innerHTML = `<option value="">${rt("Tüm Etiketler", "All Tags")}</option>` +
         keywords.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join("");
     if (keywords.includes(current)) sel.value = current;
 }
@@ -270,7 +270,7 @@ function exportCsv() {
     const tr = v => v != null ? String(v).replace(".", ",") : "";
     let rows;
     if (isHealthMode()) {
-        rows = [["Servis", "Tip", "Hedef", "Açıklama", "Keyword", "Kapasite", "Kontrol Sayısı", "Uptime %",
+        rows = [["Servis", "Tip", "Hedef", "Açıklama", "Etiket", "Kapasite", "Kontrol Sayısı", "Uptime %",
                  "CPU Ort %", "CPU Peak %", "RAM Ort %", "RAM Peak %", "Disk Ort %", "Disk Peak %"].join(sep)];
         getFilteredServices().forEach(s => {
             const h = s.health || {};
@@ -281,7 +281,7 @@ function exportCsv() {
             ].join(sep));
         });
     } else {
-        rows = [["Servis", "Tip", "Hedef", "Açıklama", "Keyword", "Kontrol Sayısı", "UP Sayısı", "Uptime %", "Kesinti Sayısı", "Kesinti (dk)", "Ort. Yanıt (ms)"].join(sep)];
+        rows = [["Servis", "Tip", "Hedef", "Açıklama", "Etiket", "Kontrol Sayısı", "UP Sayısı", "Uptime %", "Kesinti Sayısı", "Kesinti (dk)", "Ort. Yanıt (ms)"].join(sep)];
         getFilteredServices().forEach(s => rows.push([
             `"${s.name}"`, s.type, `"${s.target}${s.port ? ":" + s.port : ""}"`,
             `"${s.description || ""}"`, `"${s.keyword || ""}"`, s.checkCount, s.upCount,

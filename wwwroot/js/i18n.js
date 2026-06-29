@@ -28,7 +28,7 @@
         "Manuel": "Manual", "Manuel Şifre": "Manual Password", "Detay": "Detail", "Özet": "Summary",
         "Yükleniyor...": "Loading...", "Kayıtlar": "Records", "Sonuç": "Result", "Başarılı": "Success",
         "Başarısız": "Failed", "Eylem": "Action", "Hedef": "Target", "Zaman": "Time", "Kullanıcı": "User",
-        "Ad": "Name", "Tip": "Type", "Keyword": "Keyword", "Kimlik": "Credential", "Aralık": "Interval",
+        "Ad": "Name", "Tip": "Type", "Etiket": "Tag", "Kimlik": "Credential", "Aralık": "Interval",
         "Rol / Yetkiler": "Role / Permissions", "Son Giriş": "Last Login", "Yetkiler:": "Permissions:",
 
         // Durum rozetleri (JS ile çizilen kartlar dahil)
@@ -50,9 +50,14 @@
         // Dashboard düzenleme formu
         "Dashboard Düzenle": "Edit Dashboard", "Dashboard Adı": "Dashboard Name",
         "Tip Filtresi (otomatik dahil)": "Type Filter (auto-included)", "Sıra": "Order",
-        "Keyword Filtresi (otomatik dahil)": "Keyword Filter (auto-included)", "Seçili Servisler": "Selected Services",
+        "Etiket Filtresi (otomatik dahil)": "Tag Filter (auto-included)", "Seçili Servisler": "Selected Services",
         "Görünenlerin hepsini seç": "Select all visible",
-        "Ad / hedef / tip / keyword ara...": "Search name / target / type / keyword...",
+        "Ad / hedef / tip / etiket ara...": "Search name / target / type / tag...",
+        "İstatistikler": "Statistics",
+        "İzlenen altyapının canlı özeti — filtrelenebilir, sürüklenebilir panolar": "Live overview of monitored infrastructure — filterable, draggable panels",
+        "Yenile": "Refresh", "Düzenle": "Edit", "Kilitle": "Lock",
+        "Etiket ekle (mevcuda eklenir, virgülle ayırın)": "Add tag (appended to existing, comma-separated)",
+        "Mevcut etiketler korunur; yazılanlar listeye eklenir (tekrarlar atlanır).": "Existing tags are kept; entries are added to the list (duplicates skipped).",
         "örn. Ping İzleme, Kritik DB'ler": "e.g. Ping Monitoring, Critical DBs",
         "Windows Sağlık": "Windows Health", "Linux Sağlık": "Linux Health",
         "Windows Servis": "Windows Service", "Linux Servis": "Linux Service",
@@ -65,7 +70,7 @@
         "İzlenen servisleri yönetin, CSV ile toplu ekleyin": "Manage monitored services, bulk add via CSV",
         "CSV Dışa Aktar (Yedek)": "Export CSV (Backup)", "Örnek CSV İndir": "Download Sample CSV",
         "CSV İçe Aktar": "Import CSV", "Yeni Servis": "New Service", "Ad / hedef ara...": "Search name / target...",
-        "Tüm Tipler": "All Types", "Tüm Keyword'ler": "All Keywords", "Seçilenleri Düzenle": "Edit Selected",
+        "Tüm Tipler": "All Types", "Tüm Etiketler": "All Tags", "Seçilenleri Düzenle": "Edit Selected",
         "Henüz servis yok.": "No services yet.", "Alarm kanalları & durum": "Alarm channels & status",
         "E-posta alarmı": "Email alarm", "SMS alarmı": "SMS alarm", "WhatsApp alarmı": "WhatsApp alarm",
         "Arama alarmı": "Call alarm", "Kontrol aralığı (dk)": "Check interval (min)",
@@ -75,7 +80,7 @@
         "CSV ile Toplu Servis Ekleme": "Bulk Add Services via CSV", "CSV Dosyası": "CSV File",
 
         // Servis formu (etiketler — JS dinamik olanlar dahil)
-        "Servis Adı": "Service Name", "Keyword / Etiket": "Keyword / Tag", "İzleme Türü": "Monitoring Type",
+        "Servis Adı": "Service Name", "İzleme Türü": "Monitoring Type",
         "Hedef": "Target", "Ekstra": "Extra", "Kimlik Bilgisi": "Credential", "Zaman Aşımı (sn)": "Timeout (s)",
         "Kontrol Aralığı (dk)": "Check Interval (min)", "Yavaşlık Eşiği (ms)": "Slowness Threshold (ms)",
         "SSL kullan": "Use SSL", "LDAPS kullan": "Use LDAPS", "IMAPS (993)": "IMAPS (993)",
@@ -200,7 +205,7 @@
         // Raporlar
         "Erişilebilirlik Raporları": "Availability Reports",
         "Tarih–saat aralıklı geriye dönük analiz ve CSV dışa aktarma": "Date–time ranged historical analysis and CSV export",
-        "Sadece kesintili": "Outages only", "Sadece hatalı": "Errors only", "Ad / hedef / keyword ara...": "Search name / target / keyword...",
+        "Sadece kesintili": "Outages only", "Sadece hatalı": "Errors only", "Ad / hedef / etiket ara...": "Search name / target / tag...",
         "Servis": "Service", "Kontrol": "Checks", "Uptime": "Uptime", "Kesinti": "Outages",
         "Toplam Kesinti": "Total Outage", "Ort. Yanıt": "Avg. Response",
 
@@ -252,8 +257,8 @@
         "PNG, JPG, GIF veya WEBP (en fazla 2 MB). Logo dosyası uygulamayla birlikte gelmez; buradan yüklersiniz ve sunucuda saklanır.": "PNG, JPG, GIF or WEBP (max 2 MB). The logo file is not shipped with the app; you upload it here and it is stored on the server.",
         // Dashboard formu hint'leri
         "Bu tipteki tüm servisler (yeni eklenenler dahil) otomatik girer.": "All services of this type (including newly added ones) are included automatically.",
-        "Bu keyword'e sahip tüm servisler (yeni eklenenler dahil) otomatik girer.": "All services with this keyword (including newly added ones) are included automatically.",
-        "Tip filtresi, keyword filtresi ve seçili servisler birleşir.": "The type filter, keyword filter and selected services are combined.",
+        "Bu etikete sahip tüm servisler (yeni eklenenler dahil) otomatik girer.": "All services with this tag (including newly added ones) are included automatically.",
+        "Tip filtresi, etiket filtresi ve seçili servisler birleşir.": "The type filter, tag filter and selected services are combined.",
         // Entegrasyon formu hint'leri
         "Bu entegrasyon hangi kanaldan gönderir.": "Which channel this integration sends through.",
         "Listede bu adla görünür. \"Twilio\" kullanılamaz.": "Shown with this name in the list. \"Twilio\" cannot be used.",

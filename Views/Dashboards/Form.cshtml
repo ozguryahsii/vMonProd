@@ -52,18 +52,18 @@
             </div>
 
             <div>
-                <label class="label">Keyword Filtresi (otomatik dahil)</label>
+                <label class="label">Etiket Filtresi (otomatik dahil)</label>
                 <select asp-for="KeywordFilter" class="input max-w-xs">
                     <option value="">— Yok —</option>
                     @foreach (var k in keywords) { <option value="@k">@k</option> }
                 </select>
-                <div class="hint">Bu keyword'e sahip tüm servisler (yeni eklenenler dahil) otomatik girer.</div>
+                <div class="hint">Bu etikete sahip tüm servisler (yeni eklenenler dahil) otomatik girer.</div>
             </div>
 
             <div>
                 <label class="label">Seçili Servisler</label>
                 <div class="flex flex-wrap items-center gap-3 mb-2">
-                    <input type="text" id="svcSearch" class="input !w-60 !py-1.5" placeholder="Ad / hedef / tip / keyword ara..." />
+                    <input type="text" id="svcSearch" class="input !w-60 !py-1.5" placeholder="Ad / hedef / tip / etiket ara..." />
                     <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
                         <input class="switch" type="checkbox" id="selectAllVisible" /> Görünenlerin hepsini seç
                     </label>
@@ -87,7 +87,7 @@
                         </label>
                     }
                 </div>
-                <div class="hint">Tip filtresi, keyword filtresi ve seçili servisler birleşir.</div>
+                <div class="hint">Tip filtresi, etiket filtresi ve seçili servisler birleşir.</div>
             </div>
 
             <div class="flex gap-2">

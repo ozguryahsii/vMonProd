@@ -30,6 +30,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SmsProvider> SmsProviders => Set<SmsProvider>();
     public DbSet<AlarmSession> AlarmSessions => Set<AlarmSession>();
+    public DbSet<StatWidget> StatWidgets => Set<StatWidget>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

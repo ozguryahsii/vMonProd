@@ -2,7 +2,10 @@ using vMonitor.Models;
 
 namespace vMonitor.Services.Checkers;
 
-public record HealthMetricsData(double? Cpu, double? Ram, double? MaxDisk, string? DiskDetail, string? Capacity = null);
+public record HealthMetricsData(double? Cpu, double? Ram, double? MaxDisk, string? DiskDetail, string? Capacity = null,
+    int? CpuCores = null, double? RamTotalGb = null, double? RamUsedGb = null,
+    double? DiskTotalGb = null, double? DiskUsedGb = null,
+    string? OsName = null, string? OsKind = null);
 
 public record CheckOutcome(bool IsUp, long ResponseTimeMs, string? Error = null, HealthMetricsData? Metrics = null, CheckStatus Status = CheckStatus.Up);
 

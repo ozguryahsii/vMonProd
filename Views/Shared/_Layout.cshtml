@@ -106,6 +106,7 @@
                     @if (User.Can(Perms.DashboardsView)) {
                         <a class="navlink" asp-controller="Dashboards" asp-action="Index"><i class="bi bi-columns-gap"></i> Dashboard'lar</a>
                         <a class="navlink" asp-controller="Reports" asp-action="Index"><i class="bi bi-bar-chart-line"></i> Raporlar</a>
+                        <a class="navlink" asp-controller="Statistics" asp-action="Index"><i class="bi bi-graph-up-arrow"></i> İstatistikler</a>
                     }
                     @if (User.Can(Perms.ServicesManage)) {
                         <a class="navlink" asp-controller="Services" asp-action="Index"><i class="bi bi-hdd-network"></i> Servisler</a>
@@ -170,6 +171,7 @@
                 @if (User.Can(Perms.DashboardsView)) {
                     <a class="navlink" asp-controller="Dashboards" asp-action="Index"><i class="bi bi-columns-gap"></i> Dashboard'lar</a>
                     <a class="navlink" asp-controller="Reports" asp-action="Index"><i class="bi bi-bar-chart-line"></i> Raporlar</a>
+                    <a class="navlink" asp-controller="Statistics" asp-action="Index"><i class="bi bi-graph-up-arrow"></i> İstatistikler</a>
                 }
                 @if (User.Can(Perms.ServicesManage)) { <a class="navlink" asp-controller="Services" asp-action="Index"><i class="bi bi-hdd-network"></i> Servisler</a> }
                 @if (User.Can(Perms.CredentialsManage)) { <a class="navlink" asp-controller="Credentials" asp-action="Index"><i class="bi bi-key"></i> Kimlik Bilgileri</a> }
