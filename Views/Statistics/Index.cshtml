@@ -58,6 +58,9 @@
         <p class="text-sm text-slate-500 mt-0.5" data-i18n="stats.subtitle">İzlenen altyapının canlı özeti — filtrelenebilir, sürüklenebilir panolar</p>
     </div>
     <div class="flex items-center gap-2">
+        <span id="lastUpd" class="text-xs text-slate-400 hidden sm:inline"></span>
+        <button id="btnExport" class="btn btn-outline btn-sm" title="Özet CSV indir"><i class="bi bi-filetype-csv"></i></button>
+        <button id="btnFull" class="btn btn-outline btn-sm" title="Tam ekran"><i class="bi bi-arrows-fullscreen"></i></button>
         <button id="btnRefresh" class="btn btn-outline btn-sm"><i class="bi bi-arrow-clockwise"></i> <span data-i18n="stats.refresh">Yenile</span></button>
         @if (canEdit)
         {
@@ -84,8 +87,20 @@
                         <option value="gauge|avg_ram">Ort. RAM %</option>
                         <option value="gauge|avg_disk">Ort. Disk %</option>
                     </optgroup>
+                    <optgroup label="İçgörü">
+                        <option value="fleet|fleet">Filo trendi (30 gün)</option>
+                        <option value="top|top">Top kaynak tüketenler</option>
+                        <option value="critical|critical">Kritik durum</option>
+                        <option value="uptime|uptime">Erişilebilirlik (uptime)</option>
+                        <option value="histogram|histogram">Kullanım dağılımı</option>
+                        <option value="capacity|capacity">Kapasite (kullanılan/atanan)</option>
+                        <option value="outage|outage">Kesinti özeti</option>
+                        <option value="os_eol|os_eol">Destek sonu (EOL) OS</option>
+                        <option value="heatmap|heatmap">CPU ısı haritası</option>
+                    </optgroup>
                 </select>
                 <button id="btnAdd" class="btn btn-outline btn-sm"><i class="bi bi-plus-lg"></i> Ekle</button>
+                <button id="btnReset" class="btn btn-outline btn-sm" title="Tüm widget'ları varsayılana sıfırla"><i class="bi bi-arrow-counterclockwise"></i> Varsayılana dön</button>
                 <button id="btnSave" class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Kaydet</button>
             </div>
             <button id="btnEdit" class="btn btn-outline btn-sm" title="Düzenleme kilidini aç/kapat">
@@ -156,6 +171,16 @@
         avg_cpu:  { label:'Ortalama CPU %', icon:'bi-cpu', color:'#ed1c24' },
         avg_ram:  { label:'Ortalama RAM %', icon:'bi-memory', color:'#8b5cf6' },
         avg_disk: { label:'Ortalama Disk %', icon:'bi-device-hdd', color:'#14b8a6' },
+        fleet:    { label:'Filo Trendi — Ort. CPU/RAM/Disk (30 gün)', icon:'bi-graph-up', color:'#3b82f6' },
+        top:      { label:'Top Kaynak Tüketenler', icon:'bi-fire', color:'#ef4444' },
+        critical: { label:'Kritik Durum', icon:'bi-exclamation-octagon', color:'#ef4444' },
+        uptime:   { label:'Erişilebilirlik (Uptime)', icon:'bi-shield-check', color:'#10b981' },
+        histogram:{ label:'Kullanım Dağılımı', icon:'bi-bar-chart-steps', color:'#8b5cf6' },
+        capacity: { label:'Kapasite (kullanılan / atanan)', icon:'bi-hdd-stack', color:'#14b8a6' },
+        outage:   { label:'Kesinti Özeti (7 gün)', icon:'bi-plug', color:'#f59e0b' },
+        os_eol:   { label:'Destek Sonu (EOL) OS', icon:'bi-shield-exclamation', color:'#ef4444' },
+        heatmap:  { label:'CPU Isı Haritası (24s)', icon:'bi-grid-3x3', color:'#3b82f6' },
+        disk_full:{ label:'Diski Dolmak Üzere (%85+)', icon:'bi-device-hdd-fill', color:'#ef4444' },
     };
     const charts = {};   // elId -> echarts instance
     let DATA = null;
@@ -173,6 +198,21 @@
     function bindCardClick(item, fn){
         const card = item.querySelector('.stat-card');
         if (card) card.onclick = () => { if (!editing) fn(); };
+    }
+    function tabRow(tabs, active){
+        return '<div class="flex gap-1 mb-2">' + tabs.map(k =>
+            '<button class="px-2 py-0.5 rounded text-xs '+(k===active?'bg-brand-500 text-white':'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700')+'" data-tab="'+k+'">'+k.toUpperCase()+'</button>').join('') + '</div>';
+    }
+    function bindTabs(body, item, prop){
+        body.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); item[prop] = b.dataset.tab; renderWidget(item); }));
+    }
+    const upColor = v => v>=99.5 ? '#10b981' : v>=98 ? '#f59e0b' : '#ef4444';
+    function barList(arr, color, suffix){
+        const max = Math.max(1, ...arr.map(x=>x.value));
+        return arr.length ? arr.map(d=>'<div class="brk-row" style="cursor:default">'
+            +'<span class="brk-name" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'
+            +'<span class="brk-bar"><span style="width:'+Math.round(100*d.value/max)+'%;background:'+color+'"></span></span>'
+            +'<span class="brk-val">'+d.value+(suffix||'')+'</span></div>').join('') : '<div class="stat-sub">Veri yok.</div>';
     }
 
     const grid = GridStack.init({ column:12, cellHeight:70, margin:6, float:true,
@@ -218,11 +258,20 @@
                   '<span class="stat-sub"> / '+fmt(r.alloc)+' '+r.unit+'</span></div>' +
                   '<div class="stat-bar"><div style="width:0%;background:linear-gradient(90deg,'+meta.color+'aa,'+meta.color+')"></div></div>' +
                   '<div class="stat-sub">%'+pct+' kullanım</div>' +
+                  '<div class="stat-spark" style="height:30px;margin-top:2px"></div>' +
                 '</div>';
             const num = body.querySelector('.stat-num');
             num.textContent = '0';
             new countUp.CountUp(num, r.used, { duration:1.2, decimalPlaces:(r.used%1?1:0), separator:'.' }).start();
             requestAnimationFrame(()=>{ body.querySelector('.stat-bar>div').style.width = pct+'%'; });
+            // mini sparkline: filo trendinden bu metriğin son günleri (cpu/ram/disk %)
+            const spark = (DATA.fleet||[]).map(p=>p[source]).filter(v=>v!=null).slice(-14);
+            if (spark.length) {
+                const ch = chartFor(body.querySelector('.stat-spark'));
+                ch.setOption({ grid:{left:0,right:0,top:2,bottom:2}, xAxis:{type:'category',show:false,data:spark.map((_,i)=>i)},
+                    yAxis:{type:'value',show:false,max:100}, tooltip:{show:false},
+                    series:[{type:'line',data:spark,smooth:true,symbol:'none',lineStyle:{color:meta.color,width:2},areaStyle:{color:meta.color,opacity:.12}}] });
+            }
             bindCardClick(item, () => openDetail(source, null));
             return;
         }
@@ -275,10 +324,126 @@
             ch.off('click').on('click', () => openDetail(source, null));
             return;
         }
+        if (type === 'fleet') {
+            const f = DATA.fleet || [];
+            body.innerHTML = header(meta) + '<div class="stat-chart"></div>';
+            const ch = chartFor(body.querySelector('.stat-chart'));
+            ch.setOption({
+                tooltip:{ trigger:'axis' },
+                legend:{ bottom:0, data:['CPU','RAM','Disk'], textStyle:{color:txtColor()} },
+                grid:{ left:38, right:16, top:14, bottom:30 },
+                xAxis:{ type:'category', data:f.map(p=>p.day), axisLabel:{color:txtColor()} },
+                yAxis:{ type:'value', max:100, axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
+                series:[
+                    { name:'CPU', type:'line', smooth:true, areaStyle:{opacity:.12}, data:f.map(p=>p.cpu), itemStyle:{color:'#ed1c24'}, lineStyle:{color:'#ed1c24'} },
+                    { name:'RAM', type:'line', smooth:true, areaStyle:{opacity:.12}, data:f.map(p=>p.ram), itemStyle:{color:'#8b5cf6'}, lineStyle:{color:'#8b5cf6'} },
+                    { name:'Disk', type:'line', smooth:true, areaStyle:{opacity:.12}, data:f.map(p=>p.disk), itemStyle:{color:'#14b8a6'}, lineStyle:{color:'#14b8a6'} }
+                ]
+            });
+            return;
+        }
+        if (type === 'top') {
+            const t = item.__topTab || 'cpu';
+            const arr = (DATA.top && DATA.top[t]) || [];
+            body.innerHTML = header(meta) + tabRow(['cpu','ram','disk'], t) + '<div class="brk-list" style="overflow:auto;flex:1">' + barList(arr, meta.color, '%') + '</div>';
+            bindTabs(body, item, '__topTab');
+            return;
+        }
+        if (type === 'critical') {
+            const c = DATA.critical || { diskFull:0, breach:0 };
+            body.innerHTML = header(meta) + '<div class="flex-1 grid grid-cols-2 gap-3 items-center text-center">'
+                + '<button data-k="disk_full"><div class="stat-num" style="color:#ef4444">'+c.diskFull+'</div><div class="stat-sub">Disk %85+</div></button>'
+                + '<button data-k="error"><div class="stat-num" style="color:#f59e0b">'+c.breach+'</div><div class="stat-sub">Eşik aşan (Error)</div></button></div>';
+            body.querySelector('[data-k="disk_full"]').onclick = e => { e.stopPropagation(); openDetail('disk_full', null); };
+            body.querySelector('[data-k="error"]').onclick = e => { e.stopPropagation(); openDetail('error', null); };
+            return;
+        }
+        if (type === 'uptime') {
+            const u = DATA.uptime || { h24:100, d7:100 };
+            body.innerHTML = header(meta) + '<div class="flex-1 grid grid-cols-2 gap-3 items-center text-center">'
+                + '<div><div class="stat-num" style="color:'+upColor(u.h24)+'">'+u.h24+'%</div><div class="stat-sub">Son 24 saat</div></div>'
+                + '<div><div class="stat-num" style="color:'+upColor(u.d7)+'">'+u.d7+'%</div><div class="stat-sub">Son 7 gün</div></div></div>';
+            return;
+        }
+        if (type === 'histogram') {
+            const t = item.__hTab || 'cpu';
+            const arr = (DATA.histogram && DATA.histogram[t]) || [0,0,0,0,0];
+            const labels = ['0-20','20-40','40-60','60-80','80-100'];
+            body.innerHTML = header(meta) + tabRow(['cpu','ram','disk'], t) + '<div class="stat-chart"></div>';
+            bindTabs(body, item, '__hTab');
+            const ch = chartFor(body.querySelector('.stat-chart'));
+            ch.setOption({
+                tooltip:{}, grid:{ left:30, right:12, top:10, bottom:22 },
+                xAxis:{ type:'category', data:labels, axisLabel:{color:txtColor(),fontSize:10} },
+                yAxis:{ type:'value', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
+                series:[{ type:'bar', barWidth:'55%', data:arr.map((v,i)=>({ value:v, itemStyle:{ color:PALETTE[i], borderRadius:[4,4,0,0] } })) }]
+            });
+            return;
+        }
+        if (type === 'capacity') {
+            const t = item.__cTab || 'ram';
+            const cap = DATA.capacity || [];
+            const used = cap.map(p => t==='ram'?p.ramUsed:p.diskUsed);
+            const alloc = cap.map(p => t==='ram'?p.ramAlloc:p.diskAlloc);
+            body.innerHTML = header(meta) + tabRow(['ram','disk'], t) + '<div class="stat-chart"></div>';
+            bindTabs(body, item, '__cTab');
+            const ch = chartFor(body.querySelector('.stat-chart'));
+            ch.setOption({
+                tooltip:{ trigger:'axis' }, legend:{ bottom:0, data:['Atanan','Kullanılan'], textStyle:{color:txtColor()} },
+                grid:{ left:46, right:14, top:12, bottom:30 },
+                xAxis:{ type:'category', data:cap.map(p=>p.day), axisLabel:{color:txtColor()} },
+                yAxis:{ type:'value', name:'GB', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
+                series:[
+                    { name:'Atanan', type:'line', smooth:true, areaStyle:{opacity:.08}, data:alloc, itemStyle:{color:'#94a3b8'}, lineStyle:{color:'#94a3b8'} },
+                    { name:'Kullanılan', type:'line', smooth:true, areaStyle:{opacity:.22}, data:used, itemStyle:{color:meta.color}, lineStyle:{color:meta.color} }
+                ]
+            });
+            return;
+        }
+        if (type === 'outage') {
+            const o = DATA.outages || { count:0, minutes:0, daily:[], worst:[] };
+            body.innerHTML = header(meta)
+                + '<div class="flex gap-5 my-1"><div><span class="stat-num" style="font-size:1.7rem;color:'+meta.color+'">'+o.count+'</span><span class="stat-sub"> kesinti</span></div>'
+                + '<div><span class="stat-num" style="font-size:1.7rem">'+o.minutes+'</span><span class="stat-sub"> dk toplam</span></div></div>'
+                + '<div class="stat-chart"></div>';
+            const ch = chartFor(body.querySelector('.stat-chart'));
+            ch.setOption({
+                tooltip:{ trigger:'axis' }, grid:{ left:30, right:12, top:8, bottom:22 },
+                xAxis:{ type:'category', data:(o.daily||[]).map(p=>p.day), axisLabel:{color:txtColor()} },
+                yAxis:{ type:'value', axisLabel:{color:txtColor()}, splitLine:{lineStyle:{color:trackColor()}} },
+                series:[{ type:'bar', barWidth:'50%', data:(o.daily||[]).map(p=>p.value), itemStyle:{ color:meta.color, borderRadius:[4,4,0,0] } }]
+            });
+            return;
+        }
+        if (type === 'os_eol') {
+            const e = DATA.osEol || { count:0, items:[] };
+            const list = (e.items||[]).map(d=>'<div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-700"><span class="truncate" title="'+esc(d.name)+'">'+esc(d.name)+'</span><span class="badge pill-error ml-2">'+d.value+'</span></div>').join('') || '<div class="stat-sub">EOL sürüm yok 👍</div>';
+            body.innerHTML = header(meta) + '<div class="stat-num" style="color:#ef4444">'+e.count+'</div><div class="stat-sub mb-2">destek sonu sunucu</div><div style="overflow:auto;flex:1">'+list+'</div>';
+            return;
+        }
+        if (type === 'heatmap') {
+            const h = DATA.heatmap || { rows:[], data:[] };
+            const hours = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
+            body.innerHTML = header(meta) + '<div class="stat-chart"></div>';
+            const ch = chartFor(body.querySelector('.stat-chart'));
+            ch.setOption({
+                tooltip:{ position:'top', formatter:p=> (h.rows[p.value[1]]||'')+' · '+hours[p.value[0]]+':00 → %'+p.value[2] },
+                grid:{ left:130, right:14, top:8, bottom:18 },
+                xAxis:{ type:'category', data:hours, splitArea:{show:true}, axisLabel:{color:txtColor(),fontSize:9} },
+                yAxis:{ type:'category', data:h.rows, axisLabel:{color:txtColor(),fontSize:9}, splitArea:{show:true} },
+                visualMap:{ min:0, max:100, show:false, inRange:{ color:['#dbeafe','#fde68a','#f87171','#dc2626'] } },
+                series:[{ type:'heatmap', data:h.data, itemStyle:{borderColor:isDark()?'#1e293b':'#fff',borderWidth:1}, emphasis:{itemStyle:{borderColor:'#334155',borderWidth:1}} }]
+            });
+            return;
+        }
         body.innerHTML = header(meta)+'<div class="stat-sub mt-2">Bilinmeyen widget</div>';
     }
 
-    function renderAll(){ document.querySelectorAll('.grid-stack-item').forEach(renderWidget); }
+    function renderAll(){
+        Object.values(charts).forEach(c => { try { c.dispose(); } catch(e){} });
+        for (const k in charts) delete charts[k];
+        document.querySelectorAll('.grid-stack-item').forEach(renderWidget);
+    }
     function resizeAll(){ Object.values(charts).forEach(c=>{ try{c.resize();}catch(e){} }); }
 
     async function load(){
@@ -287,12 +452,41 @@
             DATA = await r.json();
         } catch(e){ DATA = null; }
         renderAll();
+        if (DATA && DATA.lastUpdated)
+            document.getElementById('lastUpd').textContent = 'Son güncelleme: ' + new Date(DATA.lastUpdated).toLocaleTimeString('tr-TR');
+    }
+
+    function exportCsv(){
+        if (!DATA) return;
+        const rows = [['Metrik','Değer'],
+            ['Toplam sunucu', DATA.counts.total], ['Up', DATA.counts.up], ['Down', DATA.counts.down], ['Error', DATA.counts.error],
+            ['CPU kullanılan (çekirdek)', DATA.cpu.used], ['CPU atanan (çekirdek)', DATA.cpu.alloc],
+            ['RAM kullanılan (GB)', DATA.ram.used], ['RAM atanan (GB)', DATA.ram.alloc],
+            ['Disk kullanılan (GB)', DATA.disk.used], ['Disk atanan (GB)', DATA.disk.alloc],
+            ['Ort. CPU %', DATA.avg.cpu], ['Ort. RAM %', DATA.avg.ram], ['Ort. Disk %', DATA.avg.disk],
+            ['Uptime 24s %', DATA.uptime.h24], ['Uptime 7g %', DATA.uptime.d7],
+            ['Kesinti (7g)', DATA.outages.count], ['Kesinti dk (7g)', DATA.outages.minutes],
+            ['EOL sunucu', DATA.osEol.count], ['Disk %85+', DATA.critical.diskFull], []];
+        rows.push(['OS sürümü','Adet']); (DATA.osVersion||[]).forEach(o=> rows.push([o.name, o.value]));
+        rows.push([]); rows.push(['Etiket','Adet']); (DATA.tags||[]).forEach(o=> rows.push([o.name, o.value]));
+        const csv = rows.map(r => r.map(c => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(';')).join('\r\n');
+        const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'vmon-istatistik-' + new Date().toISOString().slice(0,10) + '.csv';
+        a.click();
     }
 
     grid.on('resizestop', (e,el)=>{ setTimeout(()=>{ renderWidget(el); }, 50); });
     window.addEventListener('resize', ()=> setTimeout(resizeAll,100));
 
     document.getElementById('btnRefresh').addEventListener('click', load);
+    document.getElementById('btnExport').addEventListener('click', exportCsv);
+    document.getElementById('btnFull').addEventListener('click', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+        else document.exitFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => setTimeout(resizeAll, 200));
 
     window.removeWidget = function(btn){
         const item = btn.closest('.grid-stack-item');
@@ -315,7 +509,10 @@
 
         document.getElementById('btnAdd').addEventListener('click', ()=>{
             const [type, source] = document.getElementById('addType').value.split('|');
-            const w = type==='counter'?3:4, h = type==='counter'?2:(type==='resource'?3:4);
+            const SIZE = { counter:[3,2], resource:[4,3], pie:[4,4], gauge:[4,3],
+                fleet:[12,4], top:[6,5], critical:[6,2], uptime:[6,3], histogram:[6,4],
+                capacity:[6,4], outage:[6,4], os_eol:[3,4], heatmap:[12,5] };
+            const [w, h] = SIZE[type] || [4,3];
             const el = document.createElement('div');
             el.className = 'grid-stack-item';
             el.setAttribute('data-type', type); el.setAttribute('data-source', source); el.setAttribute('data-config','');
@@ -324,6 +521,13 @@
                 '<div class="widget-body" style="flex:1;display:flex;flex-direction:column;min-height:0;"></div></div></div>';
             grid.addWidget(el, { w, h, autoPosition:true });
             renderWidget(el);
+        });
+
+        document.getElementById('btnReset').addEventListener('click', async ()=>{
+            if (!confirm('Tüm istatistik widget\'ları varsayılan düzene sıfırlanacak. Devam edilsin mi?')) return;
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const r = await fetch('@Url.Action("ResetLayout")', { method:'POST', headers:{ 'RequestVerificationToken': token } });
+            if (r.ok) location.reload(); else alert('Sıfırlanamadı.');
         });
 
         document.getElementById('btnSave').addEventListener('click', async ()=>{
