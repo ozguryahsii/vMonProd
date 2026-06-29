@@ -40,6 +40,16 @@
     .stbl th, .stbl td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
     .dark .stbl th, .dark .stbl td { border-color:#334155; }
     .stbl th { color:#64748b; font-weight:600; position:sticky; top:0; background:inherit; }
+    /* Kategori dökümü (breakdown) barlari */
+    .brk-list { display:flex; flex-direction:column; gap:.35rem; }
+    .brk-row { display:grid; grid-template-columns:12rem 1fr 3.2rem; align-items:center; gap:.7rem; width:100%; text-align:left; padding:.4rem .55rem; border-radius:.55rem; background:transparent; border:0; cursor:pointer; }
+    .brk-row:hover { background:#f1f5f9; }
+    .dark .brk-row:hover { background:#0f172a; }
+    .brk-name { font-size:.84rem; color:inherit; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .brk-bar { height:.7rem; background:#eef2f7; border-radius:999px; overflow:hidden; }
+    .dark .brk-bar { background:#334155; }
+    .brk-bar > span { display:block; height:100%; border-radius:999px; transition:width .9s cubic-bezier(.22,1,.36,1); }
+    .brk-val { text-align:right; font-weight:700; font-size:.9rem; }
 </style>
 
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -160,9 +170,9 @@
         const c = s==='Up'?'#10b981': s==='Down'?'#ef4444': s==='Hata'?'#f59e0b':'#94a3b8';
         return '<span style="color:'+c+';font-weight:600">'+esc(s)+'</span>';
     }
-    function bindCardClick(item, source){
+    function bindCardClick(item, fn){
         const card = item.querySelector('.stat-card');
-        if (card) card.onclick = () => { if (!editing) openDetail(source, null); };
+        if (card) card.onclick = () => { if (!editing) fn(); };
     }
 
     const grid = GridStack.init({ column:12, cellHeight:70, margin:6, float:true,
@@ -196,7 +206,7 @@
             body.innerHTML = header(meta) + '<div class="flex-1 flex items-center"><div class="stat-num" style="color:'+meta.color+'">0</div></div>';
             const num = body.querySelector('.stat-num');
             new countUp.CountUp(num, v, { duration:1.2, separator:'.' }).start();
-            bindCardClick(item, source);
+            bindCardClick(item, () => openDetail(source, null));
             return;
         }
         if (type === 'resource') {
@@ -213,7 +223,7 @@
             num.textContent = '0';
             new countUp.CountUp(num, r.used, { duration:1.2, decimalPlaces:(r.used%1?1:0), separator:'.' }).start();
             requestAnimationFrame(()=>{ body.querySelector('.stat-bar>div').style.width = pct+'%'; });
-            bindCardClick(item, source);
+            bindCardClick(item, () => openDetail(source, null));
             return;
         }
         if (type === 'pie') {
@@ -240,7 +250,9 @@
                 }],
                 graphic: total ? [{ type:'text', left:'center', top:'40%', style:{ text:total, fontSize:22, fontWeight:'bold', fill:txtColor() }}] : []
             });
-            if (arr.length) ch.off('click').on('click', p => { openDetail(source, p.name); });
+            // Pasta dilimine/merkeze/karta tıkla → kategori dökümü (sayısal bar listesi), oradan sunuculara in
+            ch.off('click').on('click', () => openBreakdown(source));
+            bindCardClick(item, () => openBreakdown(source));
             return;
         }
         if (type === 'gauge') {
@@ -337,6 +349,37 @@
 
     let detailState = { source:null, value:null };
     const rangeLabel = { 7:'7 gün', 30:'1 ay', 90:'3 ay', 180:'6 ay', 365:'1 yıl' };
+    const PIE_SOURCES = ['os_kind','os_version','tag'];
+
+    // 1. seviye: kategori dökümü — sayısal bar listesi (örn. 95 Windows / 144 Linux)
+    window.openBreakdown = function(source){
+        detailState = { source, value:null };
+        const meta = META[source] || { label: source };
+        document.querySelector('#smTitle span').textContent = meta.label || source;
+        document.getElementById('smTrend').classList.add('hidden');
+        document.getElementById('smRange').classList.add('hidden');
+        if (modalChart) { modalChart.dispose(); modalChart = null; }
+
+        let arr = source==='os_kind' ? DATA?.osKind : source==='os_version' ? DATA?.osVersion : DATA?.tags;
+        arr = (arr || []).slice();
+        const total = arr.reduce((a,b)=>a+b.value, 0);
+        const max = Math.max(1, ...arr.map(x=>x.value));
+        const list = arr.length ? arr.map((d,i)=>{
+            const w = Math.round(100*d.value/max), col = PALETTE[i%PALETTE.length];
+            return '<button class="brk-row" data-name="'+esc(d.name)+'">'
+                + '<span class="brk-name" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'
+                + '<span class="brk-bar"><span style="width:0%;background:'+col+'" data-w="'+w+'"></span></span>'
+                + '<span class="brk-val">'+d.value+'</span></button>';
+        }).join('') : '<div class="stat-sub">Veri yok.</div>';
+
+        document.getElementById('smTableWrap').innerHTML =
+            '<div class="stat-sub mb-2">Toplam <b>'+total+'</b> — bir kategoriye tıklayıp sunucuları görün.</div>'
+            + '<div class="brk-list">'+list+'</div>';
+        document.querySelectorAll('#smTableWrap .brk-row').forEach(b =>
+            b.addEventListener('click', () => openDetail(source, b.dataset.name)));
+        requestAnimationFrame(()=> document.querySelectorAll('#smTableWrap .brk-bar>span').forEach(s => s.style.width = s.dataset.w+'%'));
+        document.getElementById('smodal').classList.add('open');
+    };
 
     window.openDetail = async function(source, value){
         detailState = { source, value };
@@ -364,10 +407,14 @@
                 '<td>'+esc(s.os||'')+'</td><td>'+statusBadge(s.status)+'</td>'+
                 '<td>'+pct(s.cpu)+'</td><td>'+pct(s.ram)+'</td><td>'+pct(s.disk)+'</td>'+
                 '<td class="text-slate-400">'+esc(s.capacity||'')+'</td></tr>').join('');
-            document.getElementById('smTableWrap').innerHTML =
+            const back = (PIE_SOURCES.includes(detailState.source) && detailState.value)
+                ? '<button id="smBack" class="btn btn-outline btn-sm mb-3"><i class="bi bi-arrow-left"></i> Kategorilere dön</button>' : '';
+            document.getElementById('smTableWrap').innerHTML = back +
                 '<table class="stbl"><thead><tr><th>Sunucu</th><th>İşletim Sistemi</th><th>Durum</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Kapasite</th></tr></thead><tbody>'
                 + (rows || '<tr><td colspan="7" class="stat-sub">Kayıt yok.</td></tr>') + '</tbody></table>'
                 + '<div class="stat-sub mt-2">Toplam ' + (d.count||0) + ' sunucu.</div>';
+            const bb = document.getElementById('smBack');
+            if (bb) bb.addEventListener('click', () => openBreakdown(detailState.source));
         }
 
         const trendDiv = document.getElementById('smTrend');
