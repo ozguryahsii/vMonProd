@@ -16,7 +16,7 @@
 <div class="set">
 <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-4"><i class="bi bi-gear text-brand-500"></i> Ayarlar</h1>
 
-<form method="post" asp-action="Save">
+<form method="post" asp-action="Save" id="settingsForm">
     @Html.AntiForgeryToken()
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
 
@@ -210,10 +210,6 @@
 
     </div>
 
-    <div class="sticky bottom-0 z-20 mt-5 py-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-        <span class="text-xs text-slate-400 hidden sm:inline"><i class="bi bi-info-circle"></i> Tüm ayarlar tek seferde kaydedilir.</span>
-        <button class="btn btn-primary"><i class="bi bi-save"></i> Ayarları Kaydet</button>
-    </div>
 </form>
 
 @{
@@ -406,6 +402,11 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
+    <span class="text-xs text-slate-400 hidden sm:inline"><i class="bi bi-info-circle"></i> Yukarıdaki ayarlar tek seferde kaydedilir (Bildirim Kanalları / Yedek / EOL / Logo işlemleri ayrıdır, anında uygulanır).</span>
+    <button type="submit" form="settingsForm" class="btn btn-primary"><i class="bi bi-save"></i> Ayarları Kaydet</button>
 </div>
 </div>
 
