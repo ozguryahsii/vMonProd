@@ -233,7 +233,13 @@ app.Use(async (ctx, next) =>
     h["Referrer-Policy"] = "no-referrer";
     h["X-Permitted-Cross-Domain-Policies"] = "none";
     h["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()";
-    h["Content-Security-Policy"] = "frame-ancestors 'none'";
+    // CSP: dış kaynak yüklemeyi kıs (default-src 'self'); clickjacking/plugin/base/form sıkılaştır.
+    // NOT: mevcut mimari inline script/handler + Alpine (eval) kullandığından script-src 'unsafe-inline'/'unsafe-eval'
+    // gerekir; tüm kütüphaneler YEREL barındırıldığı için harici kaynak yok. (Logo yanıtı kendi sıkı CSP'sini yazar.)
+    h["Content-Security-Policy"] =
+        "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; " +
+        "img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self'";
     h.Remove("X-Powered-By");
 
     // Dinamik (kimlikli) sayfalar önbelleğe alınmasın — araya giren proxy/WAF eski içerik göstermesin.

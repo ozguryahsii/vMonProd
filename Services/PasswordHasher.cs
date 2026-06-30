@@ -17,6 +17,21 @@ public static class PasswordHasher
         return $"pbkdf2.sha256.{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
     }
 
+    /// <summary>Parola politikasını doğrular (PCI 8.3.6 / NIST 800-63B). (geçerli, hata mesajı) döner.</summary>
+    public static (bool ok, string? error) ValidatePolicy(string? password, int minLength, bool requireComplexity)
+    {
+        password ??= "";
+        if (password.Length < minLength)
+            return (false, $"Parola en az {minLength} karakter olmalı.");
+        if (requireComplexity)
+        {
+            bool upper = password.Any(char.IsUpper), lower = password.Any(char.IsLower), digit = password.Any(char.IsDigit);
+            if (!(upper && lower && digit))
+                return (false, "Parola en az bir büyük harf, bir küçük harf ve bir rakam içermeli.");
+        }
+        return (true, null);
+    }
+
     public static bool Verify(string password, string? stored)
     {
         if (string.IsNullOrEmpty(stored)) return false;

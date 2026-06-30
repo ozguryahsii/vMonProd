@@ -63,6 +63,12 @@ public class MonitorSettings
     /// <summary>İsteğe bağlı giden HTTP proxy (örn. http://proxy:8080). Boşsa doğrudan bağlanır.</summary>
     public string EolProxyUrl { get; set; } = "";
 
+    // --- Yerel kullanıcı parola politikası (PCI 8.3.6 / NIST 800-63B) ---
+    /// <summary>Yerel kullanıcı parolaları için en az karakter sayısı.</summary>
+    public int MinPasswordLength { get; set; } = 12;
+    /// <summary>Parola karmaşıklığı zorunlu mu? (büyük + küçük harf + rakam)</summary>
+    public bool RequirePasswordComplexity { get; set; } = true;
+
     /// <summary>Kullanıcı senkronizasyonunda kullanılacak kimlik bilgisi (Kimlik Bilgileri ekranından, Vault destekli olabilir).</summary>
     public int? LdapSyncCredentialId { get; set; }
 
@@ -177,6 +183,8 @@ public class SettingsService
         if (dict.TryGetValue("EolEnabled", out v)) s.EolEnabled = v == "true";
         if (dict.TryGetValue("EolWarnDays", out v) && int.TryParse(v, out var ew)) s.EolWarnDays = Math.Clamp(ew, 1, 3650);
         if (dict.TryGetValue("EolProxyUrl", out v)) s.EolProxyUrl = v ?? "";
+        if (dict.TryGetValue("MinPasswordLength", out v) && int.TryParse(v, out var mpl)) s.MinPasswordLength = Math.Clamp(mpl, 8, 128);
+        if (dict.TryGetValue("RequirePasswordComplexity", out v)) s.RequirePasswordComplexity = v == "true";
         if (dict.TryGetValue("LdapSyncCredentialId", out v) && int.TryParse(v, out var ci) && ci > 0) s.LdapSyncCredentialId = ci;
         if (dict.TryGetValue("TrustInternalTlsCertificates", out v)) s.TrustInternalTlsCertificates = v == "true";
         if (dict.TryGetValue("MaxLoginAttempts", out v) && int.TryParse(v, out i) && i > 0) s.MaxLoginAttempts = Math.Min(i, 10);
@@ -234,6 +242,8 @@ public class SettingsService
             ["EolEnabled"] = s.EolEnabled ? "true" : "false",
             ["EolWarnDays"] = s.EolWarnDays.ToString(),
             ["EolProxyUrl"] = s.EolProxyUrl,
+            ["MinPasswordLength"] = s.MinPasswordLength.ToString(),
+            ["RequirePasswordComplexity"] = s.RequirePasswordComplexity ? "true" : "false",
             ["LdapSyncCredentialId"] = s.LdapSyncCredentialId?.ToString() ?? "",
             ["TrustInternalTlsCertificates"] = s.TrustInternalTlsCertificates ? "true" : "false",
             ["MaxLoginAttempts"] = s.MaxLoginAttempts.ToString(),

@@ -170,8 +170,9 @@ public class SetupController : Controller
         {
             if (string.IsNullOrWhiteSpace(f.CompanyName)) return Json(new { ok = false, message = "Şirket adı zorunlu." });
             if (string.IsNullOrWhiteSpace(f.AdminUsers)) return Json(new { ok = false, message = "Yönetici kullanıcı adı zorunlu." });
-            if (string.IsNullOrWhiteSpace(f.AdminPassword) || f.AdminPassword.Length < 8)
-                return Json(new { ok = false, message = "Yönetici şifresi en az 8 karakter olmalı." });
+            // Parola politikası (kurulumda varsayılan: en az 12 karakter + karmaşıklık — PCI 8.3.6 / NIST 800-63B)
+            var (pwOk, pwErr) = PasswordHasher.ValidatePolicy(f.AdminPassword, 12, true);
+            if (!pwOk) return Json(new { ok = false, message = "Yönetici şifresi: " + pwErr });
 
             var c = ToConfig(f);
             var pass = ResolvePlainPassword(f, c);

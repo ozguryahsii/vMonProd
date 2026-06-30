@@ -288,22 +288,42 @@ public class AccountController : Controller
         var sam = User.FindFirst("sam")?.Value;
         var u = await _db.AppUsers.FirstOrDefaultAsync(x => x.Sam == sam);
         if (u == null) return RedirectToAction("Index", "Home");
+        var st = await _settings.GetAsync();
+        ViewBag.MinPasswordLength = st.MinPasswordLength;
+        ViewBag.RequireComplexity = st.RequirePasswordComplexity;
         return View(u);
     }
 
     [Microsoft.AspNetCore.Authorization.Authorize]
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Profile(string? email, string? phone)
+    public async Task<IActionResult> Profile(string? email, string? phone, string? currentPassword, string? newPassword, string? confirmPassword)
     {
         var sam = User.FindFirst("sam")?.Value;
         var u = await _db.AppUsers.FirstOrDefaultAsync(x => x.Sam == sam);
-        if (u != null)
+        if (u == null) return RedirectToAction(nameof(Profile));
+
+        u.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        u.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+
+        // Yerel kullanıcı parola değişimi (opsiyonel): yeni parola girildiyse mevcut doğrula + politika uygula
+        if (u.IsLocal && !string.IsNullOrEmpty(newPassword))
         {
-            u.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
-            u.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+            if (!PasswordHasher.Verify(currentPassword ?? "", u.PasswordHash))
+            { TempData["Error"] = "Mevcut şifre hatalı."; return RedirectToAction(nameof(Profile)); }
+            if (newPassword != confirmPassword)
+            { TempData["Error"] = "Yeni şifre ile tekrarı eşleşmiyor."; return RedirectToAction(nameof(Profile)); }
+            var settings = await _settings.GetAsync();
+            var (ok, err) = PasswordHasher.ValidatePolicy(newPassword, settings.MinPasswordLength, settings.RequirePasswordComplexity);
+            if (!ok) { TempData["Error"] = err; return RedirectToAction(nameof(Profile)); }
+            u.PasswordHash = PasswordHasher.Hash(newPassword);
             await _db.SaveChangesAsync();
-            TempData["Message"] = "Profil güncellendi.";
+            await _audit.LogAsync("user.password.change", u.Sam, "Yerel kullanıcı parolasını değiştirdi", true);
+            TempData["Message"] = "Profil ve şifre güncellendi.";
+            return RedirectToAction(nameof(Profile));
         }
+
+        await _db.SaveChangesAsync();
+        TempData["Message"] = "Profil güncellendi.";
         return RedirectToAction(nameof(Profile));
     }
 
