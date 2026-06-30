@@ -30,13 +30,21 @@ public class WindowsHealthChecker : CheckerBase
             // CPU — performans sayacından toplam yük (Win32_Processor.LoadPercentage KULLANILMAZ; yavaş).
             // GÜVENİLİRLİK: PerfFormattedData _Total bazı durumlarda taze WMI bağlantısında "cold" (0/eski) dönebilir.
             // Bu yüzden iki kez okuyup (kısa aralıkla) İKİNCİ taze değeri kullanırız; ikisi de geçerliyse ortalamalarını.
-            double? ReadCpuTotal()
+            double? ReadCpuFrom(string cls)
             {
                 using var searcher = new ManagementObjectSearcher(scope,
-                    new ObjectQuery("SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor WHERE Name='_Total'"));
+                    new ObjectQuery($"SELECT PercentProcessorTime FROM {cls} WHERE Name='_Total'"));
                 foreach (ManagementObject mo in searcher.Get())
                     if (mo["PercentProcessorTime"] != null) return Convert.ToDouble(mo["PercentProcessorTime"]);
                 return null;
+            }
+            double? ReadCpuTotal()
+            {
+                // Grup-farkında modern sayaç: TÜM işlemci gruplarını (64+ çekirdek) kapsar.
+                // Eski PerfOS_Processor yalnız ilk grubu (≤64) gördüğü için büyük sunucularda eksik ölçerdi.
+                try { var v = ReadCpuFrom("Win32_PerfFormattedData_Counters_ProcessorInformation"); if (v.HasValue) return v; }
+                catch { /* eski Windows'ta sınıf yoksa fallback */ }
+                return ReadCpuFrom("Win32_PerfFormattedData_PerfOS_Processor");
             }
             var cpu1 = ReadCpuTotal();
             System.Threading.Thread.Sleep(600);
