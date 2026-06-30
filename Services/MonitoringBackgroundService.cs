@@ -93,7 +93,8 @@ public class MonitoringBackgroundService : BackgroundService
                 _lastScheduledBackup = nowLocal;
                 using var scope = _scopeFactory.CreateScope();
                 var backup = scope.ServiceProvider.GetRequiredService<BackupService>();
-                var (file, err) = await backup.BackupNowAsync(settings.BackupPath, settings.BackupRetentionCount, ct);
+                var pwd = string.IsNullOrWhiteSpace(settings.BackupPasswordEncrypted) ? null : CryptoHelper.Decrypt(settings.BackupPasswordEncrypted);
+                var (file, err) = await backup.BackupNowAsync(settings.BackupPath, settings.BackupRetentionCount, settings.BackupEncrypt, pwd, ct);
                 if (err != null) _logger.LogError("Zamanlanmış yedek başarısız: {Err}", err);
                 else _logger.LogInformation("Zamanlanmış yedek alındı: {File}", file);
             }

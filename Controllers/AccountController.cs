@@ -70,6 +70,7 @@ public class AccountController : Controller
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int Count, DateTime FirstAt)> _loginGate = new();
 
     [HttpPost, ValidateAntiForgeryToken]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public async Task<IActionResult> Login(string username, string password, string? returnUrl = null)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "?";
@@ -315,6 +316,15 @@ public class AccountController : Controller
             var settings = await _settings.GetAsync();
             var (ok, err) = PasswordHasher.ValidatePolicy(newPassword, settings.MinPasswordLength, settings.RequirePasswordComplexity);
             if (!ok) { TempData["Error"] = err; return RedirectToAction(nameof(Profile)); }
+            // Tekrar kullanım engeli (PCI 8.3.7): yeni parola mevcut veya son N parolayla aynı olamaz
+            var history = (u.PasswordHistory ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries).ToList();
+            if (PasswordHasher.Verify(newPassword, u.PasswordHash) || history.Any(h => PasswordHasher.Verify(newPassword, h)))
+            { TempData["Error"] = $"Yeni parola son {settings.PasswordHistoryCount} parolanızdan farklı olmalı."; return RedirectToAction(nameof(Profile)); }
+            if (settings.PasswordHistoryCount > 0 && !string.IsNullOrEmpty(u.PasswordHash))
+            {
+                history.Insert(0, u.PasswordHash!);   // eski parolayı geçmişe ekle
+                u.PasswordHistory = string.Join("\n", history.Take(settings.PasswordHistoryCount));
+            }
             u.PasswordHash = PasswordHasher.Hash(newPassword);
             await _db.SaveChangesAsync();
             await _audit.LogAsync("user.password.change", u.Sam, "Yerel kullanıcı parolasını değiştirdi", true);

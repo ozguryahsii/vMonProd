@@ -68,6 +68,20 @@ public class MonitorSettings
     public int MinPasswordLength { get; set; } = 12;
     /// <summary>Parola karmaşıklığı zorunlu mu? (büyük + küçük harf + rakam)</summary>
     public bool RequirePasswordComplexity { get; set; } = true;
+    /// <summary>Tekrar kullanılamayacak son parola sayısı (PCI 8.3.7). 0 = kapalı.</summary>
+    public int PasswordHistoryCount { get; set; } = 4;
+
+    // --- SIEM / Syslog aktarımı (PCI 10.5.4 / NIST AU-6) ---
+    public bool SyslogEnabled { get; set; } = false;
+    public string SyslogHost { get; set; } = "";
+    public int SyslogPort { get; set; } = 514;
+    /// <summary>TCP mu (true) yoksa UDP mü (false) ile gönderilsin.</summary>
+    public bool SyslogTcp { get; set; } = false;
+
+    // --- Yedek dosyası şifreleme (PCI 3.x/9.4.1) ---
+    public bool BackupEncrypt { get; set; } = false;
+    /// <summary>Yedek şifreleme parolası (DPAPI ile şifreli saklanır).</summary>
+    public string BackupPasswordEncrypted { get; set; } = "";
 
     /// <summary>Kullanıcı senkronizasyonunda kullanılacak kimlik bilgisi (Kimlik Bilgileri ekranından, Vault destekli olabilir).</summary>
     public int? LdapSyncCredentialId { get; set; }
@@ -185,6 +199,13 @@ public class SettingsService
         if (dict.TryGetValue("EolProxyUrl", out v)) s.EolProxyUrl = v ?? "";
         if (dict.TryGetValue("MinPasswordLength", out v) && int.TryParse(v, out var mpl)) s.MinPasswordLength = Math.Clamp(mpl, 8, 128);
         if (dict.TryGetValue("RequirePasswordComplexity", out v)) s.RequirePasswordComplexity = v == "true";
+        if (dict.TryGetValue("PasswordHistoryCount", out v) && int.TryParse(v, out var phc)) s.PasswordHistoryCount = Math.Clamp(phc, 0, 24);
+        if (dict.TryGetValue("SyslogEnabled", out v)) s.SyslogEnabled = v == "true";
+        if (dict.TryGetValue("SyslogHost", out v)) s.SyslogHost = v ?? "";
+        if (dict.TryGetValue("SyslogPort", out v) && int.TryParse(v, out var sp)) s.SyslogPort = Math.Clamp(sp, 1, 65535);
+        if (dict.TryGetValue("SyslogTcp", out v)) s.SyslogTcp = v == "true";
+        if (dict.TryGetValue("BackupEncrypt", out v)) s.BackupEncrypt = v == "true";
+        if (dict.TryGetValue("BackupPasswordEncrypted", out v)) s.BackupPasswordEncrypted = v ?? "";
         if (dict.TryGetValue("LdapSyncCredentialId", out v) && int.TryParse(v, out var ci) && ci > 0) s.LdapSyncCredentialId = ci;
         if (dict.TryGetValue("TrustInternalTlsCertificates", out v)) s.TrustInternalTlsCertificates = v == "true";
         if (dict.TryGetValue("MaxLoginAttempts", out v) && int.TryParse(v, out i) && i > 0) s.MaxLoginAttempts = Math.Min(i, 10);
@@ -244,6 +265,13 @@ public class SettingsService
             ["EolProxyUrl"] = s.EolProxyUrl,
             ["MinPasswordLength"] = s.MinPasswordLength.ToString(),
             ["RequirePasswordComplexity"] = s.RequirePasswordComplexity ? "true" : "false",
+            ["PasswordHistoryCount"] = s.PasswordHistoryCount.ToString(),
+            ["SyslogEnabled"] = s.SyslogEnabled ? "true" : "false",
+            ["SyslogHost"] = s.SyslogHost,
+            ["SyslogPort"] = s.SyslogPort.ToString(),
+            ["SyslogTcp"] = s.SyslogTcp ? "true" : "false",
+            ["BackupEncrypt"] = s.BackupEncrypt ? "true" : "false",
+            ["BackupPasswordEncrypted"] = s.BackupPasswordEncrypted,
             ["LdapSyncCredentialId"] = s.LdapSyncCredentialId?.ToString() ?? "",
             ["TrustInternalTlsCertificates"] = s.TrustInternalTlsCertificates ? "true" : "false",
             ["MaxLoginAttempts"] = s.MaxLoginAttempts.ToString(),

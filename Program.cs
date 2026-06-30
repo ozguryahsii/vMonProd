@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using vMonitor.Data;
 using vMonitor.Models;
@@ -128,7 +130,18 @@ builder.Services.AddScoped<WhatsappService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddSingleton<EolService>();
+builder.Services.AddSingleton<SyslogService>();
 builder.Services.AddMemoryCache();
+
+// Hız sınırlama (DoS direnci) — kimlik doğrulama uçları için IP başına pencere (NIST SC-5 / OWASP).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
 builder.Services.AddScoped<CheckRunner>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MutabakatService>();
@@ -203,8 +216,9 @@ using (var scope = app.Services.CreateScope())
             {
                 var s = scope.ServiceProvider.GetRequiredService<SettingsService>().GetAsync().GetAwaiter().GetResult();
                 VaultClient.TrustInternalCertificates = s.TrustInternalTlsCertificates;
+                app.Services.GetRequiredService<SyslogService>().Configure(s);
             }
-            catch (Exception ex) { logger.LogWarning(ex, "TLS güven ayarı okunamadı, güvenli varsayılan kullanılıyor."); }
+            catch (Exception ex) { logger.LogWarning(ex, "TLS/syslog ayarı okunamadı, güvenli varsayılan kullanılıyor."); }
 
             try
             {
@@ -285,6 +299,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -316,6 +331,7 @@ app.Use(async (ctx, next) =>
                 || path.StartsWithSegments("/css")
                 || path.StartsWithSegments("/js")
                 || path.StartsWithSegments("/api/whatsapp")   // gelen WhatsApp webhook'u (kendi gizli anahtarıyla doğrulanır)
+                || path.StartsWithSegments("/.well-known")    // security.txt vb. (RFC 9116) — herkese açık olmalı
                 || path.Value == "/favicon.ico";
     if (open)
     {
@@ -344,5 +360,16 @@ app.Use(async (ctx, next) =>
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+// RFC 9116 security.txt — sorumlu açıklama (responsible disclosure) iletişim noktası
+app.MapGet("/.well-known/security.txt", async (SettingsService settings) =>
+{
+    string contact;
+    try { var s = await settings.GetAsync(); contact = string.IsNullOrWhiteSpace(s.MailFrom) ? "mailto:security@localhost" : "mailto:" + s.MailFrom.Trim(); }
+    catch { contact = "mailto:security@localhost"; }
+    var expires = DateTime.UtcNow.AddYears(1).ToString("yyyy-MM-ddT00:00:00Z");
+    var body = $"Contact: {contact}\nExpires: {expires}\nPreferred-Languages: tr, en\n";
+    return Results.Text(body, "text/plain; charset=utf-8");
+});
 
 app.Run();

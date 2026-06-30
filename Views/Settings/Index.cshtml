@@ -169,14 +169,30 @@
                     </div>
                     <hr class="border-slate-100" />
                     <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Yerel Parola Politikası</div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-center">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
                         <div><label class="label">Min. parola uzunluğu</label><input asp-for="MinPasswordLength" type="number" min="8" max="128" class="input" /><div class="hint">PCI 8.3.6: ≥12 · NIST 800-63B: ≥8.</div></div>
-                        <label class="flex items-center gap-2 text-sm text-slate-700 mt-4"><input asp-for="RequirePasswordComplexity" class="switch" /> Karmaşıklık (büyük+küçük harf+rakam)</label>
+                        <div><label class="label">Tekrar engeli (son N parola)</label><input asp-for="PasswordHistoryCount" type="number" min="0" max="24" class="input" /><div class="hint">PCI 8.3.7: ≥4. 0 = kapalı.</div></div>
                     </div>
+                    <label class="flex items-center gap-2 text-sm text-slate-700"><input asp-for="RequirePasswordComplexity" class="switch" /> Karmaşıklık (büyük+küçük harf+rakam)</label>
                     <div class="hint">Yalnız <b>yerel</b> kullanıcı parolaları için (kurulum + Profil → şifre değiştir). LDAP parolaları AD politikasına tabidir.</div>
                     <div class="alert-info text-sm">
                         <i class="bi bi-info-circle"></i> Boşta kalma zaman aşımı <b>15 dk</b> sabittir (PCI 8.2.8). İşlemler <a class="text-brand-600 hover:underline" asp-controller="Audit" asp-action="Index">Denetim Kaydı</a>'nda izlenir.
                     </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><i class="bi bi-broadcast text-brand-500"></i> SIEM / Syslog Aktarımı</div>
+                <div class="card-body">
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input asp-for="SyslogEnabled" class="switch" /> Denetim kayıtlarını syslog'a ilet
+                    </label>
+                    <div class="grid grid-cols-12 gap-2">
+                        <div class="col-span-7"><label class="label">Sunucu (host/IP)</label><input asp-for="SyslogHost" class="input mono" placeholder="siem.firma.local" /></div>
+                        <div class="col-span-3"><label class="label">Port</label><input asp-for="SyslogPort" type="number" class="input" /></div>
+                        <div class="col-span-2 flex items-end pb-1"><label class="flex items-center gap-1 text-sm text-slate-700"><input asp-for="SyslogTcp" class="switch" /> TCP</label></div>
+                    </div>
+                    <div class="hint">Her denetim olayı RFC 3164 syslog mesajı olarak iletilir (UDP varsayılan). PCI 10.5.4 · NIST AU-6. Bağlantı testi: <b>Yönetim &amp; İşlemler</b> bölümü.</div>
                 </div>
             </div>
 
@@ -210,7 +226,12 @@
                         <div><label class="label">Dakika</label><input asp-for="BackupMinute" type="number" min="0" max="59" class="input" /></div>
                         <div><label class="label">Adet</label><input asp-for="BackupRetentionCount" type="number" min="0" class="input" /></div>
                     </div>
-                    <div class="hint">Elle yedek alma / geri yükleme: aşağıdaki "Yedek Al / Geri Yükle".</div>
+                    <hr class="border-slate-100" />
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input asp-for="BackupEncrypt" class="switch" /> Yedek dosyalarını şifrele (AES-256)
+                    </label>
+                    <div><label class="label">Yedek şifreleme parolası</label><input type="password" name="newBackupPassword" autocomplete="new-password" class="input" placeholder="@(string.IsNullOrEmpty(Model.BackupPasswordEncrypted) ? "parola girin" : "•••••• (değiştirmek için yeni girin)")" /></div>
+                    <div class="hint">Açıkken yedekler <code>.db.enc</code> olarak parolayla şifrelenir (PCI 3.x/9.4.1). <b>Parolayı kaybederseniz yedek geri yüklenemez.</b> Elle yedek/geri yükleme aşağıda.</div>
                 </div>
             </div>
         </div>
@@ -359,8 +380,20 @@
         </div>
     </div>
 
-    <!-- KOLON 3: EOL Verisi + Logo -->
+    <!-- KOLON 3: Syslog Testi + EOL Verisi + Logo -->
     <div class="space-y-4">
+        <div class="card">
+            <div class="card-head">
+                <span><i class="bi bi-broadcast text-brand-500"></i> Syslog Testi</span>
+                <form method="post" asp-action="TestSyslog" class="inline">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-outline btn-sm"><i class="bi bi-send"></i> Test Mesajı Gönder</button>
+                </form>
+            </div>
+            <div class="card-body">
+                <div class="hint">Kayıtlı syslog ayarlarıyla bir test mesajı gönderir. Önce <b>Kaydet</b>, sonra test edin. Sonuç sayfanın üstünde görünür.</div>
+            </div>
+        </div>
         <div class="card">
             <div class="card-head">
                 <span><i class="bi bi-arrow-repeat text-brand-500"></i> EOL Verisi</span>

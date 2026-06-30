@@ -14,13 +14,15 @@ public class AuditService
     private readonly IHttpContextAccessor _http;
     private readonly ILogger<AuditService> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly SyslogService _syslog;
 
-    public AuditService(AppDbContext db, IHttpContextAccessor http, ILogger<AuditService> logger, IWebHostEnvironment env)
+    public AuditService(AppDbContext db, IHttpContextAccessor http, ILogger<AuditService> logger, IWebHostEnvironment env, SyslogService syslog)
     {
         _db = db;
         _http = http;
         _logger = logger;
         _env = env;
+        _syslog = syslog;
     }
 
     // Hash-zinciri yazımını serileştirir (eşzamanlı denetim yazımlarında zincir bozulmasın).
@@ -86,6 +88,8 @@ public class AuditService
                 await _db.SaveChangesAsync(ct);
             }
             finally { _chainLock.Release(); }
+
+            _syslog.Forward(entry);   // SIEM/syslog'a ilet (fire-and-forget; açıksa)
         }
         catch (Exception ex)
         {

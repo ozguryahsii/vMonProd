@@ -35,6 +35,9 @@ public class AppUser
     /// <summary>Yerel kullanıcı için PBKDF2 şifre hash'i (LDAP kullanıcılarında boş).</summary>
     public string? PasswordHash { get; set; }
 
+    /// <summary>Önceki parola hash'leri (yeni satır ayraçlı) — tekrar kullanımı engellemek için (PCI 8.3.7).</summary>
+    public string? PasswordHistory { get; set; }
+
     public HashSet<string> Permissions() =>
         (PermissionsCsv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

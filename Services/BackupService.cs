@@ -24,29 +24,39 @@ public class BackupService
     public string LivePath => _bootstrap.SqlitePath;
 
     /// <summary>Şimdi tutarlı yedek al. Zaman damgalı dosya üretir, retention uygular. (dosyaAdı, hata) döner.</summary>
-    public async Task<(string? file, string? error)> BackupNowAsync(string targetDir, int retentionCount, CancellationToken ct = default)
+    public async Task<(string? file, string? error)> BackupNowAsync(string targetDir, int retentionCount, bool encrypt = false, string? password = null, CancellationToken ct = default)
     {
         if (!IsSqlite) return (null, "Yedekleme yalnızca SQLite içindir. Diğer veritabanlarında native yedekleme araçlarını kullanın.");
         if (string.IsNullOrWhiteSpace(targetDir)) return (null, "Yedek klasörü tanımlı değil.");
         if (!File.Exists(LivePath)) return (null, $"Aktif veritabanı bulunamadı: {LivePath}");
+        if (encrypt && string.IsNullOrWhiteSpace(password)) return (null, "Yedek şifreleme açık ama parola tanımlı değil (Ayarlar → Yedekleme).");
 
         try
         {
             Directory.CreateDirectory(targetDir);
-            var name = $"{Prefix}{DateTime.Now:yyyyMMdd-HHmmss}.db";
-            var dest = Path.Combine(targetDir, name);
+            var baseName = $"{Prefix}{DateTime.Now:yyyyMMdd-HHmmss}.db";
+            var plain = Path.Combine(targetDir, baseName);
 
             await Task.Run(() =>
             {
                 using var src = new SqliteConnection($"Data Source={LivePath};Mode=ReadWrite");
                 src.Open();
-                using var dst = new SqliteConnection($"Data Source={dest}");
+                using var dst = new SqliteConnection($"Data Source={plain}");
                 dst.Open();
                 src.BackupDatabase(dst);          // tutarlı online snapshot
             }, ct);
 
+            string name = baseName;
+            if (encrypt)
+            {
+                var enc = plain + ".enc";
+                await Task.Run(() => AesFileCrypto.EncryptFile(plain, enc, password!), ct);
+                try { File.Delete(plain); } catch { }
+                name = baseName + ".enc";
+            }
+
             ApplyRetention(targetDir, retentionCount);
-            _logger.LogInformation("Yedek alındı: {Dest}", dest);
+            _logger.LogInformation("Yedek alındı: {Dest}", Path.Combine(targetDir, name));
             return (name, null);
         }
         catch (Exception ex)
@@ -61,15 +71,17 @@ public class BackupService
     {
         var result = new List<BackupFile>();
         if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir)) return result;
-        foreach (var f in new DirectoryInfo(targetDir).GetFiles($"{Prefix}*.db"))
-            result.Add(new BackupFile(f.Name, Math.Round(f.Length / 1048576.0, 2), f.LastWriteTimeUtc));
+        foreach (var f in new DirectoryInfo(targetDir).GetFiles($"{Prefix}*.db*"))
+            if (f.Name.EndsWith(".db", StringComparison.OrdinalIgnoreCase) || f.Name.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase))
+                result.Add(new BackupFile(f.Name, Math.Round(f.Length / 1048576.0, 2), f.LastWriteTimeUtc));
         return result.OrderByDescending(x => x.ModifiedUtc).ToList();
     }
 
     private void ApplyRetention(string targetDir, int keep)
     {
         if (keep <= 0) return;
-        var files = new DirectoryInfo(targetDir).GetFiles($"{Prefix}*.db")
+        var files = new DirectoryInfo(targetDir).GetFiles($"{Prefix}*.db*")
+            .Where(f => f.Name.EndsWith(".db", StringComparison.OrdinalIgnoreCase) || f.Name.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(f => f.LastWriteTimeUtc).Skip(keep).ToList();
         foreach (var f in files)
             try { f.Delete(); } catch (Exception ex) { _logger.LogWarning(ex, "Eski yedek silinemedi: {F}", f.Name); }
@@ -80,7 +92,8 @@ public class BackupService
     {
         if (string.IsNullOrWhiteSpace(targetDir)) return null;
         var safe = Path.GetFileName(fileName);
-        if (string.IsNullOrEmpty(safe) || !safe.StartsWith(Prefix) || !safe.EndsWith(".db")) return null;
+        if (string.IsNullOrEmpty(safe) || !safe.StartsWith(Prefix)
+            || !(safe.EndsWith(".db", StringComparison.OrdinalIgnoreCase) || safe.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase))) return null;
         var full = Path.Combine(targetDir, safe);
         return File.Exists(full) ? full : null;
     }
@@ -104,15 +117,35 @@ public class BackupService
 
     /// <summary>Verilen .db dosyasını AKTİF veritabanının üzerine yazar (online backup ile). Geri yüklemeden sonra
     /// uygulamanın yeniden başlatılması önerilir (çağıran tetikler).</summary>
-    public async Task<(bool ok, string? error)> RestoreAsync(string sourceDbFile, CancellationToken ct = default)
+    public async Task<(bool ok, string? error)> RestoreAsync(string sourceDbFile, string? password = null, CancellationToken ct = default)
     {
         if (!IsSqlite) return (false, "Geri yükleme yalnızca SQLite içindir.");
-        if (!Validate(sourceDbFile, out var verr)) return (false, verr);
+
+        // Şifreli yedek (.enc) ise önce geçici bir .db'ye çöz
+        string actualSource = sourceDbFile;
+        string? tempDecrypted = null;
+        if (AesFileCrypto.IsEncrypted(sourceDbFile))
+        {
+            if (string.IsNullOrWhiteSpace(password)) return (false, "Şifreli yedek için parola gerekli (Ayarlar → Yedekleme parolası).");
+            try
+            {
+                tempDecrypted = Path.Combine(Path.GetTempPath(), "vmon-dec-" + Guid.NewGuid().ToString("N") + ".db");
+                await Task.Run(() => AesFileCrypto.DecryptFile(sourceDbFile, tempDecrypted!, password!), ct);
+                actualSource = tempDecrypted;
+            }
+            catch (Exception ex)
+            {
+                try { if (tempDecrypted != null && File.Exists(tempDecrypted)) File.Delete(tempDecrypted); } catch { }
+                return (false, "Şifre çözülemedi (parola yanlış olabilir): " + ex.GetBaseException().Message);
+            }
+        }
+
         try
         {
+            if (!Validate(actualSource, out var verr)) return (false, verr);
             await Task.Run(() =>
             {
-                using var src = new SqliteConnection($"Data Source={sourceDbFile};Mode=ReadOnly");
+                using var src = new SqliteConnection($"Data Source={actualSource};Mode=ReadOnly");
                 src.Open();
                 using var dst = new SqliteConnection($"Data Source={LivePath};Mode=ReadWrite");
                 dst.Open();
@@ -125,6 +158,10 @@ public class BackupService
         {
             _logger.LogError(ex, "Geri yükleme başarısız");
             return (false, ex.GetBaseException().Message);
+        }
+        finally
+        {
+            try { if (tempDecrypted != null && File.Exists(tempDecrypted)) File.Delete(tempDecrypted); } catch { }
         }
     }
 }

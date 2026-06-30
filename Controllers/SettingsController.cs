@@ -14,7 +14,8 @@ public class SettingsController : Controller
     private readonly BackupService _backup;
     private readonly IHostApplicationLifetime _life;
     private readonly EolService _eol;
-    public SettingsController(SettingsService settings, IWebHostEnvironment env, AppDbContext db, AuditService audit, BackupService backup, IHostApplicationLifetime life, EolService eol)
+    private readonly SyslogService _syslog;
+    public SettingsController(SettingsService settings, IWebHostEnvironment env, AppDbContext db, AuditService audit, BackupService backup, IHostApplicationLifetime life, EolService eol, SyslogService syslog)
     {
         _settings = settings;
         _env = env;
@@ -23,6 +24,7 @@ public class SettingsController : Controller
         _backup = backup;
         _life = life;
         _eol = eol;
+        _syslog = syslog;
     }
 
     /// <summary>Admin değilse (ve oturum açık modundaysa) erişimi reddet.</summary>
@@ -50,6 +52,17 @@ public class SettingsController : Controller
         ViewBag.EolSyncedAt = _eol.SyncedAt;
         ViewBag.EolHasCache = _eol.HasCache;
         return View(settings);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestSyslog()
+    {
+        var settings = await _settings.GetAsync();
+        if (!IsAllowed(settings)) return Denied();
+        _syslog.Configure(settings);
+        var (ok, msg) = _syslog.Test();
+        TempData[ok ? "Message" : "Error"] = (ok ? "Syslog testi: " : "Syslog testi başarısız: ") + msg;
+        return RedirectToAction(nameof(Index));
     }
 
     // ---------------- Destek Sonu (EOL) ----------------
@@ -86,7 +99,8 @@ public class SettingsController : Controller
     {
         var settings = await _settings.GetAsync();
         if (!IsAllowed(settings)) return Denied();
-        var (file, error) = await _backup.BackupNowAsync(settings.BackupPath, settings.BackupRetentionCount);
+        var (file, error) = await _backup.BackupNowAsync(settings.BackupPath, settings.BackupRetentionCount,
+            settings.BackupEncrypt, BackupPassword(settings));
         if (error != null) { TempData["Error"] = "Yedek alınamadı: " + error; }
         else { TempData["Message"] = "Yedek alındı: " + file; await _audit.LogAsync("backup.create", null, file); }
         return RedirectToAction(nameof(Index));
@@ -155,9 +169,14 @@ public class SettingsController : Controller
         finally { try { if (System.IO.File.Exists(temp)) System.IO.File.Delete(temp); } catch { } }
     }
 
+    /// <summary>Yedek şifreleme parolasını DPAPI'den çözer (boşsa null).</summary>
+    private static string? BackupPassword(MonitorSettings s) =>
+        string.IsNullOrWhiteSpace(s.BackupPasswordEncrypted) ? null : CryptoHelper.Decrypt(s.BackupPasswordEncrypted);
+
     private async Task<IActionResult> DoRestore(string sourcePath, string label)
     {
-        var (ok, error) = await _backup.RestoreAsync(sourcePath);
+        var settings = await _settings.GetAsync();
+        var (ok, error) = await _backup.RestoreAsync(sourcePath, BackupPassword(settings));
         if (!ok) { TempData["Error"] = "Geri yükleme başarısız: " + error; return RedirectToAction(nameof(Index)); }
         await _audit.LogAsync("backup.restore", null, label, true);
         // Geri yüklemeden sonra önbellekler/şema güncel olsun diye yeniden başlat
@@ -180,7 +199,7 @@ public class SettingsController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(MonitorSettings model, string? newSmsToken, string? newWhatsappToken)
+    public async Task<IActionResult> Save(MonitorSettings model, string? newSmsToken, string? newWhatsappToken, string? newBackupPassword)
     {
         var current = await _settings.GetAsync();
         if (!IsAllowed(current)) return Denied();
@@ -220,8 +239,13 @@ public class SettingsController : Controller
         model.WhatsappAuthTokenEncrypted = string.IsNullOrWhiteSpace(newWhatsappToken)
             ? current.WhatsappAuthTokenEncrypted
             : CryptoHelper.Encrypt(newWhatsappToken.Trim());
+        // Yedek şifreleme parolası: yeni girilmediyse mevcut (DPAPI şifreli) korunur
+        model.BackupPasswordEncrypted = string.IsNullOrWhiteSpace(newBackupPassword)
+            ? current.BackupPasswordEncrypted
+            : CryptoHelper.Encrypt(newBackupPassword.Trim());
 
         await _settings.SaveAsync(model);
+        _syslog.Configure(model);   // syslog ayarını anında uygula
         // Giden TLS güven ayarını anında uygula (Vault istemcisi)
         VaultClient.TrustInternalCertificates = model.TrustInternalTlsCertificates;
         await _audit.LogAsync("settings.save", null,
