@@ -11,6 +11,9 @@
     .set .label { margin-bottom:.15rem; font-size:.78rem; font-weight:500; color:#475569; }
     .set .hint { font-size:.72rem; margin-top:.1rem; line-height:1.25; }
     .set textarea.input { min-height:2.4rem; }
+    /* Otomatik dengeli sütunlar (masonry) — kartlar bölünmeden akar, sütunlar yakın yükseklikte biter, boşluk olmaz */
+    .set-masonry { columns: 3 19rem; column-gap: 1rem; }
+    .set-masonry > .card { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; display: inline-block; width: 100%; margin: 0 0 1rem; vertical-align: top; }
 </style>
 
 <div class="set">
@@ -18,10 +21,7 @@
 
 <form method="post" asp-action="Save" id="settingsForm">
     @Html.AntiForgeryToken()
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-
-        <!-- KOLON 1 -->
-        <div class="space-y-4">
+    <div class="set-masonry">
             <div class="card">
                 <div class="card-head"><i class="bi bi-shield-lock text-brand-500"></i> Oturum Açma (LDAP / Active Directory)</div>
                 <div class="card-body">
@@ -89,10 +89,7 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- KOLON 2 -->
-        <div class="space-y-4">
             <div class="card">
                 <div class="card-head"><i class="bi bi-stopwatch text-brand-500"></i> İzleme</div>
                 <div class="card-body">
@@ -150,10 +147,7 @@
                     <div><label class="label">Hizmet aldığımız firma adı</label><input asp-for="MutabakatVendorCompany" class="input" placeholder="örn. Hizmet Sağlayıcı" /></div>
                 </div>
             </div>
-        </div>
 
-        <!-- KOLON 3 -->
-        <div class="space-y-4">
             <div class="card">
                 <div class="card-head"><i class="bi bi-shield-check text-brand-500"></i> Güvenlik ve Uyumluluk</div>
                 <div class="card-body">
@@ -182,7 +176,10 @@
             </div>
 
             <div class="card">
-                <div class="card-head"><i class="bi bi-broadcast text-brand-500"></i> SIEM / Syslog Aktarımı</div>
+                <div class="card-head">
+                    <span><i class="bi bi-broadcast text-brand-500"></i> SIEM / Syslog Aktarımı</span>
+                    <button type="submit" formaction="@Url.Action("TestSyslog")" formmethod="post" class="btn btn-outline btn-sm" title="Kayıtlı ayarlarla test mesajı gönder (önce Kaydet)"><i class="bi bi-send"></i> Test</button>
+                </div>
                 <div class="card-body">
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input asp-for="SyslogEnabled" class="switch" /> Denetim kayıtlarını syslog'a ilet
@@ -234,7 +231,6 @@
                     <div class="hint">Açıkken yedekler <code>.db.enc</code> olarak parolayla şifrelenir (PCI 3.x/9.4.1). <b>Parolayı kaybederseniz yedek geri yüklenemez.</b> Elle yedek/geri yükleme aşağıda.</div>
                 </div>
             </div>
-        </div>
 
     </div>
 
@@ -252,10 +248,7 @@
     var settingsReturn = Url.Action("Index", "Settings");
 }
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start mt-4">
-
-    <!-- KOLON 1: Bildirim Kanalları -->
-    <div class="space-y-4">
+<div class="set-masonry mt-4">
         <div class="card">
             <div class="card-head">
                 <span><i class="bi bi-plug text-brand-500"></i> Bildirim Kanalları</span>
@@ -302,10 +295,7 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- KOLON 2: Yedek Al / Geri Yükle -->
-    <div class="space-y-4">
         <div class="card">
             <div class="card-head">
                 <span><i class="bi bi-database-down text-brand-500"></i> Yedek Al / Geri Yükle</span>
@@ -378,22 +368,7 @@
                 }
             </div>
         </div>
-    </div>
 
-    <!-- KOLON 3: Syslog Testi + EOL Verisi + Logo -->
-    <div class="space-y-4">
-        <div class="card">
-            <div class="card-head">
-                <span><i class="bi bi-broadcast text-brand-500"></i> Syslog Testi</span>
-                <form method="post" asp-action="TestSyslog" class="inline">
-                    @Html.AntiForgeryToken()
-                    <button class="btn btn-outline btn-sm"><i class="bi bi-send"></i> Test Mesajı Gönder</button>
-                </form>
-            </div>
-            <div class="card-body">
-                <div class="hint">Kayıtlı syslog ayarlarıyla bir test mesajı gönderir. Önce <b>Kaydet</b>, sonra test edin. Sonuç sayfanın üstünde görünür.</div>
-            </div>
-        </div>
         <div class="card">
             <div class="card-head">
                 <span><i class="bi bi-arrow-repeat text-brand-500"></i> EOL Verisi</span>
@@ -441,7 +416,6 @@
                 <div class="hint">PNG/JPG/GIF/WEBP (≤2 MB). Sunucuda saklanır.</div>
             </div>
         </div>
-    </div>
 </div>
 
 <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
