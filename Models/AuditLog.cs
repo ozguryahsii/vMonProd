@@ -18,4 +18,10 @@ public class AuditLog
     /// <summary>İnsan-okunur açıklama. Asla şifre/secret/token içermez.</summary>
     public string? Detail { get; set; }
     public bool Success { get; set; } = true;
+
+    /// <summary>Bu kaydın değiştirilemezlik (tamper-evident) hash'i: SHA-256(öncekiHash + kanonik alanlar).
+    /// PCI DSS 10.3.x, NIST AU-9, ISO 27001 A.8.15 — kayıtların sonradan değiştirilmediğini doğrulamak için.</summary>
+    public string? Hash { get; set; }
+    /// <summary>Bir önceki denetim kaydının Hash'i (hash-zinciri). İlk kayıtta/retention sonrası boş olabilir.</summary>
+    public string? PrevHash { get; set; }
 }

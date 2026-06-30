@@ -92,6 +92,16 @@ public class AuditController : MvcBase
         return View("Index", rows);
     }
 
+    /// <summary>Denetim kaydı hash-zincirinin bütünlüğünü doğrular (değiştirilmiş/silinmiş kayıt var mı?).</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Verify()
+    {
+        var (ok, msg, _) = await AuditService.VerifyChainAsync(_db);
+        await _audit.LogAsync("audit.verify", null, msg, ok);
+        TempData[ok ? "Message" : "Error"] = (ok ? "✅ Bütünlük doğrulandı: " : "⚠️ Bütünlük ihlali: ") + msg;
+        return RedirectToAction(nameof(Index));
+    }
+
     private static DateTime ParseDt(string? s) =>
         DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out var d) ? d : DateTime.MinValue;
