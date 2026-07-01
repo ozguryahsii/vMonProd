@@ -16,6 +16,8 @@
         "Denetim": "Audit", "Mutabakat": "Reconciliation", "Hakkında": "About",
         "Çıkış": "Logout", "Tema": "Theme", "Açık": "Light", "Koyu": "Dark", "Dil": "Language",
         "Türkçe": "Turkish", "English": "English",
+        // Sidebar (R2)
+        "Genel": "General", "Operasyon": "Operations", "Yönetim": "Administration", "Daralt": "Collapse",
 
         // Ortak butonlar / etiketler
         "Kaydet": "Save", "İptal": "Cancel", "Sil": "Delete", "Düzenle": "Edit", "Ekle": "Add",

@@ -15,6 +15,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="@__csrf.RequestToken" />
     <title>@(ViewData["Title"] != null ? ViewData["Title"] + " — " : "")vMon</title>
+    <script>/* sidebar mini tercihi — boyamadan önce oku (yanıp sönme olmasın) */
+        try { if (localStorage.getItem("vmon_sb") === "mini") document.documentElement.classList.add("sb-mini"); } catch (e) { }</script>
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" asp-append-version="true" />
     <script src="~/lib/tailwind/tailwind.js" asp-append-version="true"></script>
     <script>
@@ -91,112 +93,94 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
 </head>
-<body class="font-sans text-slate-800 antialiased">
-    <nav class="vnav bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shadow-lg sticky top-0 z-40" x-data="{ open:false }">
-        <div class="px-4 lg:px-6">
-            <div class="flex items-center h-16 gap-2">
-                <a class="flex items-center gap-2 text-white font-bold text-lg mr-2" asp-controller="Home" asp-action="Index">
-                    <span class="logo-box inline-flex items-center justify-center h-9 w-9 rounded-xl bg-brand-500 shadow-md shadow-brand-500/30">
-                        <i class="bi bi-activity text-white text-lg logo-anim"></i>
-                    </span>
-                    <span>vMon</span>
-                </a>
-
-                <button class="ml-auto lg:hidden text-slate-200 p-2" @@click="open = !open"><i class="bi bi-list text-2xl"></i></button>
-
-                <div class="hidden lg:flex items-center gap-1">
-                    @if (User.Can(Perms.DashboardsView)) {
-                        <a class="navlink" asp-controller="Dashboards" asp-action="Index"><i class="bi bi-columns-gap"></i> Dashboard'lar</a>
-                        <a class="navlink" asp-controller="Reports" asp-action="Index"><i class="bi bi-bar-chart-line"></i> Raporlar</a>
-                        <a class="navlink" asp-controller="Statistics" asp-action="Index"><i class="bi bi-graph-up-arrow"></i> İstatistikler</a>
-                    }
-                    @if (User.Can(Perms.ServicesManage)) {
-                        <a class="navlink" asp-controller="Services" asp-action="Index"><i class="bi bi-hdd-network"></i> Servisler</a>
-                    }
-                    @if (User.Can(Perms.CredentialsManage)) {
-                        <a class="navlink" asp-controller="Credentials" asp-action="Index"><i class="bi bi-key"></i> Kimlik Bilgileri</a>
-                    }
-                    @if (User.IsAppAdmin())
-                    {
-                        <a class="navlink" asp-controller="Settings" asp-action="Index"><i class="bi bi-gear"></i> Ayarlar</a>
-                        <a class="navlink" asp-controller="Users" asp-action="Index"><i class="bi bi-people"></i> Kullanıcılar</a>
-                        <a class="navlink" asp-controller="Audit" asp-action="Index"><i class="bi bi-clipboard-check"></i> Denetim</a>
-                    }
-                    @if (mutEnabled && User.Can(Perms.MutabakatView)) {
-                        <a class="navlink" asp-controller="Mutabakat" asp-action="Index"><i class="bi bi-clipboard-data"></i> Mutabakat</a>
-                    }
-                    <a class="navlink" asp-controller="Home" asp-action="About"><i class="bi bi-info-circle"></i> Hakkında</a>
-                </div>
-
-                @if (User?.Identity?.IsAuthenticated == true)
-                {
-                    <div class="hidden lg:flex items-center gap-3 ml-auto">
-                        <div class="relative" x-data="{open:false}">
-                            <button type="button" @@click="open=!open" class="text-white text-sm font-medium inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition">
-                                <i class="bi bi-person-circle text-base"></i> @User.Identity.Name <i class="bi bi-chevron-down text-[10px]"></i>
-                            </button>
-                            <div x-show="open" @@click.outside="open=false" x-cloak
-                                 class="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-50">
-                                <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tema</div>
-                                <button type="button" class="theme-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-theme="light">
-                                    <span class="inline-block w-3.5 h-3.5 rounded-full border border-slate-300" style="background:#f1f5f9"></span> Açık
-                                    <i class="bi bi-check2 ml-auto text-brand-500 theme-check" data-for="light"></i>
-                                </button>
-                                <button type="button" class="theme-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-theme="dark">
-                                    <span class="inline-block w-3.5 h-3.5 rounded-full border border-slate-600" style="background:#0f172a"></span> Koyu
-                                    <i class="bi bi-check2 ml-auto text-brand-500 theme-check" data-for="dark"></i>
-                                </button>
-                                <div class="border-t border-slate-100 my-1.5"></div>
-                                <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dil</div>
-                                <button type="button" class="lang-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-lang="tr">
-                                    <span class="text-base leading-none">🇹🇷</span> Türkçe
-                                    <i class="bi bi-check2 ml-auto text-brand-500 lang-check" data-for="tr"></i>
-                                </button>
-                                <button type="button" class="lang-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-lang="en">
-                                    <span class="text-base leading-none">🇬🇧</span> English
-                                    <i class="bi bi-check2 ml-auto text-brand-500 lang-check" data-for="en"></i>
-                                </button>
-                                <div class="border-t border-slate-100 my-1.5"></div>
-                                <a href="@Url.Action("Profile","Account")" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700"><i class="bi bi-person-badge"></i> Profilim</a>
-                                <form method="post" asp-controller="Account" asp-action="Logout">
-                                    @Html.AntiForgeryToken()
-                                    <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 text-sm font-medium"><i class="bi bi-box-arrow-right"></i> Çıkış</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-
-            <!-- Mobil menü -->
-            <div class="lg:hidden pb-3 flex flex-col gap-1" x-show="open" x-cloak>
-                @if (User.Can(Perms.DashboardsView)) {
-                    <a class="navlink" asp-controller="Dashboards" asp-action="Index"><i class="bi bi-columns-gap"></i> Dashboard'lar</a>
-                    <a class="navlink" asp-controller="Reports" asp-action="Index"><i class="bi bi-bar-chart-line"></i> Raporlar</a>
-                    <a class="navlink" asp-controller="Statistics" asp-action="Index"><i class="bi bi-graph-up-arrow"></i> İstatistikler</a>
-                }
-                @if (User.Can(Perms.ServicesManage)) { <a class="navlink" asp-controller="Services" asp-action="Index"><i class="bi bi-hdd-network"></i> Servisler</a> }
-                @if (User.Can(Perms.CredentialsManage)) { <a class="navlink" asp-controller="Credentials" asp-action="Index"><i class="bi bi-key"></i> Kimlik Bilgileri</a> }
-                @if (User.IsAppAdmin())
-                {
-                    <a class="navlink" asp-controller="Settings" asp-action="Index"><i class="bi bi-gear"></i> Ayarlar</a>
-                    <a class="navlink" asp-controller="Users" asp-action="Index"><i class="bi bi-people"></i> Kullanıcılar</a>
-                    <a class="navlink" asp-controller="Audit" asp-action="Index"><i class="bi bi-clipboard-check"></i> Denetim</a>
-                }
-                @if (mutEnabled && User.Can(Perms.MutabakatView)) {
-                    <a class="navlink" asp-controller="Mutabakat" asp-action="Index"><i class="bi bi-clipboard-data"></i> Mutabakat</a>
-                }
-                <a class="navlink" asp-controller="Home" asp-action="About"><i class="bi bi-info-circle"></i> Hakkında</a>
-                @if (User?.Identity?.IsAuthenticated == true)
-                {
-                    <form method="post" asp-controller="Account" asp-action="Logout" class="px-3 pt-2">
-                        @Html.AntiForgeryToken()
-                        <button class="btn btn-sm btn-outline w-full"><i class="bi bi-box-arrow-right"></i> Çıkış (@User.Identity.Name)</button>
-                    </form>
-                }
-            </div>
+<body class="font-sans text-slate-800 antialiased" x-data="{ sb:false }" x-on:keydown.escape.window="sb=false">
+    <!-- Sol menü (sidebar) — her iki temada koyu, mini moda daraltılabilir, mobilde çekmece -->
+    <aside class="sidebar" :class="sb ? 'open' : ''">
+        <div class="sb-head">
+            <a class="flex items-center gap-2.5 text-white font-bold text-lg" asp-controller="Home" asp-action="Index">
+                <span class="logo-box inline-flex items-center justify-center h-9 w-9 rounded-xl bg-brand-500 shadow-md shadow-brand-500/30 flex-none">
+                    <i class="bi bi-activity text-white text-lg logo-anim"></i>
+                </span>
+                <span class="sb-brand-text">vMon</span>
+            </a>
         </div>
-    </nav>
+        <nav class="sb-nav">
+            @if (User.Can(Perms.DashboardsView)) {
+                <div class="sb-sec">Genel</div>
+                <a class="navlink" asp-controller="Dashboards" asp-action="Index" title="Dashboard'lar"><i class="bi bi-columns-gap"></i><span class="snav-label">Dashboard'lar</span></a>
+                <a class="navlink" asp-controller="Reports" asp-action="Index" title="Raporlar"><i class="bi bi-bar-chart-line"></i><span class="snav-label">Raporlar</span></a>
+                <a class="navlink" asp-controller="Statistics" asp-action="Index" title="İstatistikler"><i class="bi bi-graph-up-arrow"></i><span class="snav-label">İstatistikler</span></a>
+            }
+            @if (User.Can(Perms.ServicesManage) || User.Can(Perms.CredentialsManage) || (mutEnabled && User.Can(Perms.MutabakatView))) {
+                <div class="sb-sec">Operasyon</div>
+            }
+            @if (User.Can(Perms.ServicesManage)) {
+                <a class="navlink" asp-controller="Services" asp-action="Index" title="Servisler"><i class="bi bi-hdd-network"></i><span class="snav-label">Servisler</span></a>
+            }
+            @if (User.Can(Perms.CredentialsManage)) {
+                <a class="navlink" asp-controller="Credentials" asp-action="Index" title="Kimlik Bilgileri"><i class="bi bi-key"></i><span class="snav-label">Kimlik Bilgileri</span></a>
+            }
+            @if (mutEnabled && User.Can(Perms.MutabakatView)) {
+                <a class="navlink" asp-controller="Mutabakat" asp-action="Index" title="Mutabakat"><i class="bi bi-clipboard-data"></i><span class="snav-label">Mutabakat</span></a>
+            }
+            @if (User.IsAppAdmin())
+            {
+                <div class="sb-sec">Yönetim</div>
+                <a class="navlink" asp-controller="Settings" asp-action="Index" title="Ayarlar"><i class="bi bi-gear"></i><span class="snav-label">Ayarlar</span></a>
+                <a class="navlink" asp-controller="Users" asp-action="Index" title="Kullanıcılar"><i class="bi bi-people"></i><span class="snav-label">Kullanıcılar</span></a>
+                <a class="navlink" asp-controller="Audit" asp-action="Index" title="Denetim"><i class="bi bi-clipboard-check"></i><span class="snav-label">Denetim</span></a>
+            }
+        </nav>
+        <div class="sb-foot">
+            <a class="navlink" asp-controller="Home" asp-action="About" title="Hakkında"><i class="bi bi-info-circle"></i><span class="snav-label">Hakkında</span></a>
+            <button type="button" class="navlink sb-collapse w-full" id="sbCollapse"><i class="bi bi-chevron-double-left"></i><span class="snav-label">Daralt</span></button>
+        </div>
+    </aside>
+    <div class="sb-backdrop lg:hidden" x-show="sb" x-cloak @@click="sb=false"></div>
+
+    <div class="app-main">
+        <header class="topbar">
+            <button type="button" class="topbar-btn lg:hidden" @@click="sb=true" aria-label="Menü"><i class="bi bi-list text-xl"></i></button>
+            <div class="topbar-title" id="topSection">&nbsp;</div>
+            @if (User?.Identity?.IsAuthenticated == true)
+            {
+                <div class="relative ml-auto" x-data="{open:false}">
+                    <button type="button" @@click="open=!open" class="user-chip">
+                        <span class="user-avatar">@(string.IsNullOrEmpty(User.Identity.Name) ? "?" : User.Identity.Name.Substring(0, 1).ToUpperInvariant())</span>
+                        <span class="hidden sm:inline">@User.Identity.Name</span>
+                        <i class="bi bi-chevron-down text-[10px] opacity-60"></i>
+                    </button>
+                    <div x-show="open" @@click.outside="open=false" x-cloak
+                         class="absolute right-0 mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-50">
+                        <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tema</div>
+                        <button type="button" class="theme-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-theme="light">
+                            <span class="inline-block w-3.5 h-3.5 rounded-full border border-slate-300" style="background:#f1f5f9"></span> Açık
+                            <i class="bi bi-check2 ml-auto text-brand-500 theme-check" data-for="light"></i>
+                        </button>
+                        <button type="button" class="theme-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-theme="dark">
+                            <span class="inline-block w-3.5 h-3.5 rounded-full border border-slate-600" style="background:#0f172a"></span> Koyu
+                            <i class="bi bi-check2 ml-auto text-brand-500 theme-check" data-for="dark"></i>
+                        </button>
+                        <div class="border-t border-slate-100 my-1.5"></div>
+                        <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dil</div>
+                        <button type="button" class="lang-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-lang="tr">
+                            <span class="text-base leading-none">🇹🇷</span> Türkçe
+                            <i class="bi bi-check2 ml-auto text-brand-500 lang-check" data-for="tr"></i>
+                        </button>
+                        <button type="button" class="lang-opt w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700" data-lang="en">
+                            <span class="text-base leading-none">🇬🇧</span> English
+                            <i class="bi bi-check2 ml-auto text-brand-500 lang-check" data-for="en"></i>
+                        </button>
+                        <div class="border-t border-slate-100 my-1.5"></div>
+                        <a href="@Url.Action("Profile","Account")" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-sm text-slate-700"><i class="bi bi-person-badge"></i> Profilim</a>
+                        <form method="post" asp-controller="Account" asp-action="Logout">
+                            @Html.AntiForgeryToken()
+                            <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 text-sm font-medium"><i class="bi bi-box-arrow-right"></i> Çıkış</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </header>
 
     <main class="page-enter max-w-[1600px] mx-auto px-4 lg:px-6 py-6">
         @if (TempData["Message"] != null)
@@ -215,6 +199,7 @@
         }
         @RenderBody()
     </main>
+    </div><!-- /app-main -->
 
     <script>
         window.vPerms = {
@@ -294,6 +279,17 @@
                 }
             });
             if (best) best.classList.add("active");
+
+            // Topbar başlığı: aktif menü öğesinin adı
+            var ts = document.getElementById("topSection");
+            if (ts && best) { var lbl = best.querySelector(".snav-label"); ts.textContent = (lbl ? lbl.textContent : best.textContent).trim(); }
+
+            // Sidebar daralt/genişlet (masaüstü) — tercih localStorage'da
+            var col = document.getElementById("sbCollapse");
+            if (col) col.addEventListener("click", function () {
+                var mini = document.documentElement.classList.toggle("sb-mini");
+                try { localStorage.setItem("vmon_sb", mini ? "mini" : "full"); } catch (e) { }
+            });
         })();
     </script>
     <style>[x-cloak]{display:none !important;}</style>

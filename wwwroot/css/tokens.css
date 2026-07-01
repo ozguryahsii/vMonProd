@@ -182,3 +182,117 @@ html.dark .skeleton::after { background: linear-gradient(90deg, transparent, rgb
     .page-enter { opacity: 1 !important; }
     .skeleton::after { animation: none; }
 }
+
+/* ============================================================
+   UYGULAMA KABUĞU (Faz R2) — sol sidebar + glass topbar
+   Sidebar her iki temada da koyu (premium SaaS dili); topbar temaya uyar.
+   ============================================================ */
+:root { --sb-w: 16.5rem; --tb-h: 3.75rem; }
+html.sb-mini { --sb-w: 5rem; }
+
+/* ---- Sidebar ---- */
+.sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0;
+    width: var(--sb-w); z-index: 50;
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, rgba(11, 16, 30, .97), rgba(7, 11, 20, .99));
+    border-right: 1px solid rgba(148, 163, 184, .10);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 8px 0 30px -22px rgba(0, 0, 0, .7);
+    transition: width .25s ease, transform .28s cubic-bezier(.16,1,.3,1);
+}
+.sb-head {
+    height: 4rem; flex: none;
+    display: flex; align-items: center; padding: 0 1rem;
+    border-bottom: 1px solid rgba(148, 163, 184, .08);
+}
+.sb-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: .8rem .6rem; display: flex; flex-direction: column; gap: 2px; }
+.sb-foot { flex: none; padding: .55rem .6rem; border-top: 1px solid rgba(148, 163, 184, .08); display: flex; flex-direction: column; gap: 2px; }
+
+.sb-sec {
+    padding: .95rem .7rem .4rem;
+    font-size: .62rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: #5b6b84; white-space: nowrap; overflow: hidden;
+}
+
+/* Sidebar nav linkleri (.navlink sınıfı korunur → aktif-vurgu scripti çalışır) */
+.sidebar .navlink {
+    display: flex; align-items: center; gap: .7rem;
+    padding: .58rem .7rem; border-radius: .7rem;
+    font-size: .855rem; font-weight: 500; color: #a9b4c8;
+    white-space: nowrap; overflow: hidden;
+    transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.sidebar .navlink i { flex: none; width: 1.3rem; text-align: center; font-size: 1.02rem; }
+.sidebar .navlink:hover { background: rgba(148, 163, 184, .09); color: #fff; }
+.sidebar .navlink.active {
+    background: linear-gradient(90deg, rgba(237, 28, 36, .20), rgba(237, 28, 36, .05));
+    color: #fff;
+    box-shadow: inset 2px 0 0 var(--primary), inset 0 0 0 1px rgba(237, 28, 36, .18);
+}
+.snav-label { transition: opacity .15s ease; }
+
+/* Mini (daraltılmış) mod — yalnız masaüstü */
+@media (min-width: 1024px) {
+    html.sb-mini .snav-label, html.sb-mini .sb-sec, html.sb-mini .sb-brand-text { display: none; }
+    html.sb-mini .sidebar .navlink { justify-content: center; padding: .62rem .5rem; }
+    html.sb-mini .sidebar .navlink i { width: auto; font-size: 1.15rem; }
+    html.sb-mini .sb-head { justify-content: center; padding: 0; }
+    html.sb-mini .sb-collapse i { transform: rotate(180deg); }
+}
+.sb-collapse i { transition: transform .25s ease; }
+
+/* Mobil: çekmece (drawer) */
+@media (max-width: 1023.98px) {
+    .sidebar { transform: translateX(-106%); width: 16.5rem !important; }
+    .sidebar.open { transform: none; }
+    .sb-collapse { display: none; }
+    /* mini modda gizlenen etiketler mobil çekmecede daima görünsün */
+    html.sb-mini .snav-label, html.sb-mini .sb-sec, html.sb-mini .sb-brand-text { display: revert; }
+}
+.sb-backdrop {
+    position: fixed; inset: 0; z-index: 49;
+    background: rgba(2, 6, 18, .55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* ---- İçerik alanı + topbar ---- */
+.app-main { min-height: 100vh; transition: margin-left .25s ease; }
+@media (min-width: 1024px) { .app-main { margin-left: var(--sb-w); } }
+
+.topbar {
+    position: sticky; top: 0; z-index: 40;
+    height: var(--tb-h);
+    display: flex; align-items: center; gap: .75rem;
+    padding: 0 1rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    border-bottom: 1px solid var(--glass-brd);
+}
+.topbar-title { font-weight: 600; font-size: .95rem; color: var(--text); }
+.topbar-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 2.3rem; width: 2.3rem; border-radius: .7rem;
+    color: var(--text-muted); transition: background-color .15s ease, color .15s ease;
+}
+.topbar-btn:hover { background: rgba(148, 163, 184, .12); color: var(--text); }
+.user-chip {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .35rem .7rem .35rem .4rem; border-radius: .8rem;
+    font-size: .84rem; font-weight: 500; color: var(--text);
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+    box-shadow: var(--shadow-card);
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+.user-chip:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card-hover); }
+.user-avatar {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 1.75rem; width: 1.75rem; border-radius: .6rem; flex: none;
+    background: linear-gradient(135deg, #f43f46, var(--primary-600));
+    color: #fff; font-size: .72rem; font-weight: 700; letter-spacing: .02em;
+    box-shadow: 0 4px 10px -4px var(--primary-glow);
+}
