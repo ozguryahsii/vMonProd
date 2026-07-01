@@ -153,7 +153,9 @@ public static class DbProviderConfig
                 o.UseMySql(connStr, new MySqlServerVersion(mv), x => x.EnableRetryOnFailure());
                 break;
             case DbProviderKind.Oracle:
-                o.UseOracle(connStr);
+                // Oracle.EntityFrameworkCore 8.23.x varsayılan olarak 23c hedefler → bool'u native BOOLEAN üretir.
+                // BOOLEAN yalnız 23c+'de var; 19c/21c'de ORA-00902. Uyumluluğu 19'a çekince bool → NUMBER(1) üretilir.
+                o.UseOracle(connStr, x => x.UseOracleSQLCompatibility(Microsoft.EntityFrameworkCore.OracleSQLCompatibility.DatabaseVersion19));
                 break;
             default:
                 throw new NotSupportedException($"Bilinmeyen sağlayıcı: {c.Provider}");
