@@ -126,7 +126,11 @@ public class SetupController : Controller
             }
             var pass = ResolvePlainPassword(f, c);
             await using var ctx = BuildContext(c, pass);
-            var can = await ctx.Database.CanConnectAsync(ct);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(12));
+            bool can;
+            try { can = await ctx.Database.CanConnectAsync(cts.Token); }
+            catch (OperationCanceledException) { return Json(new { ok = false, message = "Bağlantı zaman aşımı (12 sn) — sunucuya erişilemiyor. Firewall, host/port ve SQL Server Browser servisini kontrol edin." }); }
             return can
                 ? Json(new { ok = true, message = "Bağlantı başarılı ✅" })
                 : Json(new { ok = false, message = "Bağlanılamadı — sunucu/veritabanı/kullanıcı bilgilerini kontrol edin. (Veritabanı henüz yoksa önce oluşturun.)" });

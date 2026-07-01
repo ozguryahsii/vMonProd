@@ -27,14 +27,20 @@ public static class DbProviderConfig
                 return $"Data Source={c.SqlitePath}";
 
             case DbProviderKind.SqlServer:
+                // Named instance (host içinde '\' var) ile explicit port birlikte kullanılamaz;
+                // SQL Server named instance'ı kendi portunu bilir → sadece host\instance yeterli.
+                // Explicit port yalnızca default instance veya named instance'a sabit port atanmışsa kullan.
+                var namedInstance = c.Host.Contains('\\');
+                var dataSource = (c.Port > 0 && !namedInstance) ? $"{c.Host},{c.Port}" : c.Host;
                 var sb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder
                 {
-                    DataSource = c.Port > 0 ? $"{c.Host},{c.Port}" : c.Host,
+                    DataSource = dataSource,
                     InitialCatalog = c.Database,
                     UserID = c.Username,
                     Password = password,
                     Encrypt = c.UseSsl,
-                    TrustServerCertificate = c.TrustServerCertificate
+                    TrustServerCertificate = c.TrustServerCertificate,
+                    ConnectTimeout = 10
                 };
                 return sb.ConnectionString;
 
