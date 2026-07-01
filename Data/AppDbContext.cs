@@ -18,6 +18,13 @@ public class AppDbContext : DbContext
         v => v.HasValue ? (v.Value.Kind == DateTimeKind.Utc ? v.Value : v.Value.ToUniversalTime()) : v,
         v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
 
+    // Oracle boş string ''yi NULL olarak saklar → NOT NULL string kolonlara "" yazınca ORA-01400.
+    // Yaz: "" → " " (Oracle non-null saklar), Oku: " " → "" → uygulama daima "" görür (NOT NULL korunur, null-crash yok).
+    // Yalnız Oracle'da uygulanır; diğer sağlayıcılarda "" olduğu gibi kalır.
+    private static readonly ValueConverter<string, string> OracleEmptyStringConverter = new(
+        v => v == "" ? " " : v,
+        v => v == " " ? "" : v);
+
 
     public DbSet<MonitoredService> Services => Set<MonitoredService>();
     public DbSet<Credential> Credentials => Set<Credential>();
@@ -44,12 +51,15 @@ public class AppDbContext : DbContext
           .HasForeignKey(s => s.CredentialId)
           .OnDelete(DeleteBehavior.SetNull);
 
-        // Tüm DateTime alanlarına UTC dönüştürücüsü uygula (sakla UTC / oku UTC)
+        var isOracle = Database.ProviderName?.Contains("Oracle", StringComparison.OrdinalIgnoreCase) == true;
+
+        // Tüm DateTime alanlarına UTC dönüştürücüsü; Oracle'da string alanlara boş-string dönüştürücüsü uygula
         foreach (var entity in mb.Model.GetEntityTypes())
             foreach (var prop in entity.GetProperties())
             {
                 if (prop.ClrType == typeof(DateTime)) prop.SetValueConverter(UtcConverter);
                 else if (prop.ClrType == typeof(DateTime?)) prop.SetValueConverter(UtcNullableConverter);
+                else if (isOracle && prop.ClrType == typeof(string)) prop.SetValueConverter(OracleEmptyStringConverter);
             }
     }
 }
