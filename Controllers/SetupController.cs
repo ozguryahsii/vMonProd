@@ -130,12 +130,15 @@ public class SetupController : Controller
             await using var ctx = BuildContext(c, pass);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(12));
-            bool can;
-            try { can = await ctx.Database.CanConnectAsync(cts.Token); }
+            try
+            {
+                // CanConnectAsync gerçek hatayı yutar → doğrudan bağlantı aç ki tam SQL hatası (login/DB yok/SSL) yüzeye çıksın.
+                var conn = ctx.Database.GetDbConnection();
+                await conn.OpenAsync(cts.Token);
+                await conn.CloseAsync();
+                return Json(new { ok = true, message = "Bağlantı başarılı ✅" });
+            }
             catch (OperationCanceledException) { return Json(new { ok = false, message = "Bağlantı zaman aşımı (12 sn) — sunucuya erişilemiyor. Firewall, host/port ve SQL Server Browser servisini kontrol edin." }); }
-            return can
-                ? Json(new { ok = true, message = "Bağlantı başarılı ✅" })
-                : Json(new { ok = false, message = "Bağlanılamadı — sunucu/veritabanı/kullanıcı bilgilerini kontrol edin. (Veritabanı henüz yoksa önce oluşturun.)" });
         }
         catch (Exception ex)
         {
