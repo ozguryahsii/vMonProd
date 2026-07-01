@@ -1,0 +1,184 @@
+/* ============================================================
+   vMon Design System — merkezi tasarım token'ları + premium bileşen boyaması
+   (Faz R1) Tüm renk/spacing/radius/gölge tek yerden yönetilir.
+   Bileşen SINIF ADLARI değişmedi (.card/.btn/.tbl...) → görünüm yenilenir,
+   işlev bozulmaz. Bu dosya site.css'ten SONRA yüklenir ve boyamayı devralır.
+   ============================================================ */
+
+:root {
+    /* Marka */
+    --primary: #ed1c24;
+    --primary-600: #d4151c;
+    --primary-glow: rgba(237, 28, 36, .35);
+
+    /* Yüzeyler (açık tema) */
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --panel-hi: #ffffff;
+    --panel-2: #f8fafc;
+    --border: rgba(15, 23, 42, .08);
+    --border-strong: rgba(15, 23, 42, .14);
+
+    /* Metin */
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-faint: #94a3b8;
+
+    /* Efektler */
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px -12px rgba(15, 23, 42, .12);
+    --shadow-card-hover: 0 2px 4px rgba(15, 23, 42, .05), 0 16px 40px -16px rgba(15, 23, 42, .22);
+    --shadow-pop: 0 24px 70px -22px rgba(15, 23, 42, .35);
+    --glass-bg: rgba(255, 255, 255, .72);
+    --glass-brd: rgba(15, 23, 42, .08);
+    --ring: rgba(237, 28, 36, .22);
+
+    /* Ölçüler */
+    --radius: 1rem;        /* kart: rounded-2xl */
+    --radius-sm: .75rem;   /* buton/input: rounded-xl */
+    --gap: 1rem;           /* standart kart aralığı */
+}
+
+html.dark {
+    --bg: #070b14;
+    --panel: #0f1626;
+    --panel-hi: #131c30;
+    --panel-2: #0a101d;
+    --border: rgba(148, 163, 184, .10);
+    --border-strong: rgba(148, 163, 184, .18);
+
+    --text: #e6eaf2;
+    --text-muted: #9aa7bd;
+    --text-faint: #64748b;
+
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 10px 30px -14px rgba(0, 0, 0, .55);
+    --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 22px 50px -18px rgba(0, 0, 0, .7);
+    --shadow-pop: 0 30px 90px -25px rgba(0, 0, 0, .8);
+    --glass-bg: rgba(10, 15, 28, .66);
+    --glass-brd: rgba(148, 163, 184, .12);
+    --ring: rgba(237, 28, 36, .3);
+}
+
+/* ---------- Zemin: aurora gradyanlar + çok hafif nokta ızgara ---------- */
+body {
+    background:
+        radial-gradient(1100px 520px at 85% -12%, rgba(237, 28, 36, .07), transparent 60%),
+        radial-gradient(900px 480px at -8% -4%, rgba(56, 132, 255, .06), transparent 55%),
+        radial-gradient(720px 420px at 55% 110%, rgba(16, 185, 129, .04), transparent 60%),
+        var(--bg);
+    color: var(--text);
+}
+html.dark body {
+    background:
+        radial-gradient(1100px 560px at 85% -12%, rgba(237, 28, 36, .13), transparent 60%),
+        radial-gradient(950px 520px at -8% -6%, rgba(59, 130, 246, .10), transparent 55%),
+        radial-gradient(800px 460px at 55% 115%, rgba(16, 185, 129, .06), transparent 60%),
+        var(--bg);
+    color: var(--text);
+}
+
+/* ---------- Kart: gradient kenar + üst ışık çizgisi + soft shadow ---------- */
+.card {
+    position: relative;
+    background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    border-radius: var(--radius);
+    transition: box-shadow .25s ease, border-color .25s ease, transform .25s ease;
+}
+.card::before {
+    /* üstten vuran ince ışık — premium hissin sırrı */
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 32%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: .5;
+}
+html.dark .card::before {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 36%);
+    opacity: 1;
+}
+.card:hover { box-shadow: var(--shadow-card-hover); border-color: var(--border-strong); }
+.card-head { border-color: var(--border); color: var(--text); }
+
+/* stat / status-card / modal aynı dili konuşur */
+.stat { background: linear-gradient(180deg, var(--panel-hi), var(--panel)); border-color: var(--border); }
+html.dark .stat { background: linear-gradient(180deg, #16203a, #101828); border-color: var(--border-strong); }
+html.dark .stat-label { color: var(--text-muted); }
+.status-card, html.dark .status-card { background: linear-gradient(180deg, var(--panel-hi), var(--panel)); }
+.modal-card { background: var(--panel); box-shadow: var(--shadow-pop); }
+html.dark .modal-card { background: var(--panel-hi); color: var(--text); }
+.modal-overlay { background: rgba(2, 6, 18, .6); backdrop-filter: blur(6px) saturate(120%); }
+
+/* ---------- Üst menü: glassmorphism ---------- */
+nav.vnav {
+    background: linear-gradient(90deg, rgba(9, 13, 24, .88), rgba(13, 18, 32, .82), rgba(9, 13, 24, .88)) !important;
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    border-bottom: 1px solid rgba(148, 163, 184, .12);
+    box-shadow: 0 8px 30px -18px rgba(0, 0, 0, .6);
+}
+.navlink { border-radius: var(--radius-sm); }
+.navlink.active { background: rgba(237, 28, 36, .16); color: #fff; box-shadow: inset 0 0 0 1px rgba(237, 28, 36, .35); }
+
+/* ---------- Buton dili ---------- */
+.btn { border-radius: var(--radius-sm); }
+.btn-primary {
+    background: linear-gradient(180deg, #f43f46, var(--primary) 55%, var(--primary-600));
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 8px 20px -8px var(--primary-glow);
+}
+.btn-primary:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 12px 28px -8px var(--primary-glow); }
+html.dark .btn-outline { background: rgba(148, 163, 184, .06); border-color: var(--border-strong); color: var(--text); }
+html.dark .btn-outline:hover { background: rgba(148, 163, 184, .13); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+
+/* ---------- Input ---------- */
+html.dark .input { background: var(--panel-2); border-color: var(--border-strong); color: var(--text); }
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+
+/* ---------- Tablo ---------- */
+html.dark .tbl thead th { background: rgba(7, 11, 20, .55); color: var(--text-faint); border-color: var(--border); }
+html.dark .tbl tbody td { color: var(--text); border-color: var(--border); }
+html.dark .tbl tbody tr:hover { background: rgba(148, 163, 184, .07); }
+
+/* ---------- Koyu tema bileşen uyumu (eski sabit değerleri token'a çevirir) ---------- */
+html.dark .card { background: linear-gradient(180deg, var(--panel-hi), var(--panel)); border-color: var(--border); }
+html.dark .card-head { border-color: var(--border); color: var(--text); }
+html.dark .label { color: var(--text-muted); }
+html.dark .hint, html.dark .muted { color: var(--text-faint); }
+
+/* ---------- Skeleton / yükleniyor durumu (Faz R3+ ekranlarında kullanılacak) ---------- */
+.skeleton {
+    position: relative; overflow: hidden;
+    background: rgba(148, 163, 184, .14);
+    border-radius: .5rem;
+}
+.skeleton::after {
+    content: ""; position: absolute; inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .28), transparent);
+    animation: skeletonShimmer 1.4s infinite;
+}
+html.dark .skeleton { background: rgba(148, 163, 184, .09); }
+html.dark .skeleton::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent); }
+@keyframes skeletonShimmer { to { transform: translateX(100%); } }
+
+/* ---------- Boş durum (empty state) ---------- */
+.empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .5rem; padding: 3rem 1.5rem; text-align: center; color: var(--text-faint);
+}
+.empty-state i { font-size: 2.2rem; opacity: .5; }
+
+/* ---------- Sayfa giriş animasyonu (motion-fx.js tetikler) ---------- */
+.page-enter { opacity: 0; }
+.no-js .page-enter, .motion-done .page-enter { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .page-enter { opacity: 1 !important; }
+    .skeleton::after { animation: none; }
+}

@@ -4,7 +4,8 @@
     var __csrf = Antiforgery.GetAndStoreTokens(Context);
     bool mutEnabled = false;
     try { mutEnabled = (await Settings.GetAsync()).MutabakatEnabled; } catch { }
-    var __theme = Context.Request.Cookies["vmon_theme"] == "dark" ? "dark" : "";
+    // Dark-first: çerez açıkça "light" demedikçe koyu tema varsayılandır (redesign R1)
+    var __theme = Context.Request.Cookies["vmon_theme"] == "light" ? "" : "dark";
     var __lang = Context.Request.Cookies["vmon_lang"] == "en" ? "en" : "tr";
 }
 <!DOCTYPE html>
@@ -88,9 +89,10 @@
         }
     </style>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
 </head>
 <body class="font-sans text-slate-800 antialiased">
-    <nav class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shadow-lg sticky top-0 z-40" x-data="{ open:false }">
+    <nav class="vnav bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shadow-lg sticky top-0 z-40" x-data="{ open:false }">
         <div class="px-4 lg:px-6">
             <div class="flex items-center h-16 gap-2">
                 <a class="flex items-center gap-2 text-white font-bold text-lg mr-2" asp-controller="Home" asp-action="Index">
@@ -196,7 +198,7 @@
         </div>
     </nav>
 
-    <main class="max-w-[1600px] mx-auto px-4 lg:px-6 py-6">
+    <main class="page-enter max-w-[1600px] mx-auto px-4 lg:px-6 py-6">
         @if (TempData["Message"] != null)
         {
             <div class="alert-ok mb-4 fade-in" x-data="{s:true}" x-show="s">
@@ -242,6 +244,7 @@
         </script>
     }
     <script src="~/lib/alpine/alpine.min.js" asp-append-version="true" defer></script>
+    <script src="~/js/motion-fx.js" asp-append-version="true"></script>
     <script src="~/js/ui.js" asp-append-version="true"></script>
     <script src="~/js/i18n.js" asp-append-version="true"></script>
     <script>
@@ -278,6 +281,19 @@
                 });
             });
             markTheme(); markLang();
+
+            // Aktif menü vurgusu: mevcut yol hangi navlink ile başlıyorsa işaretle (en uzun eşleşme kazanır)
+            var path = location.pathname.toLowerCase();
+            var best = null, bestLen = 0;
+            document.querySelectorAll(".navlink[href]").forEach(function (a) {
+                var href = (a.getAttribute("href") || "").toLowerCase();
+                if (!href || href === "#") return;
+                if ((href === "/" && (path === "/" || path.indexOf("/home") === 0)) ||
+                    (href !== "/" && path.indexOf(href) === 0)) {
+                    if (href.length > bestLen) { best = a; bestLen = href.length; }
+                }
+            });
+            if (best) best.classList.add("active");
         })();
     </script>
     <style>[x-cloak]{display:none !important;}</style>
