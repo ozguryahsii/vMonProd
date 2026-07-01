@@ -214,6 +214,14 @@ public class SetupController : Controller
                 await ctx.Database.EnsureCreatedAsync(ct);
                 if (c.Provider == DbProviderKind.Sqlite)
                     DbSchemaHelper.EnsureSchema(ctx, _logger);
+                else
+                {
+                    // EnsureCreated, şemada tek bir (ör. önceki başarısız denemeden kalan) tablo görünce
+                    // HİÇBİR tabloyu oluşturmaz → sonraki sorgu ORA-00942 (table does not exist) verir.
+                    // Eksik tabloları/kolonları tek tek tamamla → yarım/kirli şemada da kurulum tamamlanır.
+                    await SchemaSync.EnsureTablesAsync(ctx, c.Provider, _logger, ct);
+                    await SchemaSync.EnsureColumnsAsync(ctx, c.Provider, _logger, ct);
+                }
 
                 // Yerel admin kullanıcı (şifreli) — kurulumdan sonra şifreli giriş zorunlu
                 var adminSam = f.AdminUsers.Trim();
