@@ -116,7 +116,13 @@
             <div id="sqliteNote" class="hint" style="margin-top:1rem;"><i class="bi bi-info-circle"></i> SQLite seçtiğinizde veritabanı sunucu üzerinde (Data/monitoring.db) otomatik oluşturulur — ek bilgi gerekmez.</div>
 
             <button type="button" class="btn btn-o" id="btnTestDb" style="margin-top:1rem;"><i class="bi bi-plug"></i> Bağlantıyı Test Et</button>
+            <button type="button" class="btn btn-o" id="btnSchemaScript" style="margin-top:1rem;" title="Kurulumun oluşturacağı CREATE betiğini göster (DBA incelemesi / ORA-00902 teşhisi). DB'ye dokunmaz."><i class="bi bi-file-earmark-code"></i> Şema SQL'ini Göster</button>
             <div class="msg" id="dbMsg"></div>
+            <div id="schemaWrap" class="hidden" style="margin-top:.6rem;">
+                <label>Oluşturulacak şema (DBA için — çalıştırılmaz, yalnız gösterim)</label>
+                <textarea id="schemaBox" rows="10" readonly style="width:100%;font-family:monospace;font-size:.78rem;white-space:pre;"></textarea>
+                <button type="button" class="btn btn-o" id="btnCopySchema" style="margin-top:.4rem;"><i class="bi bi-clipboard"></i> Kopyala</button>
+            </div>
 
             <div class="btns">
                 <span></span>
@@ -243,6 +249,20 @@
         try { const d = await post('/Setup/TestDb', gather()); msg(m, d.ok, d.message); dbTested = d.ok; }
         catch (e) { msg(m, false, 'Hata: ' + e.message); }
         finally { this.disabled = false; }
+    });
+
+    document.getElementById('btnSchemaScript').addEventListener('click', async function () {
+        const wrap = document.getElementById('schemaWrap'), box = document.getElementById('schemaBox');
+        this.disabled = true; box.value = 'Üretiliyor...'; wrap.classList.remove('hidden');
+        try {
+            const r = await fetch('/Setup/SchemaScript', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: gather() });
+            box.value = await r.text();
+        } catch (e) { box.value = '-- Hata: ' + e.message; }
+        finally { this.disabled = false; }
+    });
+    document.getElementById('btnCopySchema').addEventListener('click', function () {
+        const box = document.getElementById('schemaBox'); box.select();
+        navigator.clipboard.writeText(box.value).then(() => { this.innerHTML = '<i class="bi bi-check"></i> Kopyalandı'; setTimeout(() => this.innerHTML = '<i class="bi bi-clipboard"></i> Kopyala', 1500); });
     });
 
     document.getElementById('btnTestSmtp').addEventListener('click', async function () {

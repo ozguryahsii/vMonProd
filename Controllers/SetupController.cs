@@ -146,6 +146,28 @@ public class SetupController : Controller
         }
     }
 
+    /// <summary>Kurulumun oluşturacağı şema (CREATE) betiğini üretir — DB'ye DOKUNMAZ, yalnız DDL döndürür.
+    /// DBA'nın "hangi scriptleri çalıştırıyor" sorusunu yanıtlamak ve ORA-00902 gibi tip hatalarını teşhis için.</summary>
+    [HttpPost]
+    public IActionResult SchemaScript(SetupForm f)
+    {
+        try
+        {
+            var c = ToConfig(f);
+            var pass = ResolvePlainPassword(f, c);
+            using var ctx = BuildContext(c, pass);
+            // GenerateCreateScript modeli seçilen sağlayıcının SQL üreticisiyle DDL'e çevirir (bağlantı gerektirmez).
+            var script = ctx.Database.GenerateCreateScript();
+            var header = $"-- vMon şema betiği ({c.Provider}) — kurulumda EnsureCreated bunu çalıştırır.\r\n"
+                       + "-- Bu betik yalnızca üretildi; SUNUCUDA ÇALIŞTIRILMADI. DBA incelemesi içindir.\r\n\r\n";
+            return Content(header + script, "text/plain; charset=utf-8");
+        }
+        catch (Exception ex)
+        {
+            return Content("-- Betik üretilemedi: " + ex.GetBaseException().Message, "text/plain; charset=utf-8");
+        }
+    }
+
     /// <summary>SMTP testi (SMTP doldurulduysa ilerlemeden önce zorunlu).</summary>
     [HttpPost]
     public async Task<IActionResult> TestSmtp(SetupForm f, CancellationToken ct)
