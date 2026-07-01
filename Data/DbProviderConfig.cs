@@ -20,6 +20,10 @@ public static class DbProviderConfig
     /// <summary>Şifreyi (düz) alıp sağlayıcıya uygun bağlantı dizisi üretir. Builder kullanır (escape/injection güvenli).</summary>
     public static string BuildConnectionString(BootstrapConfig c, string password)
     {
+        // Gelişmiş: ham bağlantı dizesi / JDBC URL doluysa (SQLite hariç) diğer alanları yok say.
+        if (c.Provider != DbProviderKind.Sqlite && !string.IsNullOrWhiteSpace(c.ConnectionStringRaw))
+            return NormalizeRawConnString(c.ConnectionStringRaw, c.Provider);
+
         int port = c.Port > 0 ? c.Port : DefaultPort(c.Provider);
         switch (c.Provider)
         {
@@ -80,6 +84,56 @@ public static class DbProviderConfig
         }
     }
 
+    /// <summary>Ham bağlantı dizesini normalleştirir. JDBC URL (jdbc:sqlserver://...) verilirse ADO.NET'e çevirir,
+    /// aksi halde olduğu gibi (native ADO.NET dizesi) kabul eder.</summary>
+    public static string NormalizeRawConnString(string raw, DbProviderKind provider)
+    {
+        raw = raw.Trim();
+        if (!raw.StartsWith("jdbc:", StringComparison.OrdinalIgnoreCase))
+            return raw;   // zaten native ADO.NET dizesi
+
+        // jdbc:sqlserver://[host[:port]][;key=value;...]  → ADO.NET
+        if (provider == DbProviderKind.SqlServer && raw.StartsWith("jdbc:sqlserver://", StringComparison.OrdinalIgnoreCase))
+        {
+            var body = raw.Substring("jdbc:sqlserver://".Length);
+            var parts = body.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var sb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder { ConnectTimeout = 10 };
+            string host = "", portStr = "";
+            int start = 0;
+            if (parts.Length > 0 && !parts[0].Contains('='))   // ilk parça host[:port]
+            {
+                var hp = parts[0].Split(':');
+                host = hp[0];
+                if (hp.Length > 1) portStr = hp[1];
+                start = 1;
+            }
+            for (int i = start; i < parts.Length; i++)
+            {
+                var kv = parts[i].Split('=', 2);
+                if (kv.Length != 2) continue;
+                var k = kv[0].Trim().ToLowerInvariant();
+                var v = kv[1].Trim();
+                switch (k)
+                {
+                    case "servername": host = v; break;
+                    case "port": portStr = v; break;
+                    case "databasename": case "database": sb.InitialCatalog = v; break;
+                    case "user": case "username": case "userid": case "user id": sb.UserID = v; break;
+                    case "password": sb.Password = v; break;
+                    case "encrypt": sb.Encrypt = v.Equals("true", StringComparison.OrdinalIgnoreCase); break;
+                    case "trustservercertificate": sb.TrustServerCertificate = v.Equals("true", StringComparison.OrdinalIgnoreCase); break;
+                }
+            }
+            sb.DataSource = string.IsNullOrEmpty(portStr) ? host : $"{host},{portStr}";
+            return sb.ConnectionString;
+        }
+
+        // Diğer sağlayıcılar için JDBC çevirisi yok → kullanıcının native dizesini kullanması beklenir.
+        // Yaygın ön ekleri temizleyip olduğu gibi ver (best-effort).
+        var idx = raw.IndexOf("://", StringComparison.Ordinal);
+        return idx > 0 ? raw[(idx + 3)..] : raw;
+    }
+
     /// <summary>DbContextOptionsBuilder'a sağlayıcıyı uygular. Ağ üstü DB'lerde geçici hata dayanıklılığı (retry) açık.</summary>
     public static void Apply(DbContextOptionsBuilder o, BootstrapConfig c, string connStr)
     {
@@ -110,6 +164,12 @@ public static class DbProviderConfig
     public static string ResolvePassword(BootstrapConfig c, ISecretProtector secrets)
     {
         if (c.Provider == DbProviderKind.Sqlite) return "";
+        // Ham/JDBC bağlantı dizesi şifreli saklanmışsa çöz → çalışma-anı alanına koy (BuildConnectionString kullanır).
+        if (!string.IsNullOrWhiteSpace(c.ConnectionStringRawEncrypted))
+        {
+            c.ConnectionStringRaw = secrets.Unprotect(c.ConnectionStringRawEncrypted);
+            return "";
+        }
         if (c.UseVault && !string.IsNullOrWhiteSpace(c.VaultUrl))
         {
             try

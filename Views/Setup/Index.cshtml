@@ -77,29 +77,39 @@
             </select>
 
             <div id="netFields" class="hidden">
-                <div class="row">
-                    <div style="flex:2"><label>Sunucu (Host/IP) *</label><input type="text" name="Host" id="Host" placeholder="db.firma.local" /></div>
-                    <div><label>Port</label><input type="number" name="Port" id="Port" placeholder="" /></div>
-                </div>
-                <div class="row">
-                    <div><label id="dbLabel">Veritabanı adı *</label><input type="text" name="Database" id="Database" placeholder="vmon" /></div>
-                    <div><label>Kullanıcı adı</label><input type="text" name="Username" id="Username" placeholder="vmon_user" /></div>
-                </div>
-                <label id="passLabel">Şifre</label>
-                <input type="password" name="Password" id="Password" placeholder="••••••••" />
-                <div class="row">
-                    <label class="chk"><input type="checkbox" name="UseSsl" id="UseSsl" /> SSL/şifreli bağlantı</label>
-                    <label class="chk"><input type="checkbox" name="TrustServerCertificate" id="TrustServerCertificate" /> Sertifika hatalarını yoksay</label>
+                <label class="chk" style="margin-bottom:.6rem;"><input type="checkbox" name="__useRaw" id="UseRawConn" /> Gelişmiş: bağlantı dizesini elle gir (ADO.NET veya JDBC URL)</label>
+
+                <div id="stdConnFields">
+                    <div class="row">
+                        <div style="flex:2"><label>Sunucu (Host/IP) *</label><input type="text" name="Host" id="Host" placeholder="db.firma.local" /></div>
+                        <div><label>Port</label><input type="number" name="Port" id="Port" placeholder="" /></div>
+                    </div>
+                    <div class="row">
+                        <div><label id="dbLabel">Veritabanı adı *</label><input type="text" name="Database" id="Database" placeholder="vmon" /></div>
+                        <div><label>Kullanıcı adı</label><input type="text" name="Username" id="Username" placeholder="vmon_user" /></div>
+                    </div>
+                    <label id="passLabel">Şifre</label>
+                    <input type="password" name="Password" id="Password" placeholder="••••••••" />
+                    <div class="row">
+                        <label class="chk"><input type="checkbox" name="UseSsl" id="UseSsl" /> SSL/şifreli bağlantı</label>
+                        <label class="chk"><input type="checkbox" name="TrustServerCertificate" id="TrustServerCertificate" /> Sertifika hatalarını yoksay</label>
+                    </div>
+
+                    <label class="chk"><input type="checkbox" name="UseVault" id="UseVault" /> Şifreyi HashiCorp Vault'tan çek</label>
+                    <div id="vaultFields" class="hidden">
+                        <label>Vault Secret URL</label><input type="text" name="VaultUrl" placeholder="vault.firma.local/v1/vmon/data/db" />
+                        <label>Vault Token</label><input type="password" name="VaultToken" placeholder="hvs...." />
+                        <div class="row">
+                            <div><label>Kullanıcı adı anahtarı</label><input type="text" name="VaultUserKey" placeholder="username" /></div>
+                            <div><label>Şifre anahtarı</label><input type="text" name="VaultKey" placeholder="password" /></div>
+                        </div>
+                    </div>
                 </div>
 
-                <label class="chk"><input type="checkbox" name="UseVault" id="UseVault" /> Şifreyi HashiCorp Vault'tan çek</label>
-                <div id="vaultFields" class="hidden">
-                    <label>Vault Secret URL</label><input type="text" name="VaultUrl" placeholder="vault.firma.local/v1/vmon/data/db" />
-                    <label>Vault Token</label><input type="password" name="VaultToken" placeholder="hvs...." />
-                    <div class="row">
-                        <div><label>Kullanıcı adı anahtarı</label><input type="text" name="VaultUserKey" placeholder="username" /></div>
-                        <div><label>Şifre anahtarı</label><input type="text" name="VaultKey" placeholder="password" /></div>
-                    </div>
+                <div id="rawConnFields" class="hidden">
+                    <label>Bağlantı dizesi (ADO.NET veya JDBC URL)</label>
+                    <textarea name="ConnectionStringRaw" id="ConnectionStringRaw" rows="3" style="width:100%;font-family:monospace;font-size:.85rem;" placeholder="Server=WDBTEST001,14354;Database=VMON;User Id=VMON_USER;Password=***;TrustServerCertificate=true;&#10;— veya —&#10;jdbc:sqlserver://WDBTEST001:14354;databaseName=VMON;user=VMON_USER;password=***;encrypt=false"></textarea>
+                    <div class="hint"><i class="bi bi-info-circle"></i> Doluysa yukarıdaki Host/Port/Veritabanı/Kullanıcı/Şifre alanları yok sayılır. JDBC URL otomatik ADO.NET'e çevrilir. Şifre içerdiğinden diske <b>şifreli</b> yazılır. Yalnızca DB türü (üstte) seçili olmalıdır.</div>
                 </div>
             </div>
 
@@ -212,6 +222,11 @@
     document.getElementById('UseVault').addEventListener('change', function () {
         document.getElementById('vaultFields').classList.toggle('hidden', !this.checked);
         document.getElementById('Password').closest('div, body') && (document.getElementById('passLabel').style.opacity = this.checked ? .5 : 1);
+    });
+    document.getElementById('UseRawConn').addEventListener('change', function () {
+        document.getElementById('stdConnFields').classList.toggle('hidden', this.checked);
+        document.getElementById('rawConnFields').classList.toggle('hidden', !this.checked);
+        dbTested = false; document.getElementById('dbMsg').textContent = '';
     });
     document.getElementById('SmtpEnabled').addEventListener('change', function () {
         document.getElementById('smtpFields').classList.toggle('hidden', !this.checked);

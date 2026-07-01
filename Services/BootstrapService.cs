@@ -21,6 +21,12 @@ public class BootstrapConfig
     /// <summary>Pomelo (MySQL) için sabit sunucu sürümü — açılışta DB'ye bağlanıp AutoDetect yapmamak için.</summary>
     public string MySqlServerVersion { get; set; } = "8.0.21";
 
+    /// <summary>Gelişmiş: ham bağlantı dizesi (ADO.NET) veya JDBC URL. Doluysa Host/Port/Database/Username/Password yok sayılır.
+    /// Şifre içerebileceği için diske ŞİFRELİ (ConnectionStringRawEncrypted) yazılır; bu alan yalnız çalışma-anı (persist edilmez).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ConnectionStringRaw { get; set; } = "";
+    public string ConnectionStringRawEncrypted { get; set; } = "";
+
     // SQLite
     public string SqlitePath { get; set; } = "";
 

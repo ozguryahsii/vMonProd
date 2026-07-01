@@ -45,6 +45,7 @@ public class SetupController : Controller
         public string Password { get; set; } = "";
         public bool UseSsl { get; set; } = false;
         public bool TrustServerCertificate { get; set; } = false;
+        public string ConnectionStringRaw { get; set; } = "";  // gelişmiş: ADO.NET veya JDBC URL
         // Vault (opsiyonel)
         public bool UseVault { get; set; } = false;
         public string VaultUrl { get; set; } = "";
@@ -75,6 +76,7 @@ public class SetupController : Controller
             Username = f.Username?.Trim() ?? "",
             UseSsl = f.UseSsl,
             TrustServerCertificate = f.TrustServerCertificate,
+            ConnectionStringRaw = f.ConnectionStringRaw?.Trim() ?? "",
             UseVault = f.UseVault,
             VaultUrl = f.VaultUrl?.Trim() ?? "",
             VaultUserKey = f.VaultUserKey?.Trim() ?? "",
@@ -119,7 +121,7 @@ public class SetupController : Controller
         try
         {
             var c = ToConfig(f);
-            if (c.Provider != DbProviderKind.Sqlite)
+            if (c.Provider != DbProviderKind.Sqlite && string.IsNullOrWhiteSpace(c.ConnectionStringRaw))
             {
                 if (string.IsNullOrWhiteSpace(c.Host)) return Json(new { ok = false, message = "Sunucu (Host) zorunlu." });
                 if (string.IsNullOrWhiteSpace(c.Database)) return Json(new { ok = false, message = c.Provider == DbProviderKind.Oracle ? "Service Name zorunlu." : "Veritabanı adı zorunlu." });
@@ -224,7 +226,14 @@ public class SetupController : Controller
             c.Configured = true;
             if (c.Provider != DbProviderKind.Sqlite)
             {
-                if (f.UseVault)
+                if (!string.IsNullOrWhiteSpace(c.ConnectionStringRaw))
+                {
+                    // Ham/JDBC bağlantı dizesi: şifre içerebilir → şifreli sakla, diğer alanları kullanma
+                    c.UseVault = false;
+                    c.ConnectionStringRawEncrypted = _secrets.Protect(c.ConnectionStringRaw);
+                    c.PasswordEncrypted = "";
+                }
+                else if (f.UseVault)
                 {
                     c.UseVault = true;
                     c.VaultTokenEncrypted = _secrets.Protect(f.VaultToken?.Trim() ?? "");
