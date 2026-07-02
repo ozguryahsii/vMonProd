@@ -55,11 +55,11 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
   const [wa, setWa] = useState<Tri>("");
   const [call, setCall] = useState<Tri>("");
   const [enabled, setEnabled] = useState<Tri>("");
-  const [setIv, setSetIv] = useState(false); const [iv, setIv] = useState("");
-  const [setSl, setSetSl] = useState(false); const [sl, setSl] = useState("");
-  const [setCp, setSetCp] = useState(false); const [cp, setCp] = useState("");
-  const [setRm, setSetRm] = useState(false); const [rm, setRm] = useState("");
-  const [setDk, setSetDk] = useState(false); const [dk, setDk] = useState("");
+  const [ivOn, setIvOn] = useState(false); const [iv, setIv] = useState("");
+  const [slOn, setSlOn] = useState(false); const [sl, setSl] = useState("");
+  const [cpOn, setCpOn] = useState(false); const [cp, setCp] = useState("");
+  const [rmOn, setRmOn] = useState(false); const [rm, setRm] = useState("");
+  const [dkOn, setDkOn] = useState(false); const [dk, setDk] = useState("");
   const [kw, setKw] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -67,8 +67,8 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
   useEffect(() => {
     if (open) {
       setMail(""); setSms(""); setWa(""); setCall(""); setEnabled("");
-      setSetIv(false); setIv(""); setSetSl(false); setSl(""); setSetCp(false); setCp("");
-      setSetRm(false); setRm(""); setSetDk(false); setDk(""); setKw(""); setErr(null);
+      setIvOn(false); setIv(""); setSlOn(false); setSl(""); setCpOn(false); setCp("");
+      setRmOn(false); setRm(""); setDkOn(false); setDk(""); setKw(""); setErr(null);
     }
   }, [open]);
 
@@ -80,11 +80,11 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
       ids,
       alertMail: mail || null, alertSms: sms || null, alertWhatsapp: wa || null,
       alertCall: call || null, enabled: enabled || null,
-      setInterval: setIv, interval: num(iv),
-      setSlow: setSl, slow: num(sl),
-      setCpu: setCp, cpu: num(cp),
-      setRam: setRm, ram: num(rm),
-      setDisk: setDk, disk: num(dk),
+      setInterval: ivOn, interval: num(iv),
+      setSlow: slOn, slow: num(sl),
+      setCpu: cpOn, cpu: num(cp),
+      setRam: rmOn, ram: num(rm),
+      setDisk: dkOn, disk: num(dk),
       addKeywords: kw.trim() || null,
     };
     try {
@@ -121,11 +121,11 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
         <div>
           <p className="mb-2 text-sm font-medium text-muted-foreground">Sayısal Alanlar <span className="font-normal">(işaretle → yaz; boş bırakırsan özellik kapatılır)</span></p>
           <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-4">
-            <NumRow label="Aralık (dk)" hint="boş = global" set={setIv} setSet={setSetIv} val={iv} setVal={setIv} />
-            <NumRow label="Yavaşlık eşiği (ms)" hint="boş = kapalı" set={setSl} setSet={setSetSl} val={sl} setVal={setSl} />
-            <NumRow label="CPU eşiği (%)" hint="boş = kapalı" set={setCp} setSet={setSetCp} val={cp} setVal={setCp} />
-            <NumRow label="RAM eşiği (%)" hint="boş = kapalı" set={setRm} setSet={setSetRm} val={rm} setVal={setRm} />
-            <NumRow label="Disk eşiği (%)" hint="boş = kapalı" set={setDk} setSet={setSetDk} val={dk} setVal={setDk} />
+            <NumRow label="Aralık (dk)" hint="boş = global" set={ivOn} setSet={setIvOn} val={iv} setVal={setIv} />
+            <NumRow label="Yavaşlık eşiği (ms)" hint="boş = kapalı" set={slOn} setSet={setSlOn} val={sl} setVal={setSl} />
+            <NumRow label="CPU eşiği (%)" hint="boş = kapalı" set={cpOn} setSet={setCpOn} val={cp} setVal={setCp} />
+            <NumRow label="RAM eşiği (%)" hint="boş = kapalı" set={rmOn} setSet={setRmOn} val={rm} setVal={setRm} />
+            <NumRow label="Disk eşiği (%)" hint="boş = kapalı" set={dkOn} setSet={setDkOn} val={dk} setVal={setDk} />
           </div>
         </div>
 
