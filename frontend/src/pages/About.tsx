@@ -1,55 +1,62 @@
 import { useEffect, useState } from "react";
-import { Activity, ExternalLink } from "lucide-react";
+import { Activity } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Skeleton, ErrorState } from "@/components/ui/states";
 import { useMe } from "@/hooks/useMe";
 
+/** Klasik Hakkında içeriği (genel bilgiler + sürüm geçmişi + regülasyon uyumları) tek kaynaktan
+ * çekilir ve YENİ tasarımın stiliyle (about-legacy CSS eşlemesi) sayfanın içinde render edilir.
+ * iframe YOK; klasik arayüz emekli olduğunda içerik doğrudan buraya taşınacak. */
 export function About() {
   const { me } = useMe();
+  const [html, setHtml] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Sürüm rozeti klasik Hakkında sayfasından okunur (tek kaynak — çifte bakım olmasın)
     fetch("/Home/About", { credentials: "same-origin" })
       .then((r) => r.text())
-      .then((html) => {
-        const m = html.match(/v\d+\.\d+\.\d+[^<\s"]*/);
+      .then((raw) => {
+        const doc = new DOMParser().parseFromString(raw, "text/html");
+        const content = doc.querySelector("main .max-w-4xl, .max-w-4xl");
+        if (!content) { setError("İçerik alınamadı."); return; }
+        // Kendi başlık kartımız var → klasik hero'yu çıkar; script/Alpine kalıntılarını temizle
+        const hero = content.querySelector("h1")?.closest("div.rounded-2xl");
+        hero?.remove();
+        content.querySelectorAll("script").forEach((s) => s.remove());
+        // Alpine yok → x-cloak/x-show ile gizlenen her şey görünür kalsın (tam içerik)
+        content.querySelectorAll("[x-cloak]").forEach((el) => el.removeAttribute("x-cloak"));
+        const m = raw.match(/v\d+\.\d+\.\d+[^<\s"]*/);
         setVersion(m ? m[0] : null);
+        setHtml(content.innerHTML);
       })
-      .catch(() => setVersion(null));
+      .catch((e) => setError((e as Error).message));
   }, []);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
-              <Activity className="h-6 w-6 text-white" />
-            </span>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                vMon
-                {version && <span className="rounded-md bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">{version}</span>}
-              </CardTitle>
-              <CardDescription>Servis izleme ve alarm platformu {me?.companyName ? `— ${me.companyName}` : ""}</CardDescription>
-            </div>
+        <CardHeader className="flex-row items-center gap-3 space-y-0">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
+            <Activity className="h-6 w-6 text-white" />
+          </span>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              vMon
+              {version && <span className="rounded-md bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">{version}</span>}
+            </CardTitle>
+            <CardDescription>Servis izleme ve alarm platformu {me?.companyName ? `— ${me.companyName}` : ""}</CardDescription>
           </div>
-          <a href="/Home/About" target="_blank" rel="noreferrer">
-            <Button variant="outline" size="sm"><ExternalLink className="h-4 w-4" /> Yeni sekmede aç</Button>
-          </a>
         </CardHeader>
       </Card>
 
-      {/* Klasik Hakkında içeriği (genel bilgiler, sürüm geçmişi, regülasyon uyumları) — tek kaynak, gömülü */}
-      <div className="overflow-hidden rounded-lg border border-border bg-card/40">
-        <iframe
-          src="/Home/About?embed=1"
-          title="Hakkında"
-          className="h-[78vh] w-full"
-          style={{ border: "none" }}
-        />
-      </div>
+      {error ? (
+        <ErrorState message={error} />
+      ) : html === null ? (
+        <Card className="p-6 space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</Card>
+      ) : (
+        <div className="about-legacy" dangerouslySetInnerHTML={{ __html: html }} />
+      )}
     </div>
   );
 }

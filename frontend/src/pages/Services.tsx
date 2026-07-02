@@ -35,6 +35,7 @@ export function Services() {
   useEffect(() => { const sp = searchParams.get("q"); if (sp !== null) setQ(sp); }, [searchParams]);
   const [typeF, setTypeF] = useState("");
   const [statusF, setStatusF] = useState("");
+  const [tagF, setTagF] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceItem | null>(null);
   const [toDelete, setToDelete] = useState<ServiceItem | null>(null);
@@ -50,11 +51,21 @@ export function Services() {
   useEffect(() => { servicesMeta().then(setMeta).catch(() => {}); }, []);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 3500); return () => clearTimeout(t); } }, [flash]);
 
+  const tags = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of data ?? [])
+      for (const k of (s.keyword ?? "").split(",").map((x) => x.trim()).filter(Boolean)) set.add(k);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
+  }, [data]);
+
   const filtered = useMemo(() => {
+    // Tüm filtreler VE (kesişim) mantığıyla birlikte çalışır
     const items = data ?? [];
     return items.filter((s) => {
       if (typeF && s.type !== typeF) return false;
       if (statusF && statusOf(s) !== statusF) return false;
+      if (tagF && !(s.keyword ?? "").split(",").map((x) => x.trim())
+        .some((k) => k.localeCompare(tagF, "tr", { sensitivity: "accent" }) === 0)) return false;
       if (q) {
         const t = q.toLowerCase();
         if (!s.name.toLowerCase().includes(t) && !s.target.toLowerCase().includes(t) &&
@@ -62,7 +73,7 @@ export function Services() {
       }
       return true;
     });
-  }, [data, q, typeF, statusF]);
+  }, [data, q, typeF, statusF, tagF]);
 
   async function doCheck(s: ServiceItem) {
     setBusyId(s.id);
@@ -144,6 +155,10 @@ export function Services() {
           <option value="slow">Yavaş</option>
           <option value="down">Kapalı</option>
           <option value="error">Hata</option>
+        </Select>
+        <Select value={tagF} onChange={(e) => setTagF(e.target.value)} className="w-auto">
+          <option value="">Tüm etiketler</option>
+          {tags.map((t) => <option key={t} value={t}>{t}</option>)}
         </Select>
         <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
           <Plus className="h-4 w-4" /> Yeni Servis

@@ -170,6 +170,11 @@ export function Dashboard() {
                     <ResourceMini label="Disk" v={s.lastMaxDiskPercent} />
                   </div>
                 )}
+                {s.capacityInfo && (
+                  <div className="mt-2 truncate text-[10px] text-muted-foreground/80" title={s.capacityInfo}>
+                    {s.capacityInfo}
+                  </div>
+                )}
               </button>
             );
           })}

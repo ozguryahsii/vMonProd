@@ -113,6 +113,69 @@ body {
   outline: none !important;
 }
 
+/* ============================================================
+   Hakkında: klasik Razor içeriği (tek kaynak) yeni tasarım diliyle boyanır.
+   Klasik sınıflar (.card/.card-head/.badge/tablo/utility) token eşlemesi.
+   ============================================================ */
+.about-legacy { color: hsl(var(--foreground)); }
+.about-legacy > div { max-width: 100% !important; }
+.about-legacy .card {
+  background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--card) / 0.6));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.about-legacy .card-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid hsl(var(--border));
+  font-weight: 600; font-size: 0.95rem;
+}
+.about-legacy .card-body { padding: 1.25rem; }
+.about-legacy .card-body > * + * { margin-top: 0.9rem; }
+.about-legacy .badge, .about-legacy .pill-info {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  border-radius: 0.375rem; padding: 0.1rem 0.5rem;
+  font-size: 0.75rem; font-weight: 600;
+  background: hsl(var(--primary) / 0.15); color: hsl(var(--primary));
+}
+.about-legacy p { line-height: 1.6; }
+.about-legacy ul { list-style: disc; margin-left: 1.25rem; }
+.about-legacy li { margin-top: 0.35rem; line-height: 1.55; }
+.about-legacy strong { color: hsl(var(--foreground)); }
+.about-legacy code {
+  background: hsl(var(--muted)); border-radius: 0.25rem;
+  padding: 0.05rem 0.35rem; font-size: 0.8em;
+}
+.about-legacy table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.about-legacy th, .about-legacy td {
+  text-align: left; padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  vertical-align: top;
+}
+.about-legacy th {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: hsl(var(--muted-foreground));
+}
+.about-legacy a { color: hsl(var(--primary)); }
+.about-legacy a:hover { text-decoration: underline; }
+/* Klasik utility metin renkleri → tema token'ları (koyu/açık her ikisinde okunur) */
+.about-legacy [class*="text-slate"] { color: hsl(var(--foreground)); }
+.about-legacy [class*="text-slate-4"], .about-legacy [class*="text-slate-5"] { color: hsl(var(--muted-foreground)); }
+.about-legacy [class*="bg-slate-50"] {
+  background: hsl(var(--muted) / 0.3); border-radius: 0.75rem; padding: 1rem;
+  border: 1px solid hsl(var(--border));
+}
+.about-legacy .flex { display: flex; gap: 0.75rem; }
+.about-legacy .w-44 { width: 11rem; flex-shrink: 0; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.about-legacy i.bi { color: hsl(var(--primary)); margin-right: 0.25rem; }
+/* Alpine yok → aç/kapa butonları işlevsiz ama görünür (sürüm rozeti butonun içinde); içerik tamamen açık */
+.about-legacy button { pointer-events: none; cursor: default; display: inline-flex; align-items: center; gap: 0.5rem; }
+.about-legacy button .bi-chevron-down, .about-legacy button .bi-chevron-up { display: none; }
+.about-legacy [x-show] { display: block !important; }
+
 /* Skeleton shimmer */
 .skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); border-radius: 0.5rem; }
 .skeleton::after {

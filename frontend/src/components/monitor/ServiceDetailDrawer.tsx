@@ -85,6 +85,11 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
             </div>
           </div>
 
+          {service.capacityInfo && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Atanan kaynaklar: </span>{service.capacityInfo}
+            </div>
+          )}
           {flash && <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">{flash}</div>}
           {service.lastError && cat !== "up" && <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{service.lastError}</div>}
 
