@@ -7,16 +7,55 @@ export class ApiError extends Error {
   }
 }
 
+async function handle<T>(res: Response): Promise<T> {
+  if (res.status === 401) throw new ApiError(401, "Oturum gerekli. Lütfen giriş yapın.");
+  if (res.status === 403) throw new ApiError(403, "Bu işlem için yetkiniz yok.");
+  if (!res.ok) {
+    let msg = `Sunucu hatası (${res.status})`;
+    try { const t = await res.text(); if (t) msg = t; } catch { /* yoksay */ }
+    throw new ApiError(res.status, msg);
+  }
+  const txt = await res.text();
+  return (txt ? JSON.parse(txt) : null) as T;
+}
+
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { Accept: "application/json" },
     credentials: "same-origin",
     signal,
   });
-  if (res.status === 401) throw new ApiError(401, "Oturum gerekli. Lütfen giriş yapın.");
-  if (res.status === 403) throw new ApiError(403, "Bu veriye erişim yetkiniz yok.");
-  if (!res.ok) throw new ApiError(res.status, `Sunucu hatası (${res.status})`);
-  return res.json() as Promise<T>;
+  return handle<T>(res);
+}
+
+// CSRF token'ı bir kez çekilir, bellekte tutulur (global AutoValidateAntiforgery için).
+let _csrf: string | null = null;
+async function csrfToken(): Promise<string> {
+  if (_csrf) return _csrf;
+  const r = await fetch("/api/antiforgery", { credentials: "same-origin" });
+  const d = await r.json();
+  _csrf = d.token as string;
+  return _csrf;
+}
+
+export async function apiSend<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown, _retried = false): Promise<T> {
+  const token = await csrfToken();
+  const res = await fetch(`/api${path}`, {
+    method,
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "X-CSRF-TOKEN": token,
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  // 400 hem CSRF hem doğrulama hatası olabilir → token'ı yenileyip YALNIZ BİR KEZ tekrar dene
+  if (res.status === 400 && !_retried) {
+    _csrf = null;
+    return apiSend<T>(method, path, body, true);
+  }
+  return handle<T>(res);
 }
 
 // ---- Dashboard tipleri ----

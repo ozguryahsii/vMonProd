@@ -143,6 +143,123 @@ public class ApiController : ControllerBase
         });
     }
 
+    /// <summary>SPA için antiforgery token — mutasyonlarda X-CSRF-TOKEN header'ında gönderilir. (GET güvenli, doğrulama gerektirmez.)</summary>
+    [HttpGet("antiforgery")]
+    public IActionResult Antiforgery([FromServices] Microsoft.AspNetCore.Antiforgery.IAntiforgery af)
+    {
+        var tokens = af.GetAndStoreTokens(HttpContext);
+        return Ok(new { token = tokens.RequestToken });
+    }
+
+    // ---- Servisler (React ekranı) ----
+
+    /// <summary>Servis düzenleme/liste için tam alanlar + kimlik adı + anlık durum.</summary>
+    [HttpGet("services")]
+    public async Task<IActionResult> Services(CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var list = await _db.Services.AsNoTracking().Include(s => s.Credential)
+            .OrderBy(s => s.Name)
+            .Select(s => new
+            {
+                s.Id, s.Name, Type = s.Type.ToString(), s.Target, s.Port, s.Extra,
+                s.UseSsl, s.IgnoreCertErrors, s.CredentialId, credentialName = s.Credential != null ? s.Credential.Name : null,
+                s.Enabled, s.IntervalMinutesOverride, s.ResponseTimeThresholdMs, s.TimeoutSeconds,
+                s.CpuThresholdPercent, s.RamThresholdPercent, s.DiskThresholdPercent,
+                s.Keyword, s.Description, s.AlertMail, s.AlertSms, s.AlertWhatsapp, s.AlertCall,
+                s.LastCheckedAt, s.LastIsUp, s.LastStatus, s.LastResponseTimeMs, s.LastError,
+                slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue && s.LastResponseTimeMs > s.ResponseTimeThresholdMs
+            })
+            .ToListAsync(ct);
+        return Ok(list);
+    }
+
+    /// <summary>Form için meta: servis tipleri + kimlik bilgileri listesi.</summary>
+    [HttpGet("services/meta")]
+    public async Task<IActionResult> ServicesMeta(CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var creds = await _db.Credentials.AsNoTracking().OrderBy(c => c.Name)
+            .Select(c => new { c.Id, c.Name }).ToListAsync(ct);
+        return Ok(new { types = Enum.GetNames<ServiceType>(), credentials = creds });
+    }
+
+    public record ServiceInput(
+        string Name, string Type, string Target, int? Port, string? Extra,
+        bool UseSsl, bool IgnoreCertErrors, int? CredentialId, bool Enabled,
+        int? IntervalMinutesOverride, int? ResponseTimeThresholdMs, int TimeoutSeconds,
+        int? CpuThresholdPercent, int? RamThresholdPercent, int? DiskThresholdPercent,
+        string? Keyword, string? Description,
+        bool AlertMail, bool AlertSms, bool AlertWhatsapp, bool AlertCall);
+
+    private static string? ValidateInput(ServiceInput m, out ServiceType type)
+    {
+        if (!Enum.TryParse(m.Type, true, out type)) return "Geçersiz servis tipi.";
+        if (string.IsNullOrWhiteSpace(m.Name)) return "Ad zorunlu.";
+        if (string.IsNullOrWhiteSpace(m.Target)) return "Hedef zorunlu.";
+        if ((type == ServiceType.WindowsServiceControl || type == ServiceType.LinuxServiceControl)
+            && !string.IsNullOrWhiteSpace(m.Extra)
+            && !System.Text.RegularExpressions.Regex.IsMatch(m.Extra, @"^[A-Za-z0-9._@\-]+$"))
+            return "Servis adı yalnızca harf, rakam, nokta, tire ve alt çizgi içerebilir.";
+        return null;
+    }
+
+    private static void Apply(MonitoredService s, ServiceInput m, ServiceType type)
+    {
+        s.Name = m.Name.Trim(); s.Type = type; s.Target = m.Target.Trim(); s.Port = m.Port;
+        s.Extra = string.IsNullOrWhiteSpace(m.Extra) ? null : m.Extra.Trim();
+        s.UseSsl = m.UseSsl; s.IgnoreCertErrors = m.IgnoreCertErrors; s.CredentialId = m.CredentialId;
+        s.Enabled = m.Enabled; s.IntervalMinutesOverride = m.IntervalMinutesOverride;
+        s.ResponseTimeThresholdMs = m.ResponseTimeThresholdMs; s.TimeoutSeconds = m.TimeoutSeconds <= 0 ? 15 : m.TimeoutSeconds;
+        s.CpuThresholdPercent = m.CpuThresholdPercent; s.RamThresholdPercent = m.RamThresholdPercent; s.DiskThresholdPercent = m.DiskThresholdPercent;
+        s.Keyword = string.IsNullOrWhiteSpace(m.Keyword) ? null : m.Keyword.Trim();
+        s.Description = string.IsNullOrWhiteSpace(m.Description) ? null : m.Description.Trim();
+        s.AlertMail = m.AlertMail; s.AlertSms = m.AlertSms; s.AlertWhatsapp = m.AlertWhatsapp; s.AlertCall = m.AlertCall;
+    }
+
+    [HttpPost("services")]
+    public async Task<IActionResult> ServiceCreate([FromBody] ServiceInput m, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var err = ValidateInput(m, out var type);
+        if (err != null) return BadRequest(err);
+        var s = new MonitoredService();
+        Apply(s, m, type);
+        _db.Services.Add(s);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("service.create", s.Name, $"Tip: {s.Type}", ct: ct);
+        return Ok(new { s.Id });
+    }
+
+    [HttpPut("services/{id:int}")]
+    public async Task<IActionResult> ServiceUpdate(int id, [FromBody] ServiceInput m, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var err = ValidateInput(m, out var type);
+        if (err != null) return BadRequest(err);
+        var s = await _db.Services.FindAsync(new object[] { id }, ct);
+        if (s == null) return NotFound("Servis bulunamadı");
+        Apply(s, m, type);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("service.update", s.Name, $"Tip: {s.Type}", ct: ct);
+        return Ok(new { s.Id });
+    }
+
+    [HttpDelete("services/{id:int}")]
+    public async Task<IActionResult> ServiceDelete(int id, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var s = await _db.Services.FindAsync(new object[] { id }, ct);
+        if (s == null) return NotFound("Servis bulunamadı");
+        await _db.CheckResults.Where(r => r.ServiceId == id).ExecuteDeleteAsync(ct);
+        await _db.Outages.Where(o => o.ServiceId == id).ExecuteDeleteAsync(ct);
+        await _db.HealthMetrics.Where(x => x.ServiceId == id).ExecuteDeleteAsync(ct);
+        _db.Services.Remove(s);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("service.delete", s.Name, ct: ct);
+        return Ok(new { ok = true });
+    }
+
     /// <summary>Tek servisi şimdi kontrol et.</summary>
     [HttpPost("check/{id:int}")]
     public async Task<IActionResult> CheckNow(int id, CancellationToken ct)
