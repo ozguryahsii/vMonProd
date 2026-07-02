@@ -18,6 +18,7 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
   const [ram, setRam] = useState<SeriesDef[] | null>(null);
   const [disk, setDisk] = useState<SeriesDef[] | null>(null);
   const [manualIds, setManualIds] = useState<Set<number>>(new Set()); // boş = otomatik (en yavaş 12)
+  const [tick, setTick] = useState(0); // her veri yenilemesinde artar → grafik remount → animasyon HER SEFERİNDE oynar
 
   const idsKey = services.map((s) => s.id).join(",");
   const manualKey = Array.from(manualIds).sort((a, b) => a - b).join(",");
@@ -36,9 +37,10 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
     setResp(null); setCpu(null); setRam(null); setDisk(null);
 
     if (respIds.length > 0)
-      getTimeSeries(respIds, minutes, ctrl.signal).then((d) =>
-        setResp(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.up ? p.ms : null })) })))
-      ).catch(() => setResp([]));
+      getTimeSeries(respIds, minutes, ctrl.signal).then((d) => {
+        setResp(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.up ? p.ms : null })) })));
+        setTick((t) => t + 1);
+      }).catch(() => setResp([]));
     else setResp([]);
 
     if (healthIds.length > 0)
@@ -46,6 +48,7 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
         setCpu(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.cpu })) })));
         setRam(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.ram })) })));
         setDisk(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.disk })) })));
+        setTick((t) => t + 1);
       }).catch(() => { setCpu([]); setRam([]); setDisk([]); });
     else { setCpu([]); setRam([]); setDisk([]); }
 
@@ -78,16 +81,16 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
             <ServicePicker services={services.filter((s) => s.enabled)} selected={manualIds} onChange={setManualIds} />
           </CardHeader>
           <CardContent>
-            {resp === null ? <Skeleton className="h-[260px] w-full" /> : <MultiLineChart series={resp} unit=" ms" />}
+            {resp === null ? <Skeleton className="h-[260px] w-full" /> : <MultiLineChart key={`resp-${tick}`} series={resp} unit=" ms" />}
           </CardContent>
         </Card>
       )}
 
       {hasHealth && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <MetricCard title="CPU Kullanımı" data={cpu} />
-          <MetricCard title="RAM Kullanımı" data={ram} />
-          <MetricCard title="Disk Doluluk" data={disk} />
+          <MetricCard key={`cpu-${tick}`} title="CPU Kullanımı" data={cpu} />
+          <MetricCard key={`ram-${tick}`} title="RAM Kullanımı" data={ram} />
+          <MetricCard key={`disk-${tick}`} title="Disk Doluluk" data={disk} />
         </div>
       )}
     </div>

@@ -45,7 +45,7 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax }: {
         )}
         {series.map((s, i) => (
           <Line key={s.name} type="monotone" dataKey={s.name} stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={1.8} dot={false} connectNulls isAnimationActive={false} />
+            strokeWidth={1.8} dot={false} connectNulls animationDuration={900} />
         ))}
       </LineChart>
     </ResponsiveContainer>
