@@ -15,3 +15,6 @@ Data/bootstrap.json
 # ---- Deploy / geçici ----
 app_offline.htm
 *.log
+
+# React SPA build çıktısı (CI üretir, commit edilmez)
+wwwroot/app/

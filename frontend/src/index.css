@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   vMon Design System — shadcn/ui CSS değişkenleri, marka kırmızısı (#ed1c24),
+   koyu-tema öncelikli. Tüm renk/spacing/radius buradan yönetilir.
+   ============================================================ */
+@layer base {
+  :root {
+    --background: 220 33% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --primary: 358 85% 52%;          /* #ed1c24 marka kırmızısı */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 20%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 220 14% 94%;
+    --accent-foreground: 222 47% 20%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 64% 40%;
+    --warning: 38 92% 50%;
+
+    --border: 220 16% 88%;
+    --input: 220 16% 86%;
+    --ring: 358 85% 52%;
+
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 222 47% 5%;         /* derin lacivert */
+    --foreground: 213 31% 91%;
+
+    --card: 222 40% 9%;
+    --card-foreground: 213 31% 91%;
+
+    --primary: 358 85% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 14%;
+    --secondary-foreground: 213 31% 91%;
+
+    --muted: 217 33% 13%;
+    --muted-foreground: 215 20% 60%;
+
+    --accent: 217 33% 16%;
+    --accent-foreground: 213 31% 91%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 64% 44%;
+    --warning: 38 92% 55%;
+
+    --border: 217 33% 18%;
+    --input: 217 33% 20%;
+    --ring: 358 85% 55%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Aurora zemin — premium his */
+body {
+  background-image:
+    radial-gradient(1100px 520px at 85% -12%, hsl(358 85% 52% / 0.10), transparent 60%),
+    radial-gradient(950px 520px at -8% -6%, hsl(217 91% 60% / 0.08), transparent 55%),
+    radial-gradient(800px 460px at 55% 115%, hsl(158 64% 44% / 0.05), transparent 60%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Kart parlaklık çizgisi (gradient border üst ışığı) */
+.card-glow { position: relative; }
+.card-glow::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, hsl(0 0% 100% / 0.14), transparent 40%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* İnce kaydırma çubuğu */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); background-clip: content-box; }
+
+/* Skeleton shimmer */
+.skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); border-radius: 0.5rem; }
+.skeleton::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.08), transparent);
+  animation: shimmer 1.5s infinite;
+}
