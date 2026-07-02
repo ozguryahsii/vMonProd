@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Dashboard } from "@/pages/Dashboard";
 import { Services } from "@/pages/Services";
 import { Reports } from "@/pages/Reports";
+import { Statistics } from "@/pages/Statistics";
 import { Placeholder } from "@/pages/Placeholder";
 
 const titles: Record<string, { t: string; s: string }> = {
@@ -32,7 +33,8 @@ export default function App() {
           <Route path="/app/dashboard" element={<Dashboard />} />
           <Route path="/app/services" element={<Services />} />
           <Route path="/app/reports" element={<Reports />} />
-          {["statistics", "credentials", "settings", "users", "audit", "about"].map((p) => (
+          <Route path="/app/statistics" element={<Statistics />} />
+          {["credentials", "settings", "users", "audit", "about"].map((p) => (
             <Route key={p} path={`/app/${p}`} element={<Placeholder name={titles[p].t} />} />
           ))}
           <Route path="*" element={<Placeholder name="Bulunamadı" />} />
