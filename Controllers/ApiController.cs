@@ -898,6 +898,64 @@ public class ApiController : ControllerBase
         });
     }
 
+    /// <summary>Profil bilgisi (oturumdaki kullanıcı).</summary>
+    [HttpGet("profile")]
+    public async Task<IActionResult> ProfileGet(CancellationToken ct)
+    {
+        var sam = User.FindFirst("sam")?.Value;
+        if (string.IsNullOrWhiteSpace(sam)) return Forbid403();
+        var u = await _db.AppUsers.AsNoTracking().FirstOrDefaultAsync(x => x.Sam == sam, ct);
+        if (u == null) return NotFound("Kullanıcı bulunamadı");
+        var s = await _settings.GetAsync(ct);
+        return Ok(new
+        {
+            u.Sam, u.DisplayName, u.Email, u.Phone, u.IsLocal,
+            minPasswordLength = s.MinPasswordLength,
+            requireComplexity = s.RequirePasswordComplexity
+        });
+    }
+
+    public record ProfileInput(string? Email, string? Phone, string? CurrentPassword, string? NewPassword, string? ConfirmPassword);
+
+    /// <summary>Profil güncelle (+ yerel kullanıcı için şifre değişimi — klasik Profile POST semantiği).</summary>
+    [HttpPost("profile")]
+    public async Task<IActionResult> ProfileSave([FromBody] ProfileInput m, CancellationToken ct)
+    {
+        var sam = User.FindFirst("sam")?.Value;
+        if (string.IsNullOrWhiteSpace(sam)) return Forbid403();
+        var u = await _db.AppUsers.FirstOrDefaultAsync(x => x.Sam == sam, ct);
+        if (u == null) return NotFound("Kullanıcı bulunamadı");
+
+        u.Email = string.IsNullOrWhiteSpace(m.Email) ? null : m.Email.Trim();
+        u.Phone = string.IsNullOrWhiteSpace(m.Phone) ? null : m.Phone.Trim();
+
+        if (u.IsLocal && !string.IsNullOrEmpty(m.NewPassword))
+        {
+            if (!PasswordHasher.Verify(m.CurrentPassword ?? "", u.PasswordHash))
+                return BadRequest("Mevcut şifre hatalı.");
+            if (m.NewPassword != m.ConfirmPassword)
+                return BadRequest("Yeni şifre ile tekrarı eşleşmiyor.");
+            var s = await _settings.GetAsync(ct);
+            var (ok, err) = PasswordHasher.ValidatePolicy(m.NewPassword, s.MinPasswordLength, s.RequirePasswordComplexity);
+            if (!ok) return BadRequest(err);
+            var history = (u.PasswordHistory ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries).ToList();
+            if (PasswordHasher.Verify(m.NewPassword, u.PasswordHash) || history.Any(h => PasswordHasher.Verify(m.NewPassword, h)))
+                return BadRequest($"Yeni parola son {s.PasswordHistoryCount} parolanızdan farklı olmalı.");
+            if (s.PasswordHistoryCount > 0 && !string.IsNullOrEmpty(u.PasswordHash))
+            {
+                history.Insert(0, u.PasswordHash!);
+                u.PasswordHistory = string.Join("\n", history.Take(s.PasswordHistoryCount));
+            }
+            u.PasswordHash = PasswordHasher.Hash(m.NewPassword);
+            await _db.SaveChangesAsync(ct);
+            await _audit.LogAsync("user.password.change", u.Sam, "Yerel kullanıcı parolasını değiştirdi (React)", true, ct: ct);
+            return Ok(new { ok = true, message = "Profil ve şifre güncellendi." });
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { ok = true, message = "Profil güncellendi." });
+    }
+
     // ================= Faz G: Ayarlar (React) =================
 
     /// <summary>Tüm ayarlar (yalnız admin). Sırlar asla dönmez — yalnız has* bayrakları.</summary>

@@ -19,6 +19,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": { target: "http://localhost:8080", changeOrigin: true },
+      "/js": { target: "http://localhost:8080", changeOrigin: true },
+      "/Account": { target: "http://localhost:8080", changeOrigin: true },
+      "/Settings": { target: "http://localhost:8080", changeOrigin: true },
+      "/Statistics": { target: "http://localhost:8080", changeOrigin: true },
+      "/Services": { target: "http://localhost:8080", changeOrigin: true },
+      "/Home": { target: "http://localhost:8080", changeOrigin: true },
     },
   },
 });

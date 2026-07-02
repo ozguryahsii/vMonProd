@@ -4,9 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vMon</title>
+    <script>
+      // Dil/tema çerezden İLK boyamada uygulanır (yanıp sönme + i18n.js aktivasyonu için)
+      (function () {
+        var m = document.cookie.match(/(?:^|;\s*)vmon_lang=(\w+)/);
+        if (m && m[1] === "en") document.documentElement.lang = "en";
+        var t = document.cookie.match(/(?:^|;\s*)vmon_theme=(\w+)/);
+        if (t && t[1] === "light") document.documentElement.classList.remove("dark");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- TR→EN çeviri katmanı: klasik arayüzle AYNI sözlük (lang="en" değilse çalışmaz) -->
+    <script src="/js/i18n.js" defer></script>
   </body>
 </html>
