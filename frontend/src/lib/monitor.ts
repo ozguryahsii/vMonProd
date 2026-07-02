@@ -1,4 +1,4 @@
-import { apiGet } from "./api";
+import { apiGet, apiSend } from "./api";
 
 export interface StatusService {
   id: number;
@@ -64,7 +64,25 @@ export const getTimeSeries = (ids: number[], minutes = 180, signal?: AbortSignal
 export const getMetricsSeries = (ids: number[], minutes = 180, signal?: AbortSignal) =>
   apiGet<MetricsSeriesData>(`/metrics-series?ids=${ids.join(",")}&minutes=${minutes}`, signal);
 
+export interface BoardsMeta {
+  services: { id: number; name: string; type: string; keyword: string | null }[];
+  types: string[];
+  keywords: string[];
+}
+export interface BoardInput {
+  name: string;
+  serviceIds: number[];
+  typeFilter: string | null;
+  keywordFilter: string | null;
+  sortOrder: number;
+}
+
 export const getStatus = (signal?: AbortSignal) => apiGet<StatusResponse>("/status", signal);
 export const getBoards = (signal?: AbortSignal) => apiGet<Board[]>("/dashboards", signal);
+export const getBoardsMeta = (signal?: AbortSignal) => apiGet<BoardsMeta>("/dashboards/meta", signal);
 export const getHistory = (id: number, take = 120, signal?: AbortSignal) => apiGet<HistoryData>(`/history/${id}?take=${take}`, signal);
+
+export const createBoard = (b: BoardInput) => apiSend<{ id: number }>("POST", "/dashboards", b);
+export const updateBoard = (id: number, b: BoardInput) => apiSend<{ id: number }>("PUT", `/dashboards/${id}`, b);
+export const deleteBoard = (id: number) => apiSend<{ ok: boolean }>("DELETE", `/dashboards/${id}`);
 export const getMetrics = (id: number, minutes = 1440, signal?: AbortSignal) => apiGet<MetricsData>(`/metrics/${id}?minutes=${minutes}`, signal);

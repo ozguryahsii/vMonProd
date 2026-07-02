@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { LayoutGrid, ChevronRight } from "lucide-react";
+import { LayoutGrid, ChevronRight, Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ServiceDetailDrawer } from "@/components/monitor/ServiceDetailDrawer";
 import { DashboardCharts } from "@/components/monitor/DashboardCharts";
+import { BoardForm } from "@/components/monitor/BoardForm";
 import { useAsync } from "@/hooks/useAsync";
 import {
-  type StatusService, type Board, type Cat, catOf, getStatus, getBoards,
+  type StatusService, type Board, type Cat, catOf, getStatus, getBoards, deleteBoard,
 } from "@/lib/monitor";
+import { checkIds } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const cats: { key: Cat; label: string; num: string; ring: string; dot: string }[] = [
@@ -37,8 +41,16 @@ export function Dashboard() {
   const [boardId, setBoardId] = useState<number | "all">("all");
   const [active, setActive] = useState<Cat>("all");
   const [detail, setDetail] = useState<StatusService | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Board | null>(null);
+  const [toDelete, setToDelete] = useState<Board | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
-  useEffect(() => { getBoards().then(setBoards).catch(() => {}); }, []);
+  const loadBoards = () => getBoards().then(setBoards).catch(() => {});
+  useEffect(() => { loadBoards(); }, []);
+  useEffect(() => { if (data) setRefreshedAt(new Date().toLocaleTimeString()); }, [data]);
 
   const all = data?.services ?? [];
   const board = boards.find((b) => b.id === boardId);
@@ -55,6 +67,23 @@ export function Dashboard() {
 
   const visible = active === "all" ? inBoard : inBoard.filter((s) => catOf(s) === active);
 
+  async function checkVisible() {
+    if (visible.length === 0) return;
+    setChecking(true);
+    try { await checkIds(visible.map((s) => s.id)); reload(); }
+    catch { /* durum yenilenince görünür */ }
+    finally { setChecking(false); }
+  }
+  async function doDeleteBoard() {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await deleteBoard(toDelete.id);
+      if (boardId === toDelete.id) setBoardId("all");
+      setToDelete(null); loadBoards();
+    } finally { setDeleting(false); }
+  }
+
   if (loading && !data) return <DashSkeleton />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
 
@@ -69,6 +98,19 @@ export function Dashboard() {
             {b.name} <span className="opacity-60">({b.serviceIds.length})</span>
           </BoardTab>
         ))}
+        <div className="ml-auto flex items-center gap-2">
+          {refreshedAt && <span className="hidden text-xs text-muted-foreground sm:inline">Son yenileme: {refreshedAt}</span>}
+          <Button variant="outline" size="sm" disabled={checking || visible.length === 0} onClick={checkVisible}>
+            <RefreshCw className={cn("h-4 w-4", checking && "animate-spin")} /> Görünenleri Kontrol Et
+          </Button>
+          {board && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => { setEditing(board); setFormOpen(true); }}><Pencil className="h-4 w-4" /> Düzenle</Button>
+              <Button variant="destructive" size="sm" onClick={() => setToDelete(board)}><Trash2 className="h-4 w-4" /> Sil</Button>
+            </>
+          )}
+          <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> Yeni Dashboard</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -115,7 +157,10 @@ export function Dashboard() {
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", badgeOf[c].cls)}>{badgeOf[c].label}</span>
+                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", badgeOf[c].cls)}>
+                    {badgeOf[c].label}
+                    {c === "down" && s.downSince && <span className="ml-1 font-normal opacity-80">· {since(s.downSince)}</span>}
+                  </span>
                   <span className="text-xs tabular-nums text-muted-foreground">{s.lastIsUp && s.lastResponseTimeMs != null ? `${s.lastResponseTimeMs} ms` : s.type}</span>
                 </div>
                 {(s.lastCpuPercent != null || s.lastRamPercent != null || s.lastMaxDiskPercent != null) && (
@@ -132,8 +177,25 @@ export function Dashboard() {
       )}
 
       <ServiceDetailDrawer service={detail} onClose={() => setDetail(null)} onChanged={reload} />
+      <BoardForm open={formOpen} board={editing} onClose={() => setFormOpen(false)} onSaved={loadBoards} />
+      <ConfirmDialog
+        open={!!toDelete}
+        title="Panoyu sil"
+        message={toDelete ? `"${toDelete.name}" panosu silinecek (servisler silinmez). Emin misiniz?` : ""}
+        loading={deleting}
+        onConfirm={doDeleteBoard}
+        onCancel={() => setToDelete(null)}
+      />
     </div>
   );
+}
+
+/** "3 sa 12 dk" biçiminde süre */
+function since(iso: string): string {
+  const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return `${mins} dk`;
+  const h = Math.floor(mins / 60);
+  return h < 24 ? `${h} sa ${mins % 60} dk` : `${Math.floor(h / 24)} gün ${h % 24} sa`;
 }
 
 function BoardTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {

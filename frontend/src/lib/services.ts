@@ -78,6 +78,11 @@ export const createService = (input: ServiceInput) => apiSend<{ id: number }>("P
 export const updateService = (id: number, input: ServiceInput) => apiSend<{ id: number }>("PUT", `/services/${id}`, input);
 export const deleteService = (id: number) => apiSend<{ ok: boolean }>("DELETE", `/services/${id}`);
 export const checkService = (id: number) => apiSend<{ isUp: boolean; responseTimeMs: number; error: string | null }>("POST", `/check/${id}`);
+/** Görünen servisleri toplu kontrol (eski 'Görünenleri Kontrol Et'). */
+export const checkIds = (ids: number[]) =>
+  sendForm<{ id: number; isUp: boolean; responseTimeMs?: number; error: string | null }[]>(
+    "/check-ids", new URLSearchParams({ ids: ids.join(",") }));
+
 export const serviceAction = (id: number, action: "start" | "stop" | "restart") => {
   const body = new URLSearchParams({ action });
   // service-action [FromForm] bekliyor → form-encoded gönderiyoruz (apiSend JSON; burada özel fetch)
