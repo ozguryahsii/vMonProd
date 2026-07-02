@@ -8,6 +8,7 @@ import { Statistics } from "@/pages/Statistics";
 import { Audit } from "@/pages/Audit";
 import { Users } from "@/pages/Users";
 import { Credentials } from "@/pages/Credentials";
+import { Settings } from "@/pages/Settings";
 import { Placeholder } from "@/pages/Placeholder";
 
 const titles: Record<string, { t: string; s: string }> = {
@@ -40,7 +41,8 @@ export default function App() {
           <Route path="/app/audit" element={<Audit />} />
           <Route path="/app/users" element={<Users />} />
           <Route path="/app/credentials" element={<Credentials />} />
-          {["settings", "about"].map((p) => (
+          <Route path="/app/settings" element={<Settings />} />
+          {["about"].map((p) => (
             <Route key={p} path={`/app/${p}`} element={<Placeholder name={titles[p].t} />} />
           ))}
           <Route path="*" element={<Placeholder name="Bulunamadı" />} />

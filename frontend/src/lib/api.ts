@@ -38,6 +38,18 @@ async function csrfToken(): Promise<string> {
   return _csrf;
 }
 
+/** Form-encoded POST ([FromForm] bekleyen mevcut uçlar için) — CSRF dahil. */
+export async function apiForm<T>(path: string, params: Record<string, string>): Promise<T> {
+  const token = await csrfToken();
+  const res = await fetch(`/api${path}`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { Accept: "application/json", "X-CSRF-TOKEN": token, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params),
+  });
+  return handle<T>(res);
+}
+
 export async function apiSend<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown, _retried = false): Promise<T> {
   const token = await csrfToken();
   const res = await fetch(`/api${path}`, {

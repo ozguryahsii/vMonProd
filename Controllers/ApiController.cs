@@ -854,6 +854,117 @@ public class ApiController : ControllerBase
             : Ok(new { ok = false, message = error });
     }
 
+    // ================= Faz G: Ayarlar (React) =================
+
+    /// <summary>Tüm ayarlar (yalnız admin). Sırlar asla dönmez — yalnız has* bayrakları.</summary>
+    [HttpGet("settings")]
+    public async Task<IActionResult> SettingsGet(CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        return Ok(new
+        {
+            // İzleme
+            s.CheckIntervalMinutes, s.FailureThreshold, s.HistoryRetentionDays,
+            // E-posta
+            s.EmailEnabled, s.SmtpHost, s.SmtpPort, s.MailFrom, s.MailRecipients,
+            // LDAP + genel
+            s.AuthEnabled, s.LdapAuthHost, s.LdapAuthPort, s.LdapAuthUseSsl, s.LdapAuthDomain,
+            s.LdapAuthBaseDn, s.LdapAuthGroupDn, s.AdminUsers, s.CompanyName, s.LdapSyncCredentialId,
+            // OTP
+            s.OtpEnabled, s.OtpChannel,
+            // Yedekleme
+            s.BackupEnabled, s.BackupPath, s.BackupHour, s.BackupMinute, s.BackupRetentionCount, s.BackupEncrypt,
+            hasBackupPassword = !string.IsNullOrEmpty(s.BackupPasswordEncrypted),
+            // EOL
+            s.EolEnabled, s.EolWarnDays, s.EolProxyUrl,
+            // Güvenlik
+            s.MinPasswordLength, s.RequirePasswordComplexity, s.PasswordHistoryCount,
+            s.TrustInternalTlsCertificates, s.MaxLoginAttempts, s.LockoutMinutes, s.AuditRetentionDays,
+            // SIEM
+            s.SyslogEnabled, s.SyslogHost, s.SyslogPort, s.SyslogTcp,
+            // SMS / WhatsApp (global Twilio)
+            s.SmsEnabled, s.SmsProvider, s.SmsAccountSid, s.SmsFrom, s.SmsRecipients,
+            hasSmsToken = !string.IsNullOrEmpty(s.SmsAuthTokenEncrypted),
+            s.WhatsappEnabled, s.WhatsappAccountSid, s.WhatsappFrom, s.WhatsappRecipients,
+            s.WhatsappAlarmTemplateSid, s.WhatsappWebhookSecret,
+            hasWhatsappToken = !string.IsNullOrEmpty(s.WhatsappAuthTokenEncrypted),
+            // Mutabakat
+            s.MutabakatEnabled, s.MutabakatOwnCompany, s.MutabakatVendorCompany,
+            // Logo (yalnız görüntüleme)
+            s.LoginLogoFile
+        });
+    }
+
+    public record SettingsSaveInput(MonitorSettings Model, string? NewSmsToken, string? NewWhatsappToken, string? NewBackupPassword);
+
+    /// <summary>Ayarları kaydet — klasik Save ile aynı semantik (OTP kilitlenme koruması, sır koruma, syslog/TLS anında uygula).</summary>
+    [HttpPost("settings")]
+    public async Task<IActionResult> SettingsSave([FromBody] SettingsSaveInput input,
+        [FromServices] SyslogService syslog, CancellationToken ct)
+    {
+        var current = await _settings.GetAsync(ct);
+        if (!AdminAllowed(current)) return Forbid403();
+        var model = input.Model ?? new MonitorSettings();
+
+        // OTP kilitlenme koruması (klasik Save'dekiyle birebir)
+        if (model.OtpEnabled)
+        {
+            var needEmail = string.Equals(model.OtpChannel, "Email", StringComparison.OrdinalIgnoreCase);
+            var adminList = (model.AdminUsers ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var users = await _db.AppUsers.AsNoTracking().Where(u => u.IsActive).ToListAsync(ct);
+            bool IsAdminSam(string sam) => adminList.Length == 0 || adminList.Any(a => string.Equals(a, sam, StringComparison.OrdinalIgnoreCase));
+            var hasContact = users.Any(u => IsAdminSam(u.Sam) &&
+                (needEmail ? !string.IsNullOrWhiteSpace(u.Email) : !string.IsNullOrWhiteSpace(u.Phone)));
+            if (!hasContact)
+                return BadRequest(needEmail
+                    ? "OTP açılamadı: E-posta kanalı için en az bir admin kullanıcının e-posta adresi olmalı."
+                    : "OTP açılamadı: SMS/WhatsApp kanalı için en az bir admin kullanıcının telefon numarası olmalı.");
+        }
+
+        // Sistem alanları formdan taşınmaz — mevcut değerler korunur
+        model.LoginLogoFile = current.LoginLogoFile;
+        model.TwilioChannelsMigrated = current.TwilioChannelsMigrated;
+        model.SmsAuthTokenEncrypted = string.IsNullOrWhiteSpace(input.NewSmsToken)
+            ? current.SmsAuthTokenEncrypted : CryptoHelper.Encrypt(input.NewSmsToken.Trim());
+        model.WhatsappAuthTokenEncrypted = string.IsNullOrWhiteSpace(input.NewWhatsappToken)
+            ? current.WhatsappAuthTokenEncrypted : CryptoHelper.Encrypt(input.NewWhatsappToken.Trim());
+        model.BackupPasswordEncrypted = string.IsNullOrWhiteSpace(input.NewBackupPassword)
+            ? current.BackupPasswordEncrypted : CryptoHelper.Encrypt(input.NewBackupPassword.Trim());
+
+        await _settings.SaveAsync(model, ct);
+        syslog.Configure(model);
+        VaultClient.TrustInternalCertificates = model.TrustInternalTlsCertificates;
+        await _audit.LogAsync("settings.save", null,
+            $"TLS güven={model.TrustInternalTlsCertificates}, kilit={model.MaxLoginAttempts}/{model.LockoutMinutes}dk, denetim saklama={model.AuditRetentionDays}g, auth={model.AuthEnabled}", ct: ct);
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>Kayıtlı ayarlarla syslog test mesajı (yalnız admin).</summary>
+    [HttpPost("syslog-test")]
+    public async Task<IActionResult> SyslogTest([FromServices] SyslogService syslog, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        if (!s.SyslogEnabled || string.IsNullOrWhiteSpace(s.SyslogHost))
+            return Ok(new { ok = false, message = "Önce SIEM/Syslog ayarlarını doldurup kaydedin." });
+        syslog.Configure(s);
+        syslog.Test();
+        await _audit.LogAsync("syslog.test", null, $"Test mesajı gönderildi → {s.SyslogHost}:{s.SyslogPort}", ct: ct);
+        return Ok(new { ok = true, message = $"Test mesajı gönderildi → {s.SyslogHost}:{s.SyslogPort} ({(s.SyslogTcp ? "TCP" : "UDP")})" });
+    }
+
+    /// <summary>EOL verisini şimdi senkronize et (yalnız admin).</summary>
+    [HttpPost("eol-sync")]
+    public async Task<IActionResult> EolSync([FromServices] EolService eol, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var (ok, msg) = await eol.SyncAsync(s.EolProxyUrl, ct);
+        await _audit.LogAsync("eol.sync", null, msg, ok, ct: ct);
+        return Ok(new { ok, message = msg });
+    }
+
     // ================= Faz F: Denetim + Kullanıcılar + Kimlik Bilgileri (React) =================
 
     /// <summary>Denetim kaydı (yalnız admin) — EF tabanlı, SAĞLAYICI-BAĞIMSIZ (klasik ekrandaki ham SQLite
