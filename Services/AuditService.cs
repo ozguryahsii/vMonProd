@@ -64,7 +64,15 @@ public class AuditService
             user ??= ctx?.User?.FindFirst("sam")?.Value
                      ?? ctx?.User?.Identity?.Name
                      ?? (ctx?.User?.Identity?.IsAuthenticated == true ? "?" : "anonim");
-            ip ??= ctx?.Connection?.RemoteIpAddress?.ToString();
+            // Gerçek istemci IP: ForwardedHeaders middleware X-Forwarded-For'u RemoteIpAddress'e uygular.
+            // Bazı proxy'ler (nginx varsayılan şablonları) yalnız X-Real-IP gönderir → onu da destekle.
+            if (ip == null)
+            {
+                var realIp = ctx?.Request?.Headers["X-Real-IP"].ToString();
+                ip = !string.IsNullOrWhiteSpace(realIp)
+                    ? realIp
+                    : ctx?.Connection?.RemoteIpAddress?.ToString();
+            }
 
             var entry = new AuditLog
             {
