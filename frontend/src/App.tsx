@@ -8,7 +8,7 @@ import { Statistics } from "@/pages/Statistics";
 import { Placeholder } from "@/pages/Placeholder";
 
 const titles: Record<string, { t: string; s: string }> = {
-  dashboard: { t: "Dashboard", s: "Genel bakış ve anlık durum" },
+  dashboard: { t: "Dashboard'lar", s: "Özel izleme ekranların — anlık durum" },
   reports: { t: "Raporlar", s: "Erişilebilirlik ve performans raporları" },
   statistics: { t: "İstatistikler", s: "Kapasite ve dağılım analizi" },
   services: { t: "Servisler", s: "İzlenen servisleri yönet" },

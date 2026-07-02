@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { LayoutGrid, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Select } from "@/components/ui/input";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { ServiceDetailDrawer } from "@/components/monitor/ServiceDetailDrawer";
 import { DashboardCharts } from "@/components/monitor/DashboardCharts";
@@ -61,14 +60,15 @@ export function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <LayoutGrid className="h-4 w-4" /> Pano:
-        </div>
-        <Select value={String(boardId)} onChange={(e) => { setBoardId(e.target.value === "all" ? "all" : Number(e.target.value)); setActive("all"); }} className="w-auto min-w-[200px]">
-          <option value="all">Hepsi ({all.length})</option>
-          {boards.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.serviceIds.length})</option>)}
-        </Select>
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2">
+        <BoardTab active={boardId === "all"} onClick={() => { setBoardId("all"); setActive("all"); }}>
+          <LayoutGrid className="h-3.5 w-3.5" /> Hepsi <span className="opacity-60">({all.length})</span>
+        </BoardTab>
+        {boards.map((b) => (
+          <BoardTab key={b.id} active={boardId === b.id} onClick={() => { setBoardId(b.id); setActive("all"); }}>
+            {b.name} <span className="opacity-60">({b.serviceIds.length})</span>
+          </BoardTab>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -94,7 +94,8 @@ export function Dashboard() {
         })}
       </div>
 
-      <DashboardCharts services={inBoard} />
+      {/* Grafikler seçili kategoriye göre süzülür (Yavaş'a basınca yalnız yavaşlar çizilir) */}
+      <DashboardCharts services={visible} />
 
       {visible.length === 0 ? (
         <EmptyState title={inBoard.length === 0 ? "Bu panoda servis yok" : "Bu kategoride servis yok"}
@@ -132,6 +133,22 @@ export function Dashboard() {
 
       <ServiceDetailDrawer service={detail} onClose={() => setDetail(null)} onChanged={reload} />
     </div>
+  );
+}
+
+function BoardTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+        active
+          ? "bg-primary/15 text-primary ring-1 ring-inset ring-primary/30"
+          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

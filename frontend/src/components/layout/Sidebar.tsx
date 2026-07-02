@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/app/dashboard", label: "Dashboard'lar", icon: LayoutDashboard },
   { to: "/app/reports", label: "Raporlar", icon: BarChart3 },
   { to: "/app/statistics", label: "İstatistikler", icon: Activity },
   { to: "/app/services", label: "Servisler", icon: Server },

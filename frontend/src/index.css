@@ -106,6 +106,13 @@ body {
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); background-clip: content-box; }
 
+/* Recharts: dilime tıklayınca çıkan tarayıcı focus çerçevesini kaldır (donut'taki kare kutu) */
+.recharts-wrapper svg *:focus,
+.recharts-wrapper .recharts-sector:focus,
+.recharts-wrapper .recharts-layer:focus {
+  outline: none !important;
+}
+
 /* Skeleton shimmer */
 .skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); border-radius: 0.5rem; }
 .skeleton::after {
