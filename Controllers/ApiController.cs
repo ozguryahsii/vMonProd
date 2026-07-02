@@ -859,6 +859,25 @@ public class ApiController : ControllerBase
             : Ok(new { ok = false, message = error });
     }
 
+    /// <summary>Ters proxy IP teşhisi: uygulamanın gördüğü IP + gelen proxy başlıkları.
+    /// X-Forwarded-For nginx'ten geliyor mu, middleware uyguluyor mu — buradan kesin görülür.</summary>
+    [HttpGet("whoami")]
+    public IActionResult WhoAmI()
+    {
+        if (!Can(Perms.DashboardsView)) return Forbid403();
+        string H(string name) => Request.Headers.TryGetValue(name, out var v) ? v.ToString() : "(yok)";
+        return Ok(new
+        {
+            uygulamaninGorduguIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            xForwardedFor = H("X-Forwarded-For"),
+            xRealIp = H("X-Real-IP"),
+            xForwardedProto = H("X-Forwarded-Proto"),
+            host = H("Host"),
+            aciklama = "xForwardedFor '(yok)' ise nginx başlığı GÖNDERMİYOR (config/reload). " +
+                       "Dolu ama uygulamaninGorduguIp hâlâ nginx ise middleware sorunu."
+        });
+    }
+
     // ================= Faz H: oturum bilgisi (React yetki/tema/dil) =================
 
     /// <summary>Oturumdaki kullanıcı: yetkiler + tema/dil + admin bilgisi. React menü/aksiyon görünürlüğü buradan beslenir.</summary>
