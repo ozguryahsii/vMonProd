@@ -51,6 +51,19 @@ export interface MetricsData {
   points: { t: string; cpu: number | null; ram: number | null; disk: number | null; diskDetail: string | null }[];
 }
 
+export interface TimeSeriesData {
+  since: string;
+  series: { id: number; name: string; points: { t: string; ms: number; up: boolean }[] }[];
+}
+export interface MetricsSeriesData {
+  series: { id: number; name: string; points: { t: string; cpu: number | null; ram: number | null; disk: number | null }[] }[];
+}
+
+export const getTimeSeries = (ids: number[], minutes = 180, signal?: AbortSignal) =>
+  apiGet<TimeSeriesData>(`/timeseries?ids=${ids.join(",")}&minutes=${minutes}`, signal);
+export const getMetricsSeries = (ids: number[], minutes = 180, signal?: AbortSignal) =>
+  apiGet<MetricsSeriesData>(`/metrics-series?ids=${ids.join(",")}&minutes=${minutes}`, signal);
+
 export const getStatus = (signal?: AbortSignal) => apiGet<StatusResponse>("/status", signal);
 export const getBoards = (signal?: AbortSignal) => apiGet<Board[]>("/dashboards", signal);
 export const getHistory = (id: number, take = 120, signal?: AbortSignal) => apiGet<HistoryData>(`/history/${id}?take=${take}`, signal);

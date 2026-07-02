@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/input";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { ServiceDetailDrawer } from "@/components/monitor/ServiceDetailDrawer";
+import { DashboardCharts } from "@/components/monitor/DashboardCharts";
 import { useAsync } from "@/hooks/useAsync";
 import {
   type StatusService, type Board, type Cat, catOf, getStatus, getBoards,
@@ -92,6 +93,8 @@ export function Dashboard() {
           );
         })}
       </div>
+
+      <DashboardCharts services={inBoard} />
 
       {visible.length === 0 ? (
         <EmptyState title={inBoard.length === 0 ? "Bu panoda servis yok" : "Bu kategoride servis yok"}

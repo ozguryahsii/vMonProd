@@ -403,6 +403,36 @@ public class ApiController : ControllerBase
         });
     }
 
+    /// <summary>Çok-servisli sağlık metrik serisi (dashboard CPU/RAM/Disk grafikleri) — tek çağrı, en çok 20 servis.</summary>
+    [HttpGet("metrics-series")]
+    public async Task<IActionResult> MetricsSeries([FromQuery] string ids, [FromQuery] int minutes = 180, CancellationToken ct = default)
+    {
+        if (!Can(Perms.DashboardsView)) return Forbid403();
+        var idList = (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => int.TryParse(x, out _)).Select(int.Parse).Distinct().Take(20).ToList();
+        if (idList.Count == 0) return Ok(new { series = Array.Empty<object>() });
+
+        var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 7));
+        var points = await _db.HealthMetrics.AsNoTracking()
+            .Where(m => idList.Contains(m.ServiceId) && m.CheckedAt >= since)
+            .OrderBy(m => m.CheckedAt)
+            .Select(m => new { m.ServiceId, m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent })
+            .ToListAsync(ct);
+        var names = await _db.Services.AsNoTracking().Where(s => idList.Contains(s.Id))
+            .ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+
+        return Ok(new
+        {
+            series = idList.Where(names.ContainsKey).Select(id => new
+            {
+                id,
+                name = names[id],
+                points = points.Where(p => p.ServiceId == id)
+                    .Select(p => new { t = p.CheckedAt, cpu = p.CpuPercent, ram = p.RamPercent, disk = p.MaxDiskPercent })
+            })
+        });
+    }
+
     /// <summary>Sağlık metrikleri zaman serisi (CPU/RAM/Disk grafiği için).</summary>
     [HttpGet("metrics/{id:int}")]
     public async Task<IActionResult> Metrics(int id, [FromQuery] int minutes = 1440, CancellationToken ct = default)
