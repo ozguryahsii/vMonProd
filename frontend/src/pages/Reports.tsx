@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, TrendingDown, Clock, AlertOctagon, ChevronRight } from "lucide-react";
+import { Activity, TrendingDown, Clock, AlertOctagon, ChevronRight, Download, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/drawer";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { UptimeChart } from "@/components/charts/UptimeChart";
@@ -33,6 +33,9 @@ export function Reports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ReportRow | null>(null);
+  const [q, setQ] = useState("");
+  const [typeF, setTypeF] = useState("");
+  const [tagF, setTagF] = useState("");
 
   const load = useCallback(() => {
     const ctrl = new AbortController();
@@ -53,15 +56,51 @@ export function Reports() {
     setTo(isoDate(now));
   };
 
+  // Filtre seçenekleri + filtrelenmiş satırlar
+  const types = useMemo(() => Array.from(new Set((data?.services ?? []).map((s) => s.type))).sort(), [data]);
+  const tags = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of data?.services ?? [])
+      for (const k of (s.keyword ?? "").split(",").map((x) => x.trim()).filter(Boolean)) set.add(k);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
+  }, [data]);
+
+  const rows = useMemo(() => {
+    let list = data?.services ?? [];
+    if (typeF) list = list.filter((s) => s.type === typeF);
+    if (tagF) list = list.filter((s) => (s.keyword ?? "").split(",").map((x) => x.trim()).some((k) => k.localeCompare(tagF, "tr", { sensitivity: "accent" }) === 0));
+    if (q) { const t = q.toLowerCase(); list = list.filter((s) => s.name.toLowerCase().includes(t) || s.target.toLowerCase().includes(t)); }
+    return list;
+  }, [data, q, typeF, tagF]);
+
+  function exportCsv() {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [
+      "Servis;Tip;Hedef;Uptime %;Kontrol;Basarili;Ort. Yanit ms;Maks. Yanit ms;Kesinti Sayisi;Kesinti dk;Esik Asimi;Etiket",
+      ...rows.map((s) => [
+        esc(s.name), s.type, esc(s.target + (s.port ? `:${s.port}` : "")),
+        s.uptimePercent ?? "", s.checkCount, s.upCount,
+        s.avgResponseMs ?? "", s.maxResponseMs ?? "",
+        s.outageCount, s.downtimeMinutes, s.errorCount, esc(s.keyword),
+      ].join(";")),
+    ];
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `vmon-rapor_${from}_${to}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   const kpis = useMemo(() => {
-    const s = data?.services ?? [];
+    const s = rows;
     const withUp = s.filter((x) => x.uptimePercent != null);
     const avgUptime = withUp.length ? withUp.reduce((a, b) => a + (b.uptimePercent ?? 0), 0) / withUp.length : null;
     const totalDowntime = s.reduce((a, b) => a + b.downtimeMinutes, 0);
     const totalOutages = s.reduce((a, b) => a + b.outageCount, 0);
     const worst = withUp.length ? withUp.reduce((a, b) => ((a.uptimePercent ?? 100) <= (b.uptimePercent ?? 100) ? a : b)) : null;
     return { avgUptime, totalDowntime, totalOutages, worst };
-  }, [data]);
+  }, [rows]);
 
   return (
     <div className="space-y-5">
@@ -97,10 +136,31 @@ export function Reports() {
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Servis Erişilebilirlik Raporu</CardTitle>
-              <CardDescription>{shortDate(data.from)} – {shortDate(data.to)} · satıra tıklayarak detay</CardDescription>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Servis Erişilebilirlik Raporu</CardTitle>
+                <CardDescription>{shortDate(data.from)} – {shortDate(data.to)} · {rows.length} servis · satıra tıklayarak detay</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
             </CardHeader>
+            <CardContent className="px-5 pb-3">
+              <div className="flex flex-wrap gap-3">
+                <div className="relative min-w-[200px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Servis veya hedef ara…" className="h-9 pl-9" />
+                </div>
+                <Select value={typeF} onChange={(e) => setTypeF(e.target.value)} className="h-9 w-auto">
+                  <option value="">Tüm tipler</option>
+                  {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                </Select>
+                <Select value={tagF} onChange={(e) => setTagF(e.target.value)} className="h-9 w-auto">
+                  <option value="">Tüm etiketler</option>
+                  {tags.map((t) => <option key={t} value={t}>{t}</option>)}
+                </Select>
+              </div>
+            </CardContent>
             <CardContent className="px-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -116,7 +176,7 @@ export function Reports() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.services.map((s) => (
+                    {rows.map((s) => (
                       <tr key={s.id} className="cursor-pointer border-b border-border/60 transition-colors hover:bg-accent/40" onClick={() => setDetail(s)}>
                         <td className="px-5 py-3">
                           <div className="font-medium">{s.name}</div>
@@ -187,7 +247,30 @@ function ReportDetailDrawer({ row, from, to, onClose }: { row: ReportRow | null;
 
           <div>
             <h3 className="mb-2 text-sm font-semibold">Günlük Erişilebilirlik</h3>
-            {chartData.length === 0 ? <EmptyState title="Veri yok" /> : <UptimeChart data={chartData} xFormat={shortDate} />}
+            {chartData.length === 0 ? <EmptyState title="Veri yok" /> : (
+              <>
+                {/* Eski uptime şeridi: her gün bir hücre, renk = uptime bandı */}
+                <div className="mb-3 flex flex-wrap gap-1">
+                  {detail.days.map((d) => (
+                    <div key={d.date}
+                      title={`${d.date} — ${d.uptimePercent != null ? `%${d.uptimePercent}` : "veri yok"} (${d.checkCount} kontrol, ort. ${d.avgResponseMs} ms)`}
+                      className={cn(
+                        "h-7 w-4 cursor-default rounded transition-transform hover:scale-y-110",
+                        d.uptimePercent == null ? "bg-muted" :
+                        d.uptimePercent >= 99.5 ? "bg-emerald-500" :
+                        d.uptimePercent >= 98 ? "bg-amber-500" : "bg-rose-500"
+                      )} />
+                  ))}
+                </div>
+                <div className="mb-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> ≥99.5</span>
+                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" /> ≥98</span>
+                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> &lt;98</span>
+                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-muted" /> veri yok</span>
+                </div>
+                <UptimeChart data={chartData} xFormat={shortDate} />
+              </>
+            )}
           </div>
 
           <div>
