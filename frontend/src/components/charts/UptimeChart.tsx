@@ -12,8 +12,8 @@ function hourLabel(iso: string) {
   return `${String(d.getHours()).padStart(2, "0")}:00`;
 }
 
-export function UptimeChart({ data }: { data: UptimePoint[] }) {
-  const chart = data.map((p) => ({ saat: hourLabel(p.t), uptime: p.uptime }));
+export function UptimeChart({ data, xFormat = hourLabel }: { data: UptimePoint[]; xFormat?: (iso: string) => string }) {
+  const chart = data.map((p) => ({ saat: xFormat(p.t), uptime: p.uptime }));
   return (
     <ResponsiveContainer width="100%" height={280}>
       <AreaChart data={chart} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
