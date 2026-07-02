@@ -854,6 +854,221 @@ public class ApiController : ControllerBase
             : Ok(new { ok = false, message = error });
     }
 
+    // ================= Faz F: Denetim + Kullanıcılar + Kimlik Bilgileri (React) =================
+
+    /// <summary>Denetim kaydı (yalnız admin) — EF tabanlı, SAĞLAYICI-BAĞIMSIZ (klasik ekrandaki ham SQLite
+    /// sorgusunun aksine Oracle/MSSQL/PG/MySQL'de de çalışır).</summary>
+    [HttpGet("audit")]
+    public async Task<IActionResult> AuditList([FromQuery] string? q, [FromQuery] string? act,
+        [FromQuery] int days = 0, [FromQuery] int take = 500, CancellationToken ct = default)
+    {
+        if (!User.IsAppAdmin()) return Forbid403();
+        take = Math.Clamp(take, 50, 5000);
+        Response.Headers["Cache-Control"] = "no-store";
+
+        var query = _db.AuditLogs.AsNoTracking().AsQueryable();
+        if (days > 0)
+        {
+            var since = DateTime.UtcNow.AddDays(-Math.Min(days, 3650));
+            query = query.Where(a => a.At >= since);
+        }
+        if (!string.IsNullOrWhiteSpace(act))
+        {
+            var a0 = act.Trim();
+            query = query.Where(a => a.Action == a0);
+        }
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var t = q.Trim();
+            query = query.Where(a => a.User.Contains(t)
+                || (a.Target != null && a.Target.Contains(t))
+                || (a.Detail != null && a.Detail.Contains(t))
+                || (a.Ip != null && a.Ip.Contains(t)));
+        }
+        var rows = await query.OrderByDescending(a => a.Id).Take(take)
+            .Select(a => new { a.Id, a.At, a.User, a.Ip, a.Action, a.Target, a.Detail, a.Success })
+            .ToListAsync(ct);
+        var actions = await _db.AuditLogs.AsNoTracking().Select(a => a.Action).Distinct().ToListAsync(ct);
+        actions.Sort(StringComparer.OrdinalIgnoreCase);
+
+        // Denetim kaydına erişim de loglanır (PCI DSS 10.2.1.3)
+        await _audit.LogAsync("audit.view", null,
+            (string.IsNullOrWhiteSpace(q) && string.IsNullOrWhiteSpace(act) && days <= 0)
+                ? "Denetim kaydı görüntülendi" : $"Denetim kaydı görüntülendi (filtre: q='{q}', act='{act}', gün={days})", ct: ct);
+
+        return Ok(new { rows, actions });
+    }
+
+    /// <summary>Hash-zincir bütünlük doğrulaması (yalnız admin).</summary>
+    [HttpPost("audit/verify")]
+    public async Task<IActionResult> AuditVerify(CancellationToken ct)
+    {
+        if (!User.IsAppAdmin()) return Forbid403();
+        var (ok, msg, _) = await AuditService.VerifyChainAsync(_db);
+        await _audit.LogAsync("audit.verify", null, msg, ok, ct: ct);
+        return Ok(new { ok, message = msg });
+    }
+
+    /// <summary>Kullanıcı listesi + yetki kataloğu (yalnız admin).</summary>
+    [HttpGet("users")]
+    public async Task<IActionResult> UsersList(CancellationToken ct)
+    {
+        if (!User.IsAppAdmin()) return Forbid403();
+        var users = await _db.AppUsers.AsNoTracking().OrderBy(u => u.Sam)
+            .Select(u => new { u.Id, u.Sam, u.DisplayName, u.Email, u.Phone, u.PermissionsCsv, u.IsActive, u.IsLocal, u.LastLogin })
+            .ToListAsync(ct);
+        var settings = await _settings.GetAsync(ct);
+        return Ok(new
+        {
+            users,
+            adminUsers = settings.AdminUsers,
+            allPerms = Perms.All.Select(p => new { key = p.Key, label = p.Label })
+        });
+    }
+
+    public record UserUpdateInput(string[]? Perms, string? Phone, string? Email);
+
+    [HttpPut("users/{id:int}")]
+    public async Task<IActionResult> UserUpdate(int id, [FromBody] UserUpdateInput m, CancellationToken ct)
+    {
+        if (!User.IsAppAdmin()) return Forbid403();
+        var u = await _db.AppUsers.FindAsync(new object[] { id }, ct);
+        if (u == null) return NotFound("Kullanıcı bulunamadı");
+        var valid = Perms.All.Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        u.PermissionsCsv = string.Join(",", (m.Perms ?? Array.Empty<string>()).Where(p => valid.Contains(p)).Distinct());
+        u.Phone = string.IsNullOrWhiteSpace(m.Phone) ? null : m.Phone.Trim();
+        u.Email = string.IsNullOrWhiteSpace(m.Email) ? null : m.Email.Trim();
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("user.permissions", u.Sam, "Yetkiler: " + (string.IsNullOrEmpty(u.PermissionsCsv) ? "(yok)" : u.PermissionsCsv), ct: ct);
+        return Ok(new { ok = true });
+    }
+
+    [HttpDelete("users/{id:int}")]
+    public async Task<IActionResult> UserDelete(int id, CancellationToken ct)
+    {
+        if (!User.IsAppAdmin()) return Forbid403();
+        var u = await _db.AppUsers.FindAsync(new object[] { id }, ct);
+        if (u == null) return NotFound("Kullanıcı bulunamadı");
+        _db.AppUsers.Remove(u);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("user.delete", u.Sam, ct: ct);
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>LDAP grup senkronizasyonu (klasik Sync ile aynı davranış; JSON döner).</summary>
+    [HttpPost("users/sync")]
+    public async Task<IActionResult> UsersSync([FromServices] LdapAuthService ldap, CancellationToken ct)
+    {
+        if (!User.IsAppAdmin()) return Forbid403();
+        var settings = await _settings.GetAsync(ct);
+        Credential? syncCred = settings.LdapSyncCredentialId.HasValue
+            ? await _db.Credentials.AsNoTracking().FirstOrDefaultAsync(c => c.Id == settings.LdapSyncCredentialId.Value, ct)
+            : null;
+        var (error, members) = await Task.Run(() => ldap.ListGroupMembers(settings, syncCred), ct);
+        if (error != null) return Ok(new { ok = false, message = "Senkronizasyon başarısız: " + error });
+
+        var existing = await _db.AppUsers.ToDictionaryAsync(u => u.Sam, StringComparer.OrdinalIgnoreCase, ct);
+        var inGroup = members.Select(m => m.Sam).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int added = 0, reactivated = 0;
+        foreach (var m in members)
+        {
+            if (existing.TryGetValue(m.Sam, out var u))
+            {
+                if (!string.IsNullOrWhiteSpace(m.DisplayName)) u.DisplayName = m.DisplayName;
+                if (!string.IsNullOrWhiteSpace(m.Email)) u.Email = m.Email;
+                if (!u.IsActive) { u.IsActive = true; reactivated++; }
+            }
+            else
+            {
+                _db.AppUsers.Add(new AppUser { Sam = m.Sam, DisplayName = m.DisplayName, Email = m.Email, PermissionsCsv = Perms.DashboardsView, IsActive = true });
+                added++;
+            }
+        }
+        int deactivated = 0;
+        foreach (var u in existing.Values)
+            if (u.IsActive && !u.IsLocal && !inGroup.Contains(u.Sam)) { u.IsActive = false; deactivated++; }
+
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("user.sync", null,
+            $"{members.Count} grup üyesi; {added} yeni, {reactivated} yeniden etkin, {deactivated} pasifleştirildi.", ct: ct);
+        return Ok(new { ok = true, message = $"LDAP senkronizasyonu tamam: {members.Count} üye ({added} yeni, {deactivated} pasifleştirildi)." });
+    }
+
+    /// <summary>Kimlik bilgileri listesi (sırlar asla dönmez; yalnız var/yok bilgisi).</summary>
+    [HttpGet("credentials")]
+    public async Task<IActionResult> CredentialsList(CancellationToken ct)
+    {
+        if (!Can(Perms.CredentialsManage)) return Forbid403();
+        var list = await _db.Credentials.AsNoTracking().OrderBy(c => c.Name)
+            .Select(c => new
+            {
+                c.Id, c.Name, c.Username, c.Domain, c.Description,
+                sourceType = c.SourceType.ToString(),
+                c.VaultUrl, c.VaultKey, c.VaultUserKey,
+                hasPassword = c.PasswordEncrypted != null && c.PasswordEncrypted != "",
+                hasToken = c.VaultTokenEncrypted != null && c.VaultTokenEncrypted != ""
+            }).ToListAsync(ct);
+        return Ok(list);
+    }
+
+    public record CredentialInput(string Name, string Username, string? Domain, string? Description,
+        string SourceType, string? NewPassword, string? VaultUrl, string? NewVaultToken, string? VaultKey, string? VaultUserKey);
+
+    private static string? ApplyCredential(Credential c, CredentialInput m, ISecretProtector secrets)
+    {
+        if (string.IsNullOrWhiteSpace(m.Name)) return "Ad zorunlu.";
+        if (!Enum.TryParse<CredentialSource>(m.SourceType, true, out var src)) return "Geçersiz kaynak türü.";
+        c.Name = m.Name.Trim();
+        c.Username = m.Username?.Trim() ?? "";
+        c.Domain = string.IsNullOrWhiteSpace(m.Domain) ? null : m.Domain.Trim();
+        c.Description = string.IsNullOrWhiteSpace(m.Description) ? null : m.Description.Trim();
+        c.SourceType = src;
+        c.VaultUrl = string.IsNullOrWhiteSpace(m.VaultUrl) ? null : m.VaultUrl.Trim();
+        c.VaultKey = string.IsNullOrWhiteSpace(m.VaultKey) ? null : m.VaultKey.Trim();
+        c.VaultUserKey = string.IsNullOrWhiteSpace(m.VaultUserKey) ? null : m.VaultUserKey.Trim();
+        if (!string.IsNullOrEmpty(m.NewPassword)) c.PasswordEncrypted = secrets.Protect(m.NewPassword);
+        if (!string.IsNullOrEmpty(m.NewVaultToken)) c.VaultTokenEncrypted = secrets.Protect(m.NewVaultToken);
+        return null;
+    }
+
+    [HttpPost("credentials")]
+    public async Task<IActionResult> CredentialCreate([FromBody] CredentialInput m, [FromServices] ISecretProtector secrets, CancellationToken ct)
+    {
+        if (!Can(Perms.CredentialsManage)) return Forbid403();
+        var c = new Credential();
+        var err = ApplyCredential(c, m, secrets);
+        if (err != null) return BadRequest(err);
+        _db.Credentials.Add(c);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("credential.create", c.Name, ct: ct);
+        return Ok(new { c.Id });
+    }
+
+    [HttpPut("credentials/{id:int}")]
+    public async Task<IActionResult> CredentialUpdate(int id, [FromBody] CredentialInput m, [FromServices] ISecretProtector secrets, CancellationToken ct)
+    {
+        if (!Can(Perms.CredentialsManage)) return Forbid403();
+        var c = await _db.Credentials.FindAsync(new object[] { id }, ct);
+        if (c == null) return NotFound("Kimlik bilgisi bulunamadı");
+        var err = ApplyCredential(c, m, secrets);
+        if (err != null) return BadRequest(err);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("credential.update", c.Name, ct: ct);
+        return Ok(new { c.Id });
+    }
+
+    [HttpDelete("credentials/{id:int}")]
+    public async Task<IActionResult> CredentialDelete(int id, CancellationToken ct)
+    {
+        if (!Can(Perms.CredentialsManage)) return Forbid403();
+        var c = await _db.Credentials.FindAsync(new object[] { id }, ct);
+        if (c == null) return NotFound("Kimlik bilgisi bulunamadı");
+        _db.Credentials.Remove(c);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("credential.delete", c.Name, ct: ct);
+        return Ok(new { ok = true });
+    }
+
     private bool Can(string perm) => User.Can(perm);
     private IActionResult Forbid403()
     {
