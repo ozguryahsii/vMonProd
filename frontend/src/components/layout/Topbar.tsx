@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Moon, Sun, Search, ChevronDown, LogOut, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/useMe";
@@ -7,6 +8,8 @@ import { cn } from "@/lib/utils";
 
 export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   const { me } = useMe();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,7 +47,15 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
       <div className="relative ml-auto hidden md:block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
-          placeholder="Servis, rapor ara…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && search.trim()) {
+              navigate(`/app/services?q=${encodeURIComponent(search.trim())}`);
+              setSearch("");
+            }
+          }}
+          placeholder="Servis ara… (Enter)"
           className="h-9 w-64 rounded-lg border border-input bg-card/60 pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/40"
         />
       </div>

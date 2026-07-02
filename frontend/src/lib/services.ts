@@ -97,7 +97,8 @@ export interface BulkEditInput {
 export const bulkDelete = (ids: number[]) => apiSend<{ deleted: number }>("POST", "/services/bulk-delete", { ids });
 export const bulkEdit = (input: BulkEditInput) => apiSend<{ updated: number; changes: string[] }>("POST", "/services/bulk-edit", input);
 
-export const exportCsvUrl = "/api/services/export";
+export const exportCsvUrl = (ids?: number[]) =>
+  ids && ids.length > 0 ? `/api/services/export?ids=${ids.join(",")}` : "/api/services/export";
 export const sampleCsvUrl = "/Services/SampleCsv";
 
 /** CSV içe aktarım — multipart + CSRF header. */

@@ -3,6 +3,16 @@
     // Dil çerezine göre sunucu-taraflı iki dillilik (About baştan sona seçilen dilde gösterilir)
     var en = Context.Request.Cookies["vmon_lang"] == "en";
     string T(string tr, string eng) => en ? eng : tr;
+    // React /app/about içine gömülü görünüm: üst menü gizlenir, zemin şeffaf (tek içerik kaynağı)
+    var embed = Context.Request.Query["embed"] == "1";
+}
+@if (embed)
+{
+    <style>
+        nav.vnav { display: none !important; }
+        body { background: transparent !important; }
+        main { padding-top: 0 !important; }
+    </style>
 }
 
 <div class="max-w-4xl mx-auto">
@@ -29,7 +39,7 @@
                 <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-tag text-brand-500"></i> @T("Versiyon", "Version")</div>
                 <div class="text-slate-700 flex-1">
                     <button type="button" @@click="open=!open" class="inline-flex items-center gap-2 group">
-                        <span class="badge pill-info">v2.23.0-pre.23</span>
+                        <span class="badge pill-info">v2.23.0-pre.24</span>
                         <span class="text-xs text-brand-600 group-hover:underline">@T("Sürüm notları", "Release notes") <i class="bi" :class="open ? 'bi-chevron-up' : 'bi-chevron-down'"></i></span>
                     </button>
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">

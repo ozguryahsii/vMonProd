@@ -37,7 +37,7 @@ export function UptimeChart({ data, xFormat = hourLabel }: { data: UptimePoint[]
           labelStyle={{ color: "hsl(var(--muted-foreground))" }}
           formatter={(v: number) => [`${v.toFixed(1)}%`, "Erişilebilirlik"]}
         />
-        <Area type="monotone" dataKey="uptime" stroke="hsl(158 64% 44%)" strokeWidth={2} fill="url(#gUptime)" />
+        <Area type="monotone" dataKey="uptime" stroke="hsl(158 64% 44%)" strokeWidth={2} fill="url(#gUptime)" isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );

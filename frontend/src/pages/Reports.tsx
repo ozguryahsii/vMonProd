@@ -36,6 +36,8 @@ export function Reports() {
   const [q, setQ] = useState("");
   const [typeF, setTypeF] = useState("");
   const [tagF, setTagF] = useState("");
+  const [onlyOutage, setOnlyOutage] = useState(false);
+  const [onlyError, setOnlyError] = useState(false);
 
   const load = useCallback(() => {
     const ctrl = new AbortController();
@@ -66,12 +68,15 @@ export function Reports() {
   }, [data]);
 
   const rows = useMemo(() => {
+    // TÜM filtreler VE (kesişim) mantığıyla birlikte çalışır
     let list = data?.services ?? [];
     if (typeF) list = list.filter((s) => s.type === typeF);
     if (tagF) list = list.filter((s) => (s.keyword ?? "").split(",").map((x) => x.trim()).some((k) => k.localeCompare(tagF, "tr", { sensitivity: "accent" }) === 0));
+    if (onlyOutage) list = list.filter((s) => s.outageCount > 0);
+    if (onlyError) list = list.filter((s) => s.errorCount > 0);
     if (q) { const t = q.toLowerCase(); list = list.filter((s) => s.name.toLowerCase().includes(t) || s.target.toLowerCase().includes(t)); }
     return list;
-  }, [data, q, typeF, tagF]);
+  }, [data, q, typeF, tagF, onlyOutage, onlyError]);
 
   function exportCsv() {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -159,6 +164,12 @@ export function Reports() {
                   <option value="">Tüm etiketler</option>
                   {tags.map((t) => <option key={t} value={t}>{t}</option>)}
                 </Select>
+                <Button variant={onlyOutage ? "default" : "outline"} size="sm" onClick={() => setOnlyOutage((v) => !v)}>
+                  Sadece Kesintili
+                </Button>
+                <Button variant={onlyError ? "default" : "outline"} size="sm" onClick={() => setOnlyError((v) => !v)}>
+                  Sadece Hatalı
+                </Button>
               </div>
             </CardContent>
             <CardContent className="px-0">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Plus, Search, RefreshCw, Pencil, Trash2, Play, Square, RotateCw, CheckCircle2, XCircle,
   Upload, Download, FileSpreadsheet, SlidersHorizontal, X,
@@ -28,7 +29,10 @@ const badge: Record<string, { label: string; cls: string; dot: string }> = {
 export function Services() {
   const { data, loading, error, reload } = useAsync(listServices, 30000);
   const [meta, setMeta] = useState<ServicesMeta | null>(null);
-  const [q, setQ] = useState("");
+  const [searchParams] = useSearchParams();
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
+  // Üst arama kutusundan gelinirse (?q=) filtreyi güncelle
+  useEffect(() => { const sp = searchParams.get("q"); if (sp !== null) setQ(sp); }, [searchParams]);
   const [typeF, setTypeF] = useState("");
   const [statusF, setStatusF] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -149,7 +153,11 @@ export function Services() {
           <Button variant="outline" size="sm" disabled={bulkBusy} onClick={() => fileRef.current?.click()} title="CSV'den toplu servis ekle">
             <Upload className="h-4 w-4" /> İçe Aktar
           </Button>
-          <a href={exportCsvUrl}><Button variant="outline" size="sm" title="Tüm servisleri CSV indir"><Download className="h-4 w-4" /> Dışa Aktar</Button></a>
+          <a href={exportCsvUrl(Array.from(selected))}>
+            <Button variant="outline" size="sm" title={selected.size > 0 ? `Seçili ${selected.size} servisi CSV indir` : "Tüm servisleri CSV indir"}>
+              <Download className="h-4 w-4" /> Dışa Aktar{selected.size > 0 ? ` (${selected.size})` : ""}
+            </Button>
+          </a>
           <a href={sampleCsvUrl}><Button variant="ghost" size="sm" title="Örnek CSV şablonu"><FileSpreadsheet className="h-4 w-4" /> Örnek</Button></a>
         </div>
       </div>
@@ -193,9 +201,11 @@ export function Services() {
                     const busy = busyId === s.id;
                     const control = CONTROL_TYPES.includes(s.type);
                     return (
-                      <tr key={s.id} className={cn("border-b border-border/60 transition-colors hover:bg-accent/40", !s.enabled && "opacity-50", selected.has(s.id) && "bg-primary/5")}>
+                      <tr key={s.id}
+                        onClick={() => toggleSel(s.id)}
+                        className={cn("cursor-pointer border-b border-border/60 transition-colors hover:bg-accent/40", !s.enabled && "opacity-50", selected.has(s.id) && "bg-primary/5")}>
                         <td className="w-10 px-4 py-3">
-                          <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSel(s.id)}
+                          <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSel(s.id)} onClick={(e) => e.stopPropagation()}
                             className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]" />
                         </td>
                         <td className="px-5 py-3">
@@ -210,7 +220,7 @@ export function Services() {
                           </span>
                         </td>
                         <td className="px-5 py-3 tabular-nums text-muted-foreground">{s.lastIsUp === true && s.lastResponseTimeMs != null ? `${s.lastResponseTimeMs} ms` : "—"}</td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" title="Şimdi kontrol et" disabled={busy} onClick={() => doCheck(s)}>
                               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />

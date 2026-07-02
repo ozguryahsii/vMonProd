@@ -344,14 +344,19 @@ public class ApiController : ControllerBase
         return Ok(new { updated = services.Count, changes = changes.Distinct() });
     }
 
-    /// <summary>Tüm servisleri import formatında CSV indir.</summary>
+    /// <summary>Servisleri import formatında CSV indir. ids verilirse YALNIZ seçilenler, yoksa tümü.</summary>
     [HttpGet("services/export")]
-    public async Task<IActionResult> ServicesExport(CancellationToken ct)
+    public async Task<IActionResult> ServicesExport([FromQuery] string? ids, CancellationToken ct)
     {
         if (!Can(Perms.ServicesManage)) return Forbid403();
-        var services = await _db.Services.AsNoTracking().Include(s => s.Credential).OrderBy(s => s.Name).ToListAsync(ct);
+        var idList = (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => int.TryParse(x, out _)).Select(int.Parse).Distinct().ToList();
+        var query = _db.Services.AsNoTracking().Include(s => s.Credential).AsQueryable();
+        if (idList.Count > 0) query = query.Where(s => idList.Contains(s.Id));
+        var services = await query.OrderBy(s => s.Name).ToListAsync(ct);
         var bytes = ServiceCsvHelper.BuildExportCsv(services);
-        return File(bytes, "text/csv; charset=utf-8", $"vmon-servisler-yedek_{DateTime.Now:yyyyMMdd_HHmm}.csv");
+        var suffix = idList.Count > 0 ? $"secili-{idList.Count}" : "tum";
+        return File(bytes, "text/csv; charset=utf-8", $"vmon-servisler-{suffix}_{DateTime.Now:yyyyMMdd_HHmm}.csv");
     }
 
     /// <summary>CSV'den toplu servis ekleme (React) — JSON özet döner.</summary>

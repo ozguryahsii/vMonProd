@@ -167,17 +167,28 @@ function CredentialForm({ open, cred, onClose, onSaved }: {
       </>}>
       {err && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Ad"><Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="örn. AD Bind Hesabı" /></Field>
-          <Field label="Kaynak">
-            <Select value={form.sourceType} onChange={(e) => set("sourceType", e.target.value)}>
-              <option value="Manual">Elle (şifre burada saklanır)</option>
-              <option value="Vault">HashiCorp Vault</option>
-            </Select>
-          </Field>
+        <Field label="Tanım Adı"><Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="örn. AD Bind Hesabı" /></Field>
+
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-muted-foreground">Şifre Kaynağı</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([["Manual", "Elle", "Şifre burada şifreli saklanır"], ["Vault", "HashiCorp Vault", "Şifre Vault'tan çözülür"]] as const).map(([val, label, desc]) => (
+              <button key={val} type="button" onClick={() => set("sourceType", val)}
+                className={cn("rounded-lg border p-3 text-left transition",
+                  form.sourceType.toLowerCase() === val.toLowerCase()
+                    ? "border-primary/60 bg-primary/10 ring-1 ring-inset ring-primary/30"
+                    : "border-border bg-card/60 hover:bg-accent/40")}>
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className="block text-xs text-muted-foreground">{desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
+
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Kullanıcı adı"><Input value={form.username} onChange={(e) => set("username", e.target.value)} placeholder="svc_monitor" /></Field>
+          {!isVault && (
+            <Field label="Kullanıcı adı"><Input value={form.username} onChange={(e) => set("username", e.target.value)} placeholder="svc_monitor" /></Field>
+          )}
           <Field label="Alan (Domain)"><Input value={form.domain ?? ""} onChange={(e) => set("domain", e.target.value || null)} placeholder="FIRMA (opsiyonel)" /></Field>
         </div>
 

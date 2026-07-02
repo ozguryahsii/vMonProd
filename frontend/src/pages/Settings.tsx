@@ -72,7 +72,8 @@ export function Settings() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+      {/* Masonry düzeni (klasikteki gibi): kartlar sütunlara akarak dizilir, dev boşluk oluşmaz */}
+      <div className="gap-4 lg:columns-2 2xl:columns-3">
         {/* Genel */}
         <Section icon={<Building2 className="h-4 w-4" />} title="Genel">
           <Field label="Şirket adı"><Input value={s.companyName} onChange={(e) => set("companyName", e.target.value)} /></Field>
@@ -269,7 +270,7 @@ export function Settings() {
 
 function Section({ icon, title, action, children }: { icon: ReactNode; title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <Card>
+    <Card className="mb-4 break-inside-avoid">
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">{icon} {title}</CardTitle>
         {action}
