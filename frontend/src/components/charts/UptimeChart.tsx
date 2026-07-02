@@ -2,16 +2,21 @@ import {
   Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 
-const data = Array.from({ length: 24 }, (_, i) => ({
-  saat: `${String(i).padStart(2, "0")}:00`,
-  uptime: 97 + Math.sin(i / 2.5) * 1.6 + (i === 14 ? -4.5 : 0) + Math.random() * 0.6,
-  yanit: 120 + Math.cos(i / 3) * 40 + (i === 14 ? 180 : 0) + Math.random() * 30,
-}));
+export interface UptimePoint {
+  t: string;        // ISO tarih (UTC)
+  uptime: number;   // %
+}
 
-export function UptimeChart() {
+function hourLabel(iso: string) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:00`;
+}
+
+export function UptimeChart({ data }: { data: UptimePoint[] }) {
+  const chart = data.map((p) => ({ saat: hourLabel(p.t), uptime: p.uptime }));
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <AreaChart data={data} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+      <AreaChart data={chart} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
         <defs>
           <linearGradient id="gUptime" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="hsl(158 64% 44%)" stopOpacity={0.5} />
@@ -19,8 +24,8 @@ export function UptimeChart() {
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-        <XAxis dataKey="saat" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} interval={3} />
-        <YAxis domain={[88, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+        <XAxis dataKey="saat" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
+        <YAxis domain={["dataMin - 2", 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
         <Tooltip
           contentStyle={{
             background: "hsl(var(--card))",

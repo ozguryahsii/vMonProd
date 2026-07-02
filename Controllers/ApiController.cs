@@ -78,6 +78,71 @@ public class ApiController : ControllerBase
         });
     }
 
+    /// <summary>React SPA dashboard için tek çağrıda toplu veri: KPI'lar, 24s uptime serisi, durum dağılımı, son servisler.</summary>
+    [HttpGet("dashboard")]
+    public async Task<IActionResult> Dashboard(CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsView)) return Forbid403();
+
+        var svc = await _db.Services.AsNoTracking()
+            .Select(s => new
+            {
+                s.Id, s.Name, s.Type, s.Enabled, s.LastIsUp, s.LastStatus,
+                s.LastResponseTimeMs, s.ResponseTimeThresholdMs, s.LastCheckedAt
+            })
+            .ToListAsync(ct);
+
+        bool Slow(long? ms, int? thr) => thr.HasValue && ms.HasValue && ms > thr;
+
+        int total = svc.Count;
+        int slow = svc.Count(s => s.LastIsUp == true && Slow(s.LastResponseTimeMs, s.ResponseTimeThresholdMs));
+        int upTotal = svc.Count(s => s.LastIsUp == true);
+        int running = upTotal - slow;
+        int down = total - upTotal;                       // kapalı + hata + hiç kontrol edilmemiş
+        var upMs = svc.Where(s => s.LastIsUp == true && s.LastResponseTimeMs.HasValue)
+                      .Select(s => s.LastResponseTimeMs!.Value).ToList();
+        double? avgMs = upMs.Count > 0 ? Math.Round(upMs.Average(), 0) : (double?)null;
+
+        // Son 24 saat: saatlik ortalama erişilebilirlik + servis bazlı uptime (eşik aşımı=ERROR up sayılır)
+        var since = DateTime.UtcNow.AddHours(-24);
+        var checks = await _db.CheckResults.AsNoTracking()
+            .Where(r => r.CheckedAt >= since)
+            .Select(r => new { r.ServiceId, r.CheckedAt, r.IsUp, r.Status })
+            .ToListAsync(ct);
+
+        bool IsUpRow(bool isUp, int status) => isUp || status == (int)Models.CheckStatus.Error;
+
+        var uptime24h = checks
+            .GroupBy(r => new DateTime(r.CheckedAt.Year, r.CheckedAt.Month, r.CheckedAt.Day, r.CheckedAt.Hour, 0, 0, DateTimeKind.Utc))
+            .OrderBy(g => g.Key)
+            .Select(g => new { t = g.Key, uptime = Math.Round(100.0 * g.Count(r => IsUpRow(r.IsUp, r.Status)) / g.Count(), 2) })
+            .ToList();
+
+        var upBySvc = checks.GroupBy(r => r.ServiceId)
+            .ToDictionary(g => g.Key, g => Math.Round(100.0 * g.Count(r => IsUpRow(r.IsUp, r.Status)) / g.Count(), 2));
+
+        var services = svc.OrderBy(s => s.Name).Take(12).Select(s => new
+        {
+            id = s.Id,
+            name = s.Name,
+            type = s.Type.ToString(),
+            status = s.LastStatus == (int)Models.CheckStatus.Error ? "error"
+                     : s.LastIsUp != true ? "down"
+                     : Slow(s.LastResponseTimeMs, s.ResponseTimeThresholdMs) ? "slow" : "up",
+            ms = s.LastIsUp == true ? s.LastResponseTimeMs : (long?)null,
+            uptime = upBySvc.TryGetValue(s.Id, out var u) ? u : (double?)null,
+            lastCheckedAt = s.LastCheckedAt
+        }).ToList();
+
+        return Ok(new
+        {
+            kpis = new { total, up = upTotal, problem = down, avgMs },
+            distribution = new { running, slow, down },
+            uptime24h,
+            services
+        });
+    }
+
     /// <summary>Tek servisi şimdi kontrol et.</summary>
     [HttpPost("check/{id:int}")]
     public async Task<IActionResult> CheckNow(int id, CancellationToken ct)
