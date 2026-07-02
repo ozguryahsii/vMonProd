@@ -417,6 +417,99 @@ public class ApiController : ControllerBase
         return Ok(new { points });
     }
 
+    // ---- Custom panolar (Dashboard'lar — React ekranı) ----
+
+    private async Task<HashSet<int>> ResolveBoardIdsAsync(DashboardDef dash, CancellationToken ct)
+    {
+        var idSet = dash.GetServiceIds().ToHashSet();
+        ServiceType type = default;
+        bool hasType = !string.IsNullOrWhiteSpace(dash.TypeFilter) && Enum.TryParse(dash.TypeFilter, out type);
+        bool hasKw = !string.IsNullOrWhiteSpace(dash.KeywordFilter);
+        var kw = dash.KeywordFilter?.Trim() ?? "";
+        if (hasType || hasKw)
+        {
+            var candidates = await _db.Services.AsNoTracking().Select(s => new { s.Id, s.Type, s.Keyword }).ToListAsync(ct);
+            foreach (var s in candidates)
+            {
+                bool typeOk = !hasType || s.Type == type;
+                bool kwOk = !hasKw || MonitoredService.SplitKeywords(s.Keyword).Contains(kw, StringComparer.OrdinalIgnoreCase);
+                if (typeOk && kwOk) idSet.Add(s.Id);
+            }
+        }
+        return idSet;
+    }
+
+    /// <summary>Tüm panolar + her birinin çözülmüş servis Id kümesi (React dashboard seçicisi).</summary>
+    [HttpGet("dashboards")]
+    public async Task<IActionResult> DashboardsList(CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsView)) return Forbid403();
+        var boards = await _db.Dashboards.AsNoTracking().OrderBy(d => d.SortOrder).ThenBy(d => d.Name).ToListAsync(ct);
+        var result = new List<object>();
+        foreach (var d in boards)
+            result.Add(new { d.Id, d.Name, d.SortOrder, d.TypeFilter, d.KeywordFilter, serviceIds = await ResolveBoardIdsAsync(d, ct) });
+        return Ok(result);
+    }
+
+    /// <summary>Pano formu meta: tüm servisler + tipler + etiketler.</summary>
+    [HttpGet("dashboards/meta")]
+    public async Task<IActionResult> DashboardsMeta(CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsManage)) return Forbid403();
+        var services = await _db.Services.AsNoTracking().OrderBy(s => s.Name)
+            .Select(s => new { s.Id, s.Name, Type = s.Type.ToString(), s.Keyword }).ToListAsync(ct);
+        var keywords = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in services)
+            foreach (var k in MonitoredService.SplitKeywords(s.Keyword)) keywords.Add(k);
+        return Ok(new { services, types = Enum.GetNames<ServiceType>(), keywords });
+    }
+
+    public record DashboardInput(string Name, int[]? ServiceIds, string? TypeFilter, string? KeywordFilter, int SortOrder);
+
+    private static void ApplyBoard(DashboardDef d, DashboardInput m)
+    {
+        d.Name = m.Name.Trim();
+        d.ServiceIdsCsv = m.ServiceIds is { Length: > 0 } ? string.Join(",", m.ServiceIds) : null;
+        d.TypeFilter = string.IsNullOrWhiteSpace(m.TypeFilter) ? null : m.TypeFilter;
+        d.KeywordFilter = string.IsNullOrWhiteSpace(m.KeywordFilter) ? null : m.KeywordFilter.Trim();
+        d.SortOrder = m.SortOrder;
+    }
+
+    [HttpPost("dashboards")]
+    public async Task<IActionResult> DashboardCreate([FromBody] DashboardInput m, CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsManage)) return Forbid403();
+        if (string.IsNullOrWhiteSpace(m.Name)) return BadRequest("Ad zorunlu.");
+        var d = new DashboardDef();
+        ApplyBoard(d, m);
+        _db.Dashboards.Add(d);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { d.Id });
+    }
+
+    [HttpPut("dashboards/{id:int}")]
+    public async Task<IActionResult> DashboardUpdate(int id, [FromBody] DashboardInput m, CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsManage)) return Forbid403();
+        if (string.IsNullOrWhiteSpace(m.Name)) return BadRequest("Ad zorunlu.");
+        var d = await _db.Dashboards.FindAsync(new object[] { id }, ct);
+        if (d == null) return NotFound("Pano bulunamadı");
+        ApplyBoard(d, m);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { d.Id });
+    }
+
+    [HttpDelete("dashboards/{id:int}")]
+    public async Task<IActionResult> DashboardDelete(int id, CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsManage)) return Forbid403();
+        var d = await _db.Dashboards.FindAsync(new object[] { id }, ct);
+        if (d == null) return NotFound("Pano bulunamadı");
+        _db.Dashboards.Remove(d);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { ok = true });
+    }
+
     /// <summary>Dashboard tanımına göre servis Id listesi (görüntüleme sayfası için).</summary>
     [HttpGet("dashboard-services/{id:int}")]
     public async Task<IActionResult> DashboardServices(int id, CancellationToken ct)
