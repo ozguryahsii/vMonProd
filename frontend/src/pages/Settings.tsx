@@ -12,6 +12,7 @@ import {
   type AppSettings,
 } from "@/lib/settings";
 import { getCredentials, type CredentialRow } from "@/lib/admin";
+import { ChannelsCard, BackupsCard, LogoCard } from "@/components/settings/ManagementSections";
 import { cn } from "@/lib/utils";
 
 export function Settings() {
@@ -246,10 +247,19 @@ export function Settings() {
         </Section>
       </div>
 
+      {/* Yönetim: bildirim kanalları, yedekler, logo (form dışı — anında uygulanır) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ChannelsCard />
+        <div className="space-y-4">
+          <BackupsCard />
+          <LogoCard current={s.loginLogoFile} onChanged={() => getSettings().then(setS).catch(() => {})} />
+        </div>
+      </div>
+
       {/* Kaydet çubuğu */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/80 px-5 py-3 backdrop-blur lg:left-64">
         <div className="mx-auto flex max-w-[1500px] items-center justify-end gap-3">
-          <span className="hidden text-xs text-muted-foreground sm:inline">Tüm ayarlar tek seferde kaydedilir. Bildirim kanalları / yedek listesi / logo bir sonraki fazda.</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">Üstteki ayarlar tek seferde kaydedilir; kanallar / yedekler / logo anında uygulanır.</span>
           <Button onClick={doSave} disabled={saving}><Save className="h-4 w-4" /> {saving ? "Kaydediliyor…" : "Ayarları Kaydet"}</Button>
         </div>
       </div>

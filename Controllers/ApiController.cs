@@ -965,6 +965,224 @@ public class ApiController : ControllerBase
         return Ok(new { ok, message = msg });
     }
 
+    // ================= Faz G2: Bildirim Kanalları + Yedekleme + Logo (React) =================
+
+    /// <summary>Bildirim kanalları (entegrasyonlar) — sırlar dönmez.</summary>
+    [HttpGet("channels")]
+    public async Task<IActionResult> ChannelsList(CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var list = await _db.SmsProviders.AsNoTracking().OrderBy(p => p.Kind).ThenBy(p => p.Name)
+            .Select(p => new
+            {
+                p.Id, p.Name, p.Kind, p.Recipients, p.TemplateSid, p.Method, p.Url, p.ContentType,
+                p.Body, p.Headers, p.AuthType, p.Username, p.Sender, p.SuccessContains, p.Enabled,
+                hasPassword = p.PasswordEncrypted != "", hasApiKey = p.ApiKeyEncrypted != ""
+            }).ToListAsync(ct);
+        return Ok(list);
+    }
+
+    public record ChannelInput(string Name, string Kind, string? Recipients, string? TemplateSid,
+        string Method, string Url, string ContentType, string? Body, string? Headers,
+        string AuthType, string? Username, string? Sender, string? SuccessContains, bool Enabled,
+        string? NewPassword, string? NewApiKey);
+
+    private async Task<string?> ValidateChannelAsync(int id, ChannelInput m, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(m.Name)) return "Entegrasyon adı zorunlu.";
+        if (string.Equals(m.Name.Trim(), "Twilio", StringComparison.OrdinalIgnoreCase)) return "'Twilio' adı yerleşiktir; farklı bir ad kullanın.";
+        if (string.IsNullOrWhiteSpace(m.Url)) return "URL zorunlu.";
+        if (await _db.SmsProviders.AnyAsync(p => p.Id != id && p.Name == m.Name, ct)) return "Bu adda bir sağlayıcı zaten var.";
+        return null;
+    }
+
+    private static void ApplyChannel(SmsProvider p, ChannelInput m)
+    {
+        var kind = string.Equals(m.Kind, "Voice", StringComparison.OrdinalIgnoreCase) ? "Ivr" : m.Kind;
+        var allowed = new[] { "Sms", "Whatsapp", "Ivr" };
+        p.Kind = allowed.Contains(kind, StringComparer.OrdinalIgnoreCase) ? kind : "Sms";
+        p.Name = m.Name.Trim();
+        p.Recipients = m.Recipients; p.TemplateSid = m.TemplateSid;
+        p.Method = m.Method; p.Url = m.Url; p.ContentType = m.ContentType;
+        p.Body = m.Body; p.Headers = m.Headers; p.AuthType = m.AuthType;
+        p.Username = m.Username ?? ""; p.Sender = m.Sender ?? ""; p.SuccessContains = m.SuccessContains;
+        p.Enabled = m.Enabled;
+        if (!string.IsNullOrEmpty(m.NewPassword)) p.PasswordEncrypted = CryptoHelper.Encrypt(m.NewPassword);
+        if (!string.IsNullOrEmpty(m.NewApiKey)) p.ApiKeyEncrypted = CryptoHelper.Encrypt(m.NewApiKey);
+    }
+
+    [HttpPost("channels")]
+    public async Task<IActionResult> ChannelCreate([FromBody] ChannelInput m, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var err = await ValidateChannelAsync(0, m, ct);
+        if (err != null) return BadRequest(err);
+        var p = new SmsProvider { PasswordEncrypted = "", ApiKeyEncrypted = "" };
+        ApplyChannel(p, m);
+        _db.SmsProviders.Add(p);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("integration.create", p.Name, p.Kind, ct: ct);
+        return Ok(new { p.Id });
+    }
+
+    [HttpPut("channels/{id:int}")]
+    public async Task<IActionResult> ChannelUpdate(int id, [FromBody] ChannelInput m, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var p = await _db.SmsProviders.FindAsync(new object[] { id }, ct);
+        if (p == null) return NotFound("Entegrasyon bulunamadı");
+        var err = await ValidateChannelAsync(id, m, ct);
+        if (err != null) return BadRequest(err);
+        ApplyChannel(p, m);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("integration.update", p.Name, p.Kind, ct: ct);
+        return Ok(new { p.Id });
+    }
+
+    [HttpDelete("channels/{id:int}")]
+    public async Task<IActionResult> ChannelDelete(int id, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var p = await _db.SmsProviders.FindAsync(new object[] { id }, ct);
+        if (p == null) return NotFound("Entegrasyon bulunamadı");
+        _db.SmsProviders.Remove(p);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("integration.delete", p.Name, ct: ct);
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("channels/{id:int}/toggle")]
+    public async Task<IActionResult> ChannelToggle(int id, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var p = await _db.SmsProviders.FindAsync(new object[] { id }, ct);
+        if (p == null) return NotFound("Entegrasyon bulunamadı");
+        p.Enabled = !p.Enabled;
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("integration.toggle", p.Name, p.Enabled ? "aktif" : "pasif", ct: ct);
+        return Ok(new { enabled = p.Enabled });
+    }
+
+    public record ChannelTestInput(string To);
+
+    [HttpPost("channels/{id:int}/test")]
+    public async Task<IActionResult> ChannelTest(int id, [FromBody] ChannelTestInput m,
+        [FromServices] SmsService sms, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var p = await _db.SmsProviders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (p == null) return NotFound("Entegrasyon bulunamadı");
+        if (string.IsNullOrWhiteSpace(m.To)) return BadRequest("Test için bir alıcı girin.");
+        var (ok, msg) = await sms.SendViaIntegrationAsync(p, new[] { m.To.Trim() }, "vMon test mesajı ✅");
+        await _audit.LogAsync("integration.test", p.Name, msg, ok, ct: ct);
+        return Ok(new { ok, message = msg });
+    }
+
+    /// <summary>Yedek listesi (yalnız SQLite'ta anlamlı).</summary>
+    [HttpGet("backups")]
+    public async Task<IActionResult> BackupsList([FromServices] BackupService backup, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        return Ok(new
+        {
+            isSqlite = backup.IsSqlite,
+            path = s.BackupPath,
+            files = backup.List(s.BackupPath).Select(f => new { f.Name, f.SizeMb, f.ModifiedUtc })
+        });
+    }
+
+    [HttpPost("backups/now")]
+    public async Task<IActionResult> BackupNowApi([FromServices] BackupService backup, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var pwd = string.IsNullOrWhiteSpace(s.BackupPasswordEncrypted) ? null : CryptoHelper.Decrypt(s.BackupPasswordEncrypted);
+        var (file, error) = await backup.BackupNowAsync(s.BackupPath, s.BackupRetentionCount, s.BackupEncrypt, pwd, ct);
+        if (error != null) return Ok(new { ok = false, message = "Yedek alınamadı: " + error });
+        await _audit.LogAsync("backup.create", null, file, ct: ct);
+        return Ok(new { ok = true, message = "Yedek alındı: " + file });
+    }
+
+    public record BackupFileInput(string File);
+
+    [HttpPost("backups/delete")]
+    public async Task<IActionResult> BackupDelete([FromBody] BackupFileInput m, [FromServices] BackupService backup, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var path = backup.SafeBackupPath(s.BackupPath, m.File);
+        if (path == null) return NotFound("Yedek bulunamadı");
+        try { System.IO.File.Delete(path); await _audit.LogAsync("backup.delete", null, Path.GetFileName(path), ct: ct); } catch { }
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>Yedeği geri yükle — başarılıysa uygulama YENİDEN BAŞLAR (birkaç sn erişilemez).</summary>
+    [HttpPost("backups/restore")]
+    public async Task<IActionResult> BackupRestore([FromBody] BackupFileInput m,
+        [FromServices] BackupService backup, [FromServices] IHostApplicationLifetime life, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var path = backup.SafeBackupPath(s.BackupPath, m.File);
+        if (path == null) return NotFound("Yedek bulunamadı");
+        var pwd = string.IsNullOrWhiteSpace(s.BackupPasswordEncrypted) ? null : CryptoHelper.Decrypt(s.BackupPasswordEncrypted);
+        var (ok, error) = await backup.RestoreAsync(path, pwd, ct);
+        if (!ok) return Ok(new { ok = false, message = "Geri yükleme başarısız: " + error });
+        await _audit.LogAsync("backup.restore", null, Path.GetFileName(path), true, ct: ct);
+        if (Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService())
+            _ = Task.Run(async () => { await Task.Delay(1500); Environment.Exit(1); });
+        else
+            _ = Task.Run(async () => { await Task.Delay(1500); life.StopApplication(); });
+        return Ok(new { ok = true, message = "Geri yükleme tamam. Uygulama yeniden başlatılıyor — birkaç saniye içinde sayfayı yenileyin." });
+    }
+
+    /// <summary>Giriş ekranı logosu yükle (PNG/JPG/GIF/WEBP, ≤2 MB — SVG XSS riski nedeniyle kabul edilmez).</summary>
+    [HttpPost("logo")]
+    [RequestSizeLimit(5_000_000)]
+    public async Task<IActionResult> LogoUpload(IFormFile? logoFile, [FromServices] IWebHostEnvironment env, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        if (logoFile == null || logoFile.Length == 0) return BadRequest("Dosya seçilmedi.");
+        var ext = Path.GetExtension(logoFile.FileName).ToLowerInvariant();
+        var allowed = new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp" };
+        if (!allowed.Contains(ext)) return BadRequest("Geçersiz dosya türü. İzin verilenler: PNG, JPG, GIF, WEBP.");
+        if (logoFile.Length > 2 * 1024 * 1024) return BadRequest("Logo en fazla 2 MB olabilir.");
+
+        var dataDir = Path.Combine(env.ContentRootPath, "Data");
+        Directory.CreateDirectory(dataDir);
+        foreach (var old in Directory.GetFiles(dataDir, "login-logo.*"))
+            try { System.IO.File.Delete(old); } catch { }
+        var fileName = "login-logo" + ext;
+        using (var fs = System.IO.File.Create(Path.Combine(dataDir, fileName)))
+            await logoFile.CopyToAsync(fs, ct);
+        s.LoginLogoFile = fileName;
+        await _settings.SaveAsync(s, ct);
+        await _audit.LogAsync("settings.logo", fileName, "Giriş ekranı logosu güncellendi.", ct: ct);
+        return Ok(new { ok = true, file = fileName });
+    }
+
+    [HttpDelete("logo")]
+    public async Task<IActionResult> LogoRemove([FromServices] IWebHostEnvironment env, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        var dataDir = Path.Combine(env.ContentRootPath, "Data");
+        foreach (var old in Directory.GetFiles(dataDir, "login-logo.*"))
+            try { System.IO.File.Delete(old); } catch { }
+        s.LoginLogoFile = "";
+        await _settings.SaveAsync(s, ct);
+        await _audit.LogAsync("settings.logo", null, "Giriş ekranı logosu kaldırıldı.", ct: ct);
+        return Ok(new { ok = true });
+    }
+
     // ================= Faz F: Denetim + Kullanıcılar + Kimlik Bilgileri (React) =================
 
     /// <summary>Denetim kaydı (yalnız admin) — EF tabanlı, SAĞLAYICI-BAĞIMSIZ (klasik ekrandaki ham SQLite
