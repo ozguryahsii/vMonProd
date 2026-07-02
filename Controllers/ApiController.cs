@@ -649,6 +649,27 @@ public class ApiController : ControllerBase
         return Ok(new { ok = true });
     }
 
+    /// <summary>İstatistik widget düzeni (React panosu). Boşsa varsayılan set tohumlanır.</summary>
+    [HttpGet("stat-widgets")]
+    public async Task<IActionResult> StatWidgets(CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsView)) return Forbid403();
+        var widgets = await _db.StatWidgets.AsNoTracking()
+            .OrderBy(w => w.Y).ThenBy(w => w.X).ThenBy(w => w.SortOrder).ToListAsync(ct);
+        if (widgets.Count == 0)
+        {
+            widgets = StatisticsController.DefaultWidgets();
+            _db.StatWidgets.AddRange(widgets);
+            await _db.SaveChangesAsync(ct);
+        }
+        var isAdmin = (await _settings.GetAsync(ct)).IsAdmin(User.FindFirst("sam")?.Value) || User.IsAppAdmin();
+        return Ok(new
+        {
+            canEdit = isAdmin,
+            widgets = widgets.Select(w => new { w.Id, w.Type, w.Source, w.Title, w.ConfigJson, w.X, w.Y, w.W, w.H })
+        });
+    }
+
     /// <summary>Dashboard tanımına göre servis Id listesi (görüntüleme sayfası için).</summary>
     [HttpGet("dashboard-services/{id:int}")]
     public async Task<IActionResult> DashboardServices(int id, CancellationToken ct)

@@ -422,7 +422,7 @@ public class StatisticsController : Controller
         return Json(new { ok = true });
     }
 
-    private static List<StatWidget> DefaultWidgets() => new()
+    public static List<StatWidget> DefaultWidgets() => new()
     {
         new() { Type="counter",  Source="total_servers", X=0, Y=0, W=3, H=2, SortOrder=0 },
         new() { Type="counter",  Source="up",            X=3, Y=0, W=3, H=2, SortOrder=1 },

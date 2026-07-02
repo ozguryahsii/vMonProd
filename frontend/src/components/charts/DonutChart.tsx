@@ -6,7 +6,7 @@ const PALETTE = [
   "hsl(271 76% 63%)", "hsl(190 90% 50%)", "hsl(24 90% 55%)", "hsl(140 60% 50%)",
 ];
 
-export function DonutChart({ data, height = 240 }: { data: NameValue[]; height?: number }) {
+export function DonutChart({ data, height = 240 }: { data: NameValue[]; height?: number | string }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart>

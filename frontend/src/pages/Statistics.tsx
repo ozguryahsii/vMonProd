@@ -1,154 +1,143 @@
-import { motion } from "framer-motion";
-import { Server, ShieldCheck, Cpu, HardDrive, MemoryStick, Activity, AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { KpiCard } from "@/components/dashboard/KpiCard";
-import { DonutChart } from "@/components/charts/DonutChart";
-import { FleetTrendChart } from "@/components/charts/FleetTrendChart";
+import { useEffect, useMemo, useState } from "react";
+import { Lock, LockOpen, Plus, RotateCcw, Save, CheckCircle2, XCircle } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/input";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { WidgetBoard } from "@/components/stats/WidgetBoard";
+import { WIDGET_CATALOG } from "@/components/stats/widgets";
 import { useAsync } from "@/hooks/useAsync";
-import { getStats, type StatsData } from "@/lib/stats";
-import { cn } from "@/lib/utils";
+import {
+  getStats, getStatWidgets, saveStatLayout, resetStatLayout, type StatWidgetDef,
+} from "@/lib/stats";
+
+let tempId = -1; // yeni widget'lar için geçici negatif id (SaveLayout id<=0'ı yeni sayar)
 
 export function Statistics() {
   const { data, loading, error, reload } = useAsync(getStats, 30000);
+  const [widgets, setWidgets] = useState<StatWidgetDef[] | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [palette, setPalette] = useState("");
+  const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [werr, setWerr] = useState<string | null>(null);
 
-  if (loading && !data) return <StatsSkeleton />;
+  useEffect(() => {
+    getStatWidgets()
+      .then((r) => { setWidgets(r.widgets); setCanEdit(r.canEdit); })
+      .catch((e) => setWerr((e as Error).message));
+  }, []);
+  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 3000); return () => clearTimeout(t); } }, [flash]);
+
+  const groups = useMemo(() => {
+    const g = new Map<string, typeof WIDGET_CATALOG>();
+    for (const c of WIDGET_CATALOG) { if (!g.has(c.group)) g.set(c.group, []); g.get(c.group)!.push(c); }
+    return g;
+  }, []);
+
+  function change(w: StatWidgetDef[]) { setWidgets(w); setDirty(true); }
+  function remove(id: number) { change((widgets ?? []).filter((w) => w.id !== id)); }
+  function add() {
+    if (!palette || !widgets) return;
+    const [type, source] = palette.split("|");
+    const c = WIDGET_CATALOG.find((x) => x.type === type && x.source === source);
+    if (!c) return;
+    const maxY = Math.max(0, ...widgets.map((w) => w.y + w.h));
+    change([...widgets, { id: tempId--, type, source, title: null, configJson: null, x: 0, y: maxY, w: c.w, h: c.h }]);
+  }
+  async function save() {
+    if (!widgets) return;
+    setSaving(true);
+    try {
+      await saveStatLayout(widgets.map((w) => ({ ...w, id: w.id < 0 ? 0 : w.id })));
+      const r = await getStatWidgets();      // gerçek id'leri geri al
+      setWidgets(r.widgets);
+      setDirty(false); setEditing(false);
+      setFlash({ ok: true, msg: "Düzen kaydedildi." });
+    } catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }
+    finally { setSaving(false); }
+  }
+  async function doReset() {
+    setSaving(true);
+    try {
+      await resetStatLayout();
+      const r = await getStatWidgets();
+      setWidgets(r.widgets);
+      setDirty(false); setResetOpen(false);
+      setFlash({ ok: true, msg: "Varsayılan düzene dönüldü." });
+    } catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }
+    finally { setSaving(false); }
+  }
+
+  if ((loading && !data) || (!widgets && !werr)) return <StatsSkeleton />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
-  if (!data) return null;
+  if (werr) return <ErrorState message={werr} />;
+  if (!data || !widgets) return null;
   if (data.counts.total === 0)
-    return <EmptyState title="Sağlık verisi olan sunucu yok" hint="İstatistikler yalnız Windows/Linux Sağlık tipiyle izlenen sunuculardan gelir. Bu tiplerden servis ekleyince dolar." />;
+    return <EmptyState title="Sağlık verisi olan sunucu yok" hint="İstatistikler yalnız Windows/Linux Sağlık tipiyle izlenen sunuculardan gelir." />;
 
   return (
-    <div className="space-y-5">
-      {(data.osEol.count > 0 || data.osEol.soonCount > 0) && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400">
-          <AlertTriangle className="h-4 w-4" />
-          {data.osEol.count > 0 && <span>{data.osEol.count} sunucu <b>destek sonu (EOL)</b> işletim sistemi kullanıyor.</span>}
-          {data.osEol.soonCount > 0 && <span className="ml-1">{data.osEol.soonCount} tanesinin desteği yakında bitiyor.</span>}
+    <div className="space-y-4">
+      {flash && (
+        <div className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${flash.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-destructive/30 bg-destructive/10 text-destructive"}`}>
+          {flash.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />} {flash.msg}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Sağlık Sunucusu" value={String(data.counts.total)} icon={Server} accent="primary" index={0} />
-        <KpiCard label="Çalışan" value={String(data.counts.up)} icon={ShieldCheck} accent="success" index={1} />
-        <KpiCard label="Uptime (24s)" value={`${data.uptime.h24}%`} icon={Activity} accent="success" index={2} />
-        <KpiCard label="Uptime (7g)" value={`${data.uptime.d7}%`} icon={Activity} accent="muted" index={3} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <ResourceCard icon={Cpu} title="CPU" used={data.cpu.used} alloc={data.cpu.alloc} unit={data.cpu.unit} avg={data.avg.cpu} index={0} />
-        <ResourceCard icon={MemoryStick} title="RAM" used={data.ram.used} alloc={data.ram.alloc} unit={data.ram.unit} avg={data.avg.ram} index={1} />
-        <ResourceCard icon={HardDrive} title="Disk" used={data.disk.used} alloc={data.disk.alloc} unit={data.disk.unit} avg={data.avg.disk} index={2} />
-      </div>
-
-      {data.fleet.length > 1 && (
-        <Card>
-          <CardHeader><CardTitle>Filo Kaynak Trendi</CardTitle><CardDescription>Son 30 gün — ortalama CPU/RAM/Disk %</CardDescription></CardHeader>
-          <CardContent><FleetTrendChart data={data.fleet} /></CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>İşletim Sistemi Dağılımı</CardTitle></CardHeader>
-          <CardContent>{data.osKind.length === 0 ? <EmptyState title="Veri yok" /> : <DonutChart data={data.osKind} />}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Etiket Dağılımı</CardTitle></CardHeader>
-          <CardContent>{data.tags.length === 0 ? <EmptyState title="Etiket yok" /> : <DonutChart data={data.tags} />}</CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <TopList title="En Yüksek CPU" items={data.top.cpu} suffix="%" />
-        <TopList title="En Yüksek RAM" items={data.top.ram} suffix="%" />
-        <TopList title="En Yüksek Disk" items={data.top.disk} suffix="%" />
-      </div>
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div><CardTitle>Kesinti Özeti</CardTitle><CardDescription>Son 7 gün</CardDescription></div>
-          <div className="text-right text-sm">
-            <span className="font-semibold tabular-nums">{data.outages.count}</span> <span className="text-muted-foreground">kesinti ·</span>{" "}
-            <span className="font-semibold tabular-nums">{data.outages.minutes}</span> <span className="text-muted-foreground">dk</span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {data.outages.worst.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">Son 7 günde kesinti yok 🎉</div>
-          ) : (
-            <div className="space-y-2">
-              {data.outages.worst.map((w) => (
-                <div key={w.name} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-4 py-2 text-sm">
-                  <span className="font-medium">{w.name}</span>
-                  <span className="tabular-nums text-rose-400">{w.value} kesinti</span>
-                </div>
-              ))}
-            </div>
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-2">
+          {editing && (
+            <>
+              <Select value={palette} onChange={(e) => setPalette(e.target.value)} className="h-9 w-auto min-w-[220px]">
+                <option value="">Widget seç…</option>
+                {Array.from(groups.entries()).map(([g, items]) => (
+                  <optgroup key={g} label={g}>
+                    {items.map((c) => <option key={`${c.type}|${c.source}`} value={`${c.type}|${c.source}`}>{c.label}</option>)}
+                  </optgroup>
+                ))}
+              </Select>
+              <Button variant="outline" size="sm" onClick={add} disabled={!palette}><Plus className="h-4 w-4" /> Ekle</Button>
+              <Button variant="outline" size="sm" onClick={() => setResetOpen(true)} disabled={saving}><RotateCcw className="h-4 w-4" /> Varsayılana dön</Button>
+              <Button size="sm" onClick={save} disabled={saving || !dirty}><Save className="h-4 w-4" /> {saving ? "Kaydediliyor…" : "Kaydet"}</Button>
+            </>
           )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ResourceCard({ icon: Icon, title, used, alloc, unit, avg, index }: {
-  icon: typeof Cpu; title: string; used: number; alloc: number; unit: string; avg: number | null; index: number;
-}) {
-  const pct = alloc > 0 ? Math.min(100, Math.round((used / alloc) * 100)) : 0;
-  const color = pct >= 85 ? "bg-rose-500" : pct >= 65 ? "bg-amber-500" : "bg-emerald-500";
-  return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}>
-      <Card className="p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Icon className="h-4 w-4" /> {title}</div>
-          {avg != null && <span className="text-xs text-muted-foreground">ort. %{avg}</span>}
-        </div>
-        <div className="mt-2 flex items-baseline gap-1.5">
-          <span className="text-2xl font-bold tabular-nums">{used}</span>
-          <span className="text-sm text-muted-foreground">/ {alloc} {unit}</span>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-          <motion.div className={cn("h-full rounded-full", color)} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }} />
-        </div>
-        <div className="mt-1 text-right text-xs text-muted-foreground tabular-nums">%{pct} kullanımda</div>
-      </Card>
-    </motion.div>
-  );
-}
-
-function TopList({ title, items, suffix }: { title: string; items: { name: string; value: number }[]; suffix?: string }) {
-  const max = Math.max(1, ...items.map((i) => i.value));
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
-      <CardContent className="space-y-2.5">
-        {items.length === 0 ? <div className="py-4 text-center text-sm text-muted-foreground">Veri yok</div> : items.map((i) => (
-          <div key={i.name}>
-            <div className="mb-1 flex items-center justify-between text-sm">
-              <span className="truncate pr-2">{i.name}</span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">{i.value}{suffix}</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary/70" style={{ width: `${(i.value / max) * 100}%` }} />
-            </div>
+          <div className="ml-auto">
+            <Button variant={editing ? "default" : "outline"} size="sm" onClick={() => setEditing((e) => !e)}>
+              {editing ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />} {editing ? "Düzenleme açık" : "Düzenle"}
+            </Button>
           </div>
-        ))}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+
+      <WidgetBoard widgets={widgets} data={data} editing={editing} onChange={change} onRemove={remove} />
+
+      <ConfirmDialog
+        open={resetOpen}
+        title="Varsayılana dön"
+        message="Tüm widget düzeni silinip varsayılan yerleşim yüklenecek. Emin misiniz?"
+        confirmLabel="Sıfırla"
+        loading={saving}
+        onConfirm={doReset}
+        onCancel={() => setResetOpen(false)}
+      />
+    </div>
   );
 }
 
 function StatsSkeleton() {
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <Card key={i} className="p-5"><Skeleton className="h-3 w-24" /><Skeleton className="mt-3 h-8 w-20" /></Card>)}
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => <Card key={i} className="p-5"><Skeleton className="mx-auto h-9 w-16" /></Card>)}
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => <Card key={i} className="p-5"><Skeleton className="h-3 w-16" /><Skeleton className="mt-3 h-7 w-28" /><Skeleton className="mt-3 h-2 w-full" /></Card>)}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => <Card key={i} className="p-5"><Skeleton className="h-16 w-full" /></Card>)}
       </div>
-      <Card className="p-5"><Skeleton className="h-[280px] w-full" /></Card>
+      <Card className="p-5"><Skeleton className="h-[300px] w-full" /></Card>
     </div>
   );
 }
