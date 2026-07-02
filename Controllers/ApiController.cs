@@ -260,6 +260,115 @@ public class ApiController : ControllerBase
         return Ok(new { ok = true });
     }
 
+    /// <summary>Seçili servisleri toplu sil (React ekranı).</summary>
+    public record BulkIds(int[] Ids);
+
+    [HttpPost("services/bulk-delete")]
+    public async Task<IActionResult> ServicesBulkDelete([FromBody] BulkIds m, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var idList = (m.Ids ?? Array.Empty<int>()).Distinct().ToList();
+        if (idList.Count == 0) return BadRequest("Silinecek servis seçilmedi.");
+        await _db.CheckResults.Where(r => idList.Contains(r.ServiceId)).ExecuteDeleteAsync(ct);
+        await _db.Outages.Where(o => idList.Contains(o.ServiceId)).ExecuteDeleteAsync(ct);
+        await _db.HealthMetrics.Where(x => idList.Contains(x.ServiceId)).ExecuteDeleteAsync(ct);
+        var deleted = await _db.Services.Where(s => idList.Contains(s.Id)).ExecuteDeleteAsync(ct);
+        await _audit.LogAsync("service.delete-many", null, $"{deleted} servis toplu silindi.", ct: ct);
+        return Ok(new { deleted });
+    }
+
+    /// <summary>Toplu düzenleme — klasik EditMany ile aynı semantik: kanallar "on"/"off"/null(dokunma);
+    /// set*=true ise ilgili sayısal alan yazılır (null = özelliği temizle).</summary>
+    public record BulkEditInput(
+        int[] Ids,
+        string? AlertMail, string? AlertSms, string? AlertWhatsapp, string? AlertCall, string? Enabled,
+        bool SetInterval, int? Interval,
+        bool SetSlow, int? Slow,
+        bool SetCpu, int? Cpu,
+        bool SetRam, int? Ram,
+        bool SetDisk, int? Disk,
+        string? AddKeywords);
+
+    [HttpPost("services/bulk-edit")]
+    public async Task<IActionResult> ServicesBulkEdit([FromBody] BulkEditInput m, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var idList = (m.Ids ?? Array.Empty<int>()).Distinct().ToList();
+        if (idList.Count == 0) return BadRequest("Düzenlenecek servis seçilmedi.");
+
+        var services = await _db.Services.Where(s => idList.Contains(s.Id)).ToListAsync(ct);
+        var changes = new List<string>();
+        void Apply(string? v, string label, Action<bool> set)
+        {
+            if (v == "on") { set(true); changes.Add(label + "=açık"); }
+            else if (v == "off") { set(false); changes.Add(label + "=kapalı"); }
+        }
+        var newKws = MonitoredService.SplitKeywords(m.AddKeywords);
+        int? Clamp(int? v, int min, int max) => v.HasValue ? Math.Clamp(v.Value, min, max) : (int?)null;
+        var iv = Clamp(m.Interval, 1, 1440);
+        var sl = Clamp(m.Slow, 1, 600000);
+        var cp = Clamp(m.Cpu, 1, 100);
+        var rm = Clamp(m.Ram, 1, 100);
+        var dk = Clamp(m.Disk, 1, 100);
+
+        foreach (var s in services)
+        {
+            Apply(m.AlertMail, "Mail", b => s.AlertMail = b);
+            Apply(m.AlertSms, "SMS", b => s.AlertSms = b);
+            Apply(m.AlertWhatsapp, "WhatsApp", b => s.AlertWhatsapp = b);
+            Apply(m.AlertCall, "Arama", b => s.AlertCall = b);
+            Apply(m.Enabled, "Aktif", b => s.Enabled = b);
+
+            if (m.SetInterval) s.IntervalMinutesOverride = iv;
+            if (m.SetSlow) s.ResponseTimeThresholdMs = sl;
+            if (m.SetCpu) s.CpuThresholdPercent = cp;
+            if (m.SetRam) s.RamThresholdPercent = rm;
+            if (m.SetDisk) s.DiskThresholdPercent = dk;
+
+            if (newKws.Count > 0)
+            {
+                var existing = MonitoredService.SplitKeywords(s.Keyword);
+                s.Keyword = string.Join(", ", existing.Concat(newKws).Distinct(StringComparer.OrdinalIgnoreCase));
+            }
+        }
+        if (m.SetInterval) changes.Add(iv.HasValue ? $"Aralık={iv}dk" : "Aralık=global");
+        if (m.SetSlow) changes.Add(sl.HasValue ? $"Yavaşlık={sl}ms" : "Yavaşlık=kapalı");
+        if (m.SetCpu) changes.Add(cp.HasValue ? $"CPU={cp}%" : "CPU=kapalı");
+        if (m.SetRam) changes.Add(rm.HasValue ? $"RAM={rm}%" : "RAM=kapalı");
+        if (m.SetDisk) changes.Add(dk.HasValue ? $"Disk={dk}%" : "Disk=kapalı");
+        if (newKws.Count > 0) changes.Add("Keyword+(" + string.Join("/", newKws) + ")");
+        if (changes.Count == 0) return BadRequest("Değiştirilecek bir alan seçmediniz.");
+
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync("service.bulk-edit", null, $"{services.Count} servis: {string.Join(", ", changes.Distinct())}", ct: ct);
+        return Ok(new { updated = services.Count, changes = changes.Distinct() });
+    }
+
+    /// <summary>Tüm servisleri import formatında CSV indir.</summary>
+    [HttpGet("services/export")]
+    public async Task<IActionResult> ServicesExport(CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        var services = await _db.Services.AsNoTracking().Include(s => s.Credential).OrderBy(s => s.Name).ToListAsync(ct);
+        var bytes = ServiceCsvHelper.BuildExportCsv(services);
+        return File(bytes, "text/csv; charset=utf-8", $"vmon-servisler-yedek_{DateTime.Now:yyyyMMdd_HHmm}.csv");
+    }
+
+    /// <summary>CSV'den toplu servis ekleme (React) — JSON özet döner.</summary>
+    [HttpPost("services/import")]
+    public async Task<IActionResult> ServicesImport(IFormFile? csvFile, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        if (csvFile == null || csvFile.Length == 0) return BadRequest("Dosya seçilmedi.");
+        string content;
+        using (var reader = new StreamReader(csvFile.OpenReadStream(), System.Text.Encoding.UTF8, true))
+            content = await reader.ReadToEndAsync(ct);
+        var result = await ServiceCsvHelper.ImportAsync(_db, content, ct);
+        if (result.Added > 0)
+            await _audit.LogAsync("service.import", null, $"{result.Added} servis CSV ile eklendi, {result.Skipped} atlandı.", ct: ct);
+        return Ok(new { added = result.Added, skipped = result.Skipped, errors = result.Errors });
+    }
+
     /// <summary>Tek servisi şimdi kontrol et.</summary>
     [HttpPost("check/{id:int}")]
     public async Task<IActionResult> CheckNow(int id, CancellationToken ct)

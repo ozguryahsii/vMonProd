@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   Plus, Search, RefreshCw, Pencil, Trash2, Play, Square, RotateCw, CheckCircle2, XCircle,
+  Upload, Download, FileSpreadsheet, SlidersHorizontal, X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,10 +9,12 @@ import { Input, Select } from "@/components/ui/input";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ServiceForm } from "@/components/services/ServiceForm";
+import { BulkEditForm } from "@/components/services/BulkEditForm";
 import { useAsync } from "@/hooks/useAsync";
 import {
   type ServiceItem, type ServicesMeta, statusOf, CONTROL_TYPES,
   listServices, servicesMeta, deleteService, checkService, serviceAction,
+  bulkDelete, importCsv, exportCsvUrl, sampleCsvUrl,
 } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +37,11 @@ export function Services() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkDelOpen, setBulkDelOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { servicesMeta().then(setMeta).catch(() => {}); }, []);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 3500); return () => clearTimeout(t); } }, [flash]);
@@ -72,6 +80,37 @@ export function Services() {
     finally { setDeleting(false); }
   }
 
+  const toggleSel = (id: number) =>
+    setSelected((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allVisibleSelected = filtered.length > 0 && filtered.every((s) => selected.has(s.id));
+  const toggleAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(filtered.map((s) => s.id)));
+
+  async function doBulkDelete() {
+    setBulkBusy(true);
+    try {
+      const r = await bulkDelete(Array.from(selected));
+      setFlash({ ok: true, msg: `${r.deleted} servis silindi.` });
+      setSelected(new Set()); setBulkDelOpen(false); reload();
+    } catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }
+    finally { setBulkBusy(false); }
+  }
+
+  async function onImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setBulkBusy(true);
+    try {
+      const r = await importCsv(f);
+      const msg = `${r.added} servis eklendi${r.skipped > 0 ? `, ${r.skipped} atlandı` : ""}.` +
+        (r.errors.length > 0 ? ` — ${r.errors.slice(0, 5).join(" | ")}${r.errors.length > 5 ? ` | +${r.errors.length - 5} hata` : ""}` : "");
+      setFlash({ ok: r.errors.length === 0, msg });
+      reload();
+    } catch (err2) { setFlash({ ok: false, msg: (err2 as Error).message }); }
+    finally { setBulkBusy(false); }
+  }
+
   if (loading && !data) return <ListSkeleton />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
 
@@ -105,7 +144,26 @@ export function Services() {
         <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
           <Plus className="h-4 w-4" /> Yeni Servis
         </Button>
+        <div className="flex gap-1">
+          <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={onImportFile} />
+          <Button variant="outline" size="sm" disabled={bulkBusy} onClick={() => fileRef.current?.click()} title="CSV'den toplu servis ekle">
+            <Upload className="h-4 w-4" /> İçe Aktar
+          </Button>
+          <a href={exportCsvUrl}><Button variant="outline" size="sm" title="Tüm servisleri CSV indir"><Download className="h-4 w-4" /> Dışa Aktar</Button></a>
+          <a href={sampleCsvUrl}><Button variant="ghost" size="sm" title="Örnek CSV şablonu"><FileSpreadsheet className="h-4 w-4" /> Örnek</Button></a>
+        </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm">
+          <span className="font-semibold text-primary">{selected.size} servis seçili</span>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)}><SlidersHorizontal className="h-4 w-4" /> Toplu Düzenle</Button>
+            <Button variant="destructive" size="sm" onClick={() => setBulkDelOpen(true)}><Trash2 className="h-4 w-4" /> Toplu Sil</Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}><X className="h-4 w-4" /> Temizle</Button>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardContent className="px-0 py-0">
@@ -117,6 +175,10 @@ export function Services() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="w-10 px-4 py-3">
+                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll}
+                        className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]" />
+                    </th>
                     <th className="px-5 py-3 font-semibold">Servis</th>
                     <th className="px-5 py-3 font-semibold">Tip</th>
                     <th className="px-5 py-3 font-semibold">Hedef</th>
@@ -131,7 +193,11 @@ export function Services() {
                     const busy = busyId === s.id;
                     const control = CONTROL_TYPES.includes(s.type);
                     return (
-                      <tr key={s.id} className={cn("border-b border-border/60 transition-colors hover:bg-accent/40", !s.enabled && "opacity-50")}>
+                      <tr key={s.id} className={cn("border-b border-border/60 transition-colors hover:bg-accent/40", !s.enabled && "opacity-50", selected.has(s.id) && "bg-primary/5")}>
+                        <td className="w-10 px-4 py-3">
+                          <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSel(s.id)}
+                            className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]" />
+                        </td>
                         <td className="px-5 py-3">
                           <div className="font-medium">{s.name}</div>
                           {s.keyword && <div className="text-xs text-muted-foreground">{s.keyword}</div>}
@@ -173,6 +239,16 @@ export function Services() {
       <div className="text-xs text-muted-foreground">{filtered.length} / {data?.length ?? 0} servis</div>
 
       <ServiceForm open={formOpen} service={editing} meta={meta} onClose={() => setFormOpen(false)} onSaved={(m) => { setFlash({ ok: true, msg: m }); reload(); }} />
+      <BulkEditForm open={bulkOpen} ids={Array.from(selected)} onClose={() => setBulkOpen(false)}
+        onDone={(m) => { setFlash({ ok: true, msg: m }); setSelected(new Set()); reload(); }} />
+      <ConfirmDialog
+        open={bulkDelOpen}
+        title="Toplu sil"
+        message={`${selected.size} servis ve tüm geçmiş verileri kalıcı olarak silinecek. Emin misiniz?`}
+        loading={bulkBusy}
+        onConfirm={doBulkDelete}
+        onCancel={() => setBulkDelOpen(false)}
+      />
       <ConfirmDialog
         open={!!toDelete}
         title="Servisi sil"

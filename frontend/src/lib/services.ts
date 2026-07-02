@@ -78,6 +78,42 @@ export const createService = (input: ServiceInput) => apiSend<{ id: number }>("P
 export const updateService = (id: number, input: ServiceInput) => apiSend<{ id: number }>("PUT", `/services/${id}`, input);
 export const deleteService = (id: number) => apiSend<{ ok: boolean }>("DELETE", `/services/${id}`);
 export const checkService = (id: number) => apiSend<{ isUp: boolean; responseTimeMs: number; error: string | null }>("POST", `/check/${id}`);
+// ---- Toplu işlemler + CSV ----
+export interface BulkEditInput {
+  ids: number[];
+  alertMail: string | null;      // "on" | "off" | null (dokunma)
+  alertSms: string | null;
+  alertWhatsapp: string | null;
+  alertCall: string | null;
+  enabled: string | null;
+  setInterval: boolean; interval: number | null;
+  setSlow: boolean; slow: number | null;
+  setCpu: boolean; cpu: number | null;
+  setRam: boolean; ram: number | null;
+  setDisk: boolean; disk: number | null;
+  addKeywords: string | null;
+}
+
+export const bulkDelete = (ids: number[]) => apiSend<{ deleted: number }>("POST", "/services/bulk-delete", { ids });
+export const bulkEdit = (input: BulkEditInput) => apiSend<{ updated: number; changes: string[] }>("POST", "/services/bulk-edit", input);
+
+export const exportCsvUrl = "/api/services/export";
+export const sampleCsvUrl = "/Services/SampleCsv";
+
+/** CSV içe aktarım — multipart + CSRF header. */
+export async function importCsv(file: File): Promise<{ added: number; skipped: number; errors: string[] }> {
+  const token = await formCsrf();
+  const fd = new FormData();
+  fd.append("csvFile", file);
+  const res = await fetch("/api/services/import", {
+    method: "POST", credentials: "same-origin",
+    headers: { "X-CSRF-TOKEN": token },
+    body: fd,
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.text()) || `Sunucu hatası (${res.status})`);
+  return res.json();
+}
+
 /** Görünen servisleri toplu kontrol (eski 'Görünenleri Kontrol Et'). */
 export const checkIds = (ids: number[]) =>
   sendForm<{ id: number; isUp: boolean; responseTimeMs?: number; error: string | null }[]>(
