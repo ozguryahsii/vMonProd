@@ -19,6 +19,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # React SPA'yı derle → wwwroot/app (publish bunu otomatik paketler). Node YALNIZ burada (CI); üründe yok.
+      - name: Build frontend (React SPA -> wwwroot/app)
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
       - name: Publish (self-contained win-x64)
         run: dotnet publish -c Release -r win-x64 --self-contained true -o package/app
 

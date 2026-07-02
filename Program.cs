@@ -361,6 +361,12 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+// React SPA (Yol A) — /app altında sunulur; eski Razor arayüz / kökünde AYNEN çalışmaya devam eder.
+// Statik varlıklar (/app/assets/*) UseStaticFiles ile; SPA derin linkleri (/app/dashboard vb.) index.html'e düşer.
+// Not: frontend derlenmemişse (wwwroot/app yoksa) yalnız /app 404 döner; kökteki uygulama etkilenmez.
+app.MapGet("/app", () => Results.Redirect("/app/dashboard"));
+app.MapFallbackToFile("/app/{**slug}", "app/index.html");
+
 // RFC 9116 security.txt — sorumlu açıklama (responsible disclosure) iletişim noktası
 app.MapGet("/.well-known/security.txt", async (SettingsService settings) =>
 {
