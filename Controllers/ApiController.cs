@@ -854,6 +854,50 @@ public class ApiController : ControllerBase
             : Ok(new { ok = false, message = error });
     }
 
+    // ================= Faz H: oturum bilgisi (React yetki/tema/dil) =================
+
+    /// <summary>Oturumdaki kullanıcı: yetkiler + tema/dil + admin bilgisi. React menü/aksiyon görünürlüğü buradan beslenir.</summary>
+    [HttpGet("me")]
+    public async Task<IActionResult> Me(CancellationToken ct)
+    {
+        var settings = await _settings.GetAsync(ct);
+        var sam = User.FindFirst("sam")?.Value ?? User.Identity?.Name;
+        var isAuth = User?.Identity?.IsAuthenticated == true;
+        var isAdmin = !settings.AuthEnabled || !isAuth || settings.IsAdmin(sam) || (isAuth && User!.IsAppAdmin());
+
+        string theme = Request.Cookies["vmon_theme"] == "light" ? "light" : "dark";
+        string lang = Request.Cookies["vmon_lang"] == "en" ? "en" : "tr";
+        string? displayName = null;
+        var perms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (isAuth && !string.IsNullOrWhiteSpace(sam))
+        {
+            var u = await _db.AppUsers.AsNoTracking().FirstOrDefaultAsync(x => x.Sam == sam, ct);
+            if (u != null)
+            {
+                displayName = u.DisplayName;
+                perms = u.Permissions();
+                if (!string.IsNullOrEmpty(u.Theme)) theme = u.Theme;
+                if (!string.IsNullOrEmpty(u.Language)) lang = u.Language;
+            }
+        }
+        if (isAdmin) foreach (var p in Perms.All) perms.Add(p.Key);   // admin = tüm yetkiler
+        if (!isAuth || !settings.AuthEnabled) foreach (var p in Perms.All) perms.Add(p.Key); // açık mod
+
+        return Ok(new
+        {
+            sam,
+            displayName = displayName ?? sam,
+            isAdmin,
+            authEnabled = settings.AuthEnabled,
+            mutabakatEnabled = settings.MutabakatEnabled,
+            perms,
+            theme,
+            lang,
+            companyName = settings.CompanyName
+        });
+    }
+
     // ================= Faz G: Ayarlar (React) =================
 
     /// <summary>Tüm ayarlar (yalnız admin). Sırlar asla dönmez — yalnız has* bayrakları.</summary>

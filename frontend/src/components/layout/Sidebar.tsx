@@ -3,25 +3,37 @@ import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, BarChart3, Activity, Server, KeyRound,
-  Settings, Users, ClipboardCheck, Info, ChevronsLeft, ChevronsRight,
+  Settings, Users, ClipboardCheck, Info, ChevronsLeft, ChevronsRight, ClipboardList,
 } from "lucide-react";
+import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { to: "/app/dashboard", label: "Dashboard'lar", icon: LayoutDashboard },
-  { to: "/app/reports", label: "Raporlar", icon: BarChart3 },
-  { to: "/app/statistics", label: "İstatistikler", icon: Activity },
-  { to: "/app/services", label: "Servisler", icon: Server },
-  { to: "/app/credentials", label: "Kimlik Bilgileri", icon: KeyRound },
-  { to: "/app/settings", label: "Ayarlar", icon: Settings },
-  { to: "/app/users", label: "Kullanıcılar", icon: Users },
-  { to: "/app/audit", label: "Denetim", icon: ClipboardCheck },
+// perm: gerekli yetki anahtarı; admin: yalnız uygulama adminleri; flag: settings bayrağı
+const allNav = [
+  { to: "/app/dashboard", label: "Dashboard'lar", icon: LayoutDashboard, perm: "dashboards.view" },
+  { to: "/app/reports", label: "Raporlar", icon: BarChart3, perm: "dashboards.view" },
+  { to: "/app/statistics", label: "İstatistikler", icon: Activity, perm: "dashboards.view" },
+  { to: "/app/services", label: "Servisler", icon: Server, perm: "services.manage" },
+  { to: "/app/credentials", label: "Kimlik Bilgileri", icon: KeyRound, perm: "credentials.manage" },
+  { to: "/app/settings", label: "Ayarlar", icon: Settings, admin: true },
+  { to: "/app/users", label: "Kullanıcılar", icon: Users, admin: true },
+  { to: "/app/audit", label: "Denetim", icon: ClipboardCheck, admin: true },
+  { to: "/app/mutabakat", label: "Mutabakat", icon: ClipboardList, perm: "mutabakat.view", flag: "mutabakat" },
   { to: "/app/about", label: "Hakkında", icon: Info },
-];
+] as const;
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("vmon.sidebar") === "min");
   useEffect(() => { localStorage.setItem("vmon.sidebar", collapsed ? "min" : "max"); }, [collapsed]);
+  const { me, hasPerm } = useMe();
+
+  // Yetkiye göre menü: me yüklenene dek yalnız Hakkında gizlenmesin diye tümü gösterilmez — boş bekleriz
+  const nav = allNav.filter((item) => {
+    if ("flag" in item && item.flag === "mutabakat" && !me?.mutabakatEnabled) return false;
+    if ("admin" in item && item.admin) return !!me?.isAdmin;
+    if ("perm" in item && item.perm) return hasPerm(item.perm);
+    return true;
+  });
 
   return (
     <aside className={cn(

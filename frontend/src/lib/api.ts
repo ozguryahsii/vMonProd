@@ -8,7 +8,12 @@ export class ApiError extends Error {
 }
 
 async function handle<T>(res: Response): Promise<T> {
-  if (res.status === 401) throw new ApiError(401, "Oturum gerekli. Lütfen giriş yapın.");
+  if (res.status === 401) {
+    // Oturum düşmüş → login'e, dönüş adresiyle (SPA derin linki korunur)
+    const ret = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = `/Account/Login?returnUrl=${ret}`;
+    throw new ApiError(401, "Oturum gerekli. Giriş sayfasına yönlendiriliyorsunuz…");
+  }
   if (res.status === 403) throw new ApiError(403, "Bu işlem için yetkiniz yok.");
   if (!res.ok) {
     let msg = `Sunucu hatası (${res.status})`;

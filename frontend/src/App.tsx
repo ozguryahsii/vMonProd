@@ -20,6 +20,8 @@ const titles: Record<string, { t: string; s: string }> = {
   settings: { t: "Ayarlar", s: "Uygulama yapılandırması" },
   users: { t: "Kullanıcılar", s: "Kullanıcı ve yetki yönetimi" },
   audit: { t: "Denetim", s: "Değiştirilemez denetim kaydı" },
+  mutabakat: { t: "Mutabakat", s: "Envanter karşılaştırma" },
+  profile: { t: "Profilim", s: "İletişim bilgileri ve şifre" },
   about: { t: "Hakkında", s: "Sürüm ve uyumluluk bilgisi" },
 };
 
@@ -42,7 +44,7 @@ export default function App() {
           <Route path="/app/users" element={<Users />} />
           <Route path="/app/credentials" element={<Credentials />} />
           <Route path="/app/settings" element={<Settings />} />
-          {["about"].map((p) => (
+          {["about", "mutabakat", "profile"].map((p) => (
             <Route key={p} path={`/app/${p}`} element={<Placeholder name={titles[p].t} />} />
           ))}
           <Route path="*" element={<Placeholder name="Bulunamadı" />} />
