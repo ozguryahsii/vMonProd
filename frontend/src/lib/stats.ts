@@ -71,6 +71,26 @@ export async function saveStatLayout(widgets: StatWidgetDef[]): Promise<void> {
   if (!res.ok) throw new ApiError(res.status, res.status === 403 ? "Düzeni yalnız admin kaydedebilir." : `Kaydedilemedi (${res.status})`);
 }
 
+// ---- Drill-down (eski /Statistics/Detail — tıklanabilir widget'lar) ----
+export interface StatDetailServer {
+  name: string; target: string; os: string; status: string;
+  cpu: number | null; ram: number | null; disk: number | null;
+  capacity: string | null; lastChecked: string | null;
+}
+export interface StatDetail {
+  count: number;
+  servers: StatDetailServer[];
+  trend: { metric: string; days: number; points: { day: string; value: number }[] } | null;
+}
+
+export async function getStatDetail(source: string, value?: string | null, days = 7, signal?: AbortSignal): Promise<StatDetail> {
+  const qs = new URLSearchParams({ source, days: String(days) });
+  if (value) qs.set("value", value);
+  const res = await fetch(`/Statistics/Detail?${qs}`, { headers: { Accept: "application/json" }, credentials: "same-origin", signal });
+  if (!res.ok) throw new ApiError(res.status, `Sunucu hatası (${res.status})`);
+  return res.json();
+}
+
 /** Varsayılan düzene dön (tüm widget'ları siler, sonraki yüklemede tohumlanır). */
 export async function resetStatLayout(): Promise<void> {
   const token = await csrf();

@@ -7,6 +7,7 @@ import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { WidgetBoard } from "@/components/stats/WidgetBoard";
 import { WIDGET_CATALOG } from "@/components/stats/widgets";
+import { StatDetailDrawer, type Drill } from "@/components/stats/StatDetailDrawer";
 import { useAsync } from "@/hooks/useAsync";
 import {
   getStats, getStatWidgets, saveStatLayout, resetStatLayout, type StatWidgetDef,
@@ -25,6 +26,7 @@ export function Statistics() {
   const [palette, setPalette] = useState("");
   const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
   const [werr, setWerr] = useState<string | null>(null);
+  const [drill, setDrill] = useState<Drill | null>(null);
 
   useEffect(() => {
     getStatWidgets()
@@ -113,7 +115,10 @@ export function Statistics() {
         </div>
       )}
 
-      <WidgetBoard widgets={widgets} data={data} editing={editing} onChange={change} onRemove={remove} />
+      <WidgetBoard widgets={widgets} data={data} editing={editing} onChange={change} onRemove={remove}
+        onDrill={(d) => { if (!editing) setDrill(d); }} />
+
+      <StatDetailDrawer drill={drill} onClose={() => setDrill(null)} />
 
       <ConfirmDialog
         open={resetOpen}

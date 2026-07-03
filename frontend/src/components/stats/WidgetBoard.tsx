@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type PointerEvent as RPointerEvent } fro
 import { GripVertical, X } from "lucide-react";
 import type { StatsData, StatWidgetDef } from "@/lib/stats";
 import { WidgetRenderer, widgetLabel } from "./widgets";
+import type { Drill } from "./StatDetailDrawer";
 import { cn } from "@/lib/utils";
 
 const COLS = 12;
@@ -16,12 +17,13 @@ interface DragState {
 }
 
 /** Gridstack benzeri hafif pano: 12 kolon, sürükle-taşı + köşeden boyutlandır (yalnız düzenleme modunda). */
-export function WidgetBoard({ widgets, data, editing, onChange, onRemove }: {
+export function WidgetBoard({ widgets, data, editing, onChange, onRemove, onDrill }: {
   widgets: StatWidgetDef[];
   data: StatsData;
   editing: boolean;
   onChange: (w: StatWidgetDef[]) => void;
   onRemove: (id: number) => void;
+  onDrill: (d: Drill) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -103,7 +105,7 @@ export function WidgetBoard({ widgets, data, editing, onChange, onRemove }: {
                 )}
               </div>
               <div className="min-h-0 flex-1">
-                <WidgetRenderer w={w} data={data} />
+                <WidgetRenderer w={w} data={data} onDrill={onDrill} />
               </div>
               {editing && (
                 <div
