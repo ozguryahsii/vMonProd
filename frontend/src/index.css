@@ -171,10 +171,23 @@ body {
 .about-legacy .flex { display: flex; gap: 0.75rem; }
 .about-legacy .w-44 { width: 11rem; flex-shrink: 0; font-weight: 500; color: hsl(var(--muted-foreground)); }
 .about-legacy i.bi { color: hsl(var(--primary)); margin-right: 0.25rem; }
-/* Alpine yok → aç/kapa butonları işlevsiz ama görünür (sürüm rozeti butonun içinde); içerik tamamen açık */
-.about-legacy button { pointer-events: none; cursor: default; display: inline-flex; align-items: center; gap: 0.5rem; }
-.about-legacy button .bi-chevron-down, .about-legacy button .bi-chevron-up { display: none; }
-.about-legacy [x-show] { display: block !important; }
+/* Katlanır bölümler: sürüm notları + regülasyon uyumları — kapalı başlar, tıklayınca açılır */
+.about-legacy details > summary {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  cursor: pointer; list-style: none; user-select: none;
+  border-radius: 0.5rem; padding: 0.15rem 0.4rem;
+  transition: background-color 0.15s ease;
+}
+.about-legacy details > summary:hover { background: hsl(var(--accent) / 0.6); }
+.about-legacy details > summary::-webkit-details-marker { display: none; }
+.about-legacy details > summary::after {
+  content: "▾"; font-size: 0.8em; color: hsl(var(--muted-foreground));
+  transition: transform 0.2s ease;
+}
+.about-legacy details[open] > summary::after { transform: rotate(180deg); }
+.about-legacy details > summary .bi-chevron-down,
+.about-legacy details > summary .bi-chevron-up { display: none; }
+.about-legacy details > *:not(summary) { margin-top: 0.75rem; }
 
 /* Skeleton shimmer */
 .skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); border-radius: 0.5rem; }

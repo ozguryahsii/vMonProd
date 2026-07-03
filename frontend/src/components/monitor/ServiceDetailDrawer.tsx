@@ -5,6 +5,7 @@ import {
 import { RefreshCw, Play, Square, RotateCw } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { type StatusService, catOf, getHistory, getMetrics, type HistoryData, type MetricsData } from "@/lib/monitor";
 import { CONTROL_TYPES, checkService, serviceAction } from "@/lib/services";
@@ -31,6 +32,9 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<"start" | "stop" | "restart" | null>(null);
+
+  const ACTION_LABEL: Record<string, string> = { start: "BAŞLAT", stop: "DURDUR", restart: "YENİDEN BAŞLAT" };
 
   const isHealth = service?.type === "WindowsHealth" || service?.type === "LinuxHealth";
   const isControl = service ? CONTROL_TYPES.includes(service.type) : false;
@@ -77,9 +81,9 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
               </Button>
               {isControl && (
                 <>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-emerald-400" title="Başlat" disabled={busy} onClick={() => act(() => serviceAction(service.id, "start"), "Başlat")}><Play className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-400" title="Durdur" disabled={busy} onClick={() => act(() => serviceAction(service.id, "stop"), "Durdur")}><Square className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-amber-400" title="Yeniden başlat" disabled={busy} onClick={() => act(() => serviceAction(service.id, "restart"), "Yeniden başlat")}><RotateCw className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-emerald-400" title="Başlat" disabled={busy} onClick={() => setPendingAction("start")}><Play className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-400" title="Durdur" disabled={busy} onClick={() => setPendingAction("stop")}><Square className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-amber-400" title="Yeniden başlat" disabled={busy} onClick={() => setPendingAction("restart")}><RotateCw className="h-4 w-4" /></Button>
                 </>
               )}
             </div>
@@ -93,7 +97,7 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
           {flash && <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">{flash}</div>}
           {service.lastError && cat !== "up" && <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{service.lastError}</div>}
 
-          {loading ? (
+          {loading && !hist ? (
             <div className="space-y-3"><Skeleton className="h-[220px] w-full" /></div>
           ) : error ? (
             <ErrorState message={error} onRetry={load} />
@@ -155,6 +159,21 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={!!pendingAction}
+        title={pendingAction ? `Servisi ${ACTION_LABEL[pendingAction].toLowerCase()}` : ""}
+        message={service && pendingAction ? `"${service.name}" servisine ${ACTION_LABEL[pendingAction]} komutu gönderilecek. Emin misiniz?` : ""}
+        confirmLabel={pendingAction ? ACTION_LABEL[pendingAction] : "Onayla"}
+        danger={pendingAction === "stop"}
+        loading={busy}
+        onConfirm={() => {
+          if (!service || !pendingAction) return;
+          const a = pendingAction;
+          setPendingAction(null);
+          act(() => serviceAction(service.id, a), ACTION_LABEL[a]);
+        }}
+        onCancel={() => setPendingAction(null)}
+      />
     </Drawer>
   );
 }

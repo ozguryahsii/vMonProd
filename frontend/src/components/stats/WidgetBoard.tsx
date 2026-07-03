@@ -82,7 +82,8 @@ export function WidgetBoard({ widgets, data, editing, onChange, onRemove }: {
           >
             <div className={cn(
               "card-glow flex h-full flex-col overflow-hidden rounded-lg border bg-gradient-to-b from-card to-card/60 shadow-[0_10px_30px_-14px_rgba(0,0,0,0.5)]",
-              dragging ? "border-primary/60 shadow-[0_20px_50px_-15px_hsl(var(--primary)/0.4)]" : "border-border"
+              dragging ? "border-primary/60 shadow-[0_20px_50px_-15px_hsl(var(--primary)/0.4)]" : "border-border",
+              !editing && "transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_24px_55px_-18px_rgba(0,0,0,0.75)]"
             )}>
               <div
                 className={cn("flex items-center gap-1.5 border-b border-border/60 px-3 py-1.5", editing && "cursor-grab select-none active:cursor-grabbing")}

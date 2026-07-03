@@ -40,7 +40,7 @@ export function Dashboard() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [boardId, setBoardId] = useState<number | "all">("all");
   const [active, setActive] = useState<Cat>("all");
-  const [detail, setDetail] = useState<StatusService | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Board | null>(null);
   const [toDelete, setToDelete] = useState<Board | null>(null);
@@ -66,6 +66,8 @@ export function Dashboard() {
   }, [inBoard]);
 
   const visible = active === "all" ? inBoard : inBoard.filter((s) => catOf(s) === active);
+  // Drawer id ile takip eder → 20sn oto-yenilemede içerik CANLI güncellenir (bayat snapshot yok)
+  const detail = detailId != null ? all.find((s) => s.id === detailId) ?? null : null;
 
   async function checkVisible() {
     if (visible.length === 0) return;
@@ -147,7 +149,7 @@ export function Dashboard() {
           {visible.map((s) => {
             const c = catOf(s);
             return (
-              <button key={s.id} onClick={() => setDetail(s)}
+              <button key={s.id} onClick={() => setDetailId(s.id)}
                 className={cn(cardCls, "border-l-4 p-4 text-left transition-all hover:-translate-y-0.5", borderOf[c], !s.enabled && "opacity-50")}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -157,10 +159,18 @@ export function Dashboard() {
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", badgeOf[c].cls)}>
-                    {badgeOf[c].label}
-                    {c === "down" && s.downSince && <span className="ml-1 font-normal opacity-80">· {since(s.downSince)}</span>}
-                  </span>
+                  {c === "down" || c === "error" ? (
+                    // Eski tasarımdaki gibi: sorunlu servis BÜYÜK kırmızı/turuncu punto + nabız
+                    <span className={cn("animate-pulse text-base font-extrabold uppercase tracking-wide",
+                      c === "down" ? "text-rose-500" : "text-orange-400")}>
+                      {badgeOf[c].label}
+                      {c === "down" && s.downSince && <span className="ml-1.5 text-xs font-semibold normal-case opacity-80">· {since(s.downSince)}</span>}
+                    </span>
+                  ) : (
+                    <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", badgeOf[c].cls)}>
+                      {badgeOf[c].label}
+                    </span>
+                  )}
                   <span className="text-xs tabular-nums text-muted-foreground">{s.lastIsUp && s.lastResponseTimeMs != null ? `${s.lastResponseTimeMs} ms` : s.type}</span>
                 </div>
                 {(s.lastCpuPercent != null || s.lastRamPercent != null || s.lastMaxDiskPercent != null) && (
@@ -181,7 +191,7 @@ export function Dashboard() {
         </div>
       )}
 
-      <ServiceDetailDrawer service={detail} onClose={() => setDetail(null)} onChanged={reload} />
+      <ServiceDetailDrawer service={detail} onClose={() => setDetailId(null)} onChanged={reload} />
       <BoardForm open={formOpen} board={editing} onClose={() => setFormOpen(false)} onSaved={loadBoards} />
       <ConfirmDialog
         open={!!toDelete}

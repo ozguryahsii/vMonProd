@@ -47,6 +47,8 @@ export function Services() {
   const [bulkDelOpen, setBulkDelOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [actConfirm, setActConfirm] = useState<{ s: ServiceItem; action: "start" | "stop" | "restart" } | null>(null);
+  const ACTION_LABEL: Record<string, string> = { start: "BAŞLAT", stop: "DURDUR", restart: "YENİDEN BAŞLAT" };
 
   useEffect(() => { servicesMeta().then(setMeta).catch(() => {}); }, []);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 3500); return () => clearTimeout(t); } }, [flash]);
@@ -242,9 +244,9 @@ export function Services() {
                             </Button>
                             {control && (
                               <>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-400" title="Başlat" disabled={busy} onClick={() => doAction(s, "start")}><Play className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400" title="Durdur" disabled={busy} onClick={() => doAction(s, "stop")}><Square className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-400" title="Yeniden başlat" disabled={busy} onClick={() => doAction(s, "restart")}><RotateCw className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-400" title="Başlat" disabled={busy} onClick={() => setActConfirm({ s, action: "start" })}><Play className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400" title="Durdur" disabled={busy} onClick={() => setActConfirm({ s, action: "stop" })}><Square className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-400" title="Yeniden başlat" disabled={busy} onClick={() => setActConfirm({ s, action: "restart" })}><RotateCw className="h-4 w-4" /></Button>
                               </>
                             )}
                             <Button variant="ghost" size="icon" className="h-8 w-8" title="Düzenle" onClick={() => { setEditing(s); setFormOpen(true); }}><Pencil className="h-4 w-4" /></Button>
@@ -266,6 +268,16 @@ export function Services() {
       <ServiceForm open={formOpen} service={editing} meta={meta} onClose={() => setFormOpen(false)} onSaved={(m) => { setFlash({ ok: true, msg: m }); reload(); }} />
       <BulkEditForm open={bulkOpen} ids={Array.from(selected)} onClose={() => setBulkOpen(false)}
         onDone={(m) => { setFlash({ ok: true, msg: m }); setSelected(new Set()); reload(); }} />
+      <ConfirmDialog
+        open={!!actConfirm}
+        title={actConfirm ? `Servisi ${ACTION_LABEL[actConfirm.action].toLowerCase()}` : ""}
+        message={actConfirm ? `"${actConfirm.s.name}" servisine ${ACTION_LABEL[actConfirm.action]} komutu gönderilecek. Emin misiniz?` : ""}
+        confirmLabel={actConfirm ? ACTION_LABEL[actConfirm.action] : "Onayla"}
+        danger={actConfirm?.action === "stop"}
+        loading={busyId != null}
+        onConfirm={() => { if (actConfirm) { const a = actConfirm; setActConfirm(null); doAction(a.s, a.action); } }}
+        onCancel={() => setActConfirm(null)}
+      />
       <ConfirmDialog
         open={bulkDelOpen}
         title="Toplu sil"

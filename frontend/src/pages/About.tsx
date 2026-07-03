@@ -24,8 +24,21 @@ export function About() {
         const hero = content.querySelector("h1")?.closest("div.rounded-2xl");
         hero?.remove();
         content.querySelectorAll("script").forEach((s) => s.remove());
-        // Alpine yok → x-cloak/x-show ile gizlenen her şey görünür kalsın (tam içerik)
+        // Alpine yok → x-show bölgelerini yerel <details> akordeonuna çevir (KAPALI başlar,
+        // tıklayınca açılır — sürüm notları ve regülasyon uyumları böylece eskisi gibi katlanır)
         content.querySelectorAll("[x-cloak]").forEach((el) => el.removeAttribute("x-cloak"));
+        content.querySelectorAll("[x-show]").forEach((el) => {
+          const scope = el.closest("[x-data]") ?? el.parentElement;
+          const btn = scope?.querySelector("button");
+          const details = doc.createElement("details");
+          const summary = doc.createElement("summary");
+          summary.innerHTML = btn ? btn.innerHTML : "Detayları göster";
+          btn?.remove();
+          el.parentElement?.insertBefore(details, el);
+          details.appendChild(summary);
+          details.appendChild(el);
+          el.removeAttribute("x-show");
+        });
         const m = raw.match(/v\d+\.\d+\.\d+[^<\s"]*/);
         setVersion(m ? m[0] : null);
         setHtml(content.innerHTML);
