@@ -1088,6 +1088,21 @@ public class ApiController : ControllerBase
         return Ok(new { ok = true, message = $"Test mesajı gönderildi → {s.SyslogHost}:{s.SyslogPort} ({(s.SyslogTcp ? "TCP" : "UDP")})" });
     }
 
+    /// <summary>EOL verisini dosyadan içe aktar (kapalı ağ için — klasik EolImport paritesi).</summary>
+    [HttpPost("eol-import")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> EolImport(IFormFile? eolFile, [FromServices] EolService eol, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        if (eolFile == null || eolFile.Length == 0) return BadRequest("Dosya seçilmedi.");
+        using var sr = new StreamReader(eolFile.OpenReadStream());
+        var json = await sr.ReadToEndAsync(ct);
+        var (ok, msg) = eol.Import(json);
+        await _audit.LogAsync("eol.import", null, msg, ok, ct: ct);
+        return Ok(new { ok, message = msg });
+    }
+
     /// <summary>EOL verisini şimdi senkronize et (yalnız admin).</summary>
     [HttpPost("eol-sync")]
     public async Task<IActionResult> EolSync([FromServices] EolService eol, CancellationToken ct)

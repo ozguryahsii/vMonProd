@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   Save, CheckCircle2, XCircle, Mail, ShieldCheck,
   Radio, CalendarClock, Database, Building2, KeyRound, Timer, FlaskConical,
@@ -27,6 +27,24 @@ export function Settings() {
   const [testMsg, setTestMsg] = useState<Record<string, { ok: boolean; msg: string }>>({});
   const [ldapUser, setLdapUser] = useState("");
   const [ldapPass, setLdapPass] = useState("");
+  const eolFileRef = useRef<HTMLInputElement>(null);
+
+  async function onEolImport(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setTestMsg((m) => ({ ...m, eol: { ok: true, msg: "İçe aktarılıyor…" } }));
+    try {
+      const token = await (await fetch("/api/antiforgery", { credentials: "same-origin" })).json();
+      const fd = new FormData();
+      fd.append("eolFile", f);
+      const res = await fetch("/api/eol-import", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-TOKEN": token.token }, body: fd });
+      const r = await res.json();
+      setTestMsg((m) => ({ ...m, eol: { ok: r.ok, msg: r.message } }));
+    } catch (err) {
+      setTestMsg((m) => ({ ...m, eol: { ok: false, msg: (err as Error).message } }));
+    }
+  }
 
   useEffect(() => {
     getSettings().then(setS).catch((e) => setError((e as Error).message));
@@ -187,8 +205,11 @@ export function Settings() {
             <Field label="Uyarı eşiği (gün)"><Input type="number" value={s.eolWarnDays} onChange={(e) => set("eolWarnDays", num(e.target.value, 90))} /></Field>
             <Field label="Proxy URL" hint="kapalı ağda opsiyonel"><Input value={s.eolProxyUrl} onChange={(e) => set("eolProxyUrl", e.target.value)} /></Field>
           </div>
+          <div className="flex items-center gap-2">
+            <input ref={eolFileRef} type="file" accept=".json" className="hidden" onChange={onEolImport} />
+            <Button variant="ghost" size="sm" onClick={() => eolFileRef.current?.click()}>JSON içe aktar (kapalı ağ)</Button>
+          </div>
           <TestNote k="eol" msg={testMsg} />
-        </Section>
 
         {/* Yedekleme */}
         <Section icon={<Database className="h-4 w-4" />} title="Yedekleme (zamanlanmış)">
