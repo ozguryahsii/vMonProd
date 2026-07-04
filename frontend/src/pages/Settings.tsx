@@ -210,6 +210,7 @@ export function Settings() {
             <Button variant="ghost" size="sm" onClick={() => eolFileRef.current?.click()}>JSON içe aktar (kapalı ağ)</Button>
           </div>
           <TestNote k="eol" msg={testMsg} />
+        </Section>
 
         {/* Yedekleme */}
         <Section icon={<Database className="h-4 w-4" />} title="Yedekleme (zamanlanmış)">
