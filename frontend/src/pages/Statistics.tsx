@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Lock, LockOpen, Plus, RotateCcw, Save, CheckCircle2, XCircle } from "lucide-react";
+import { Lock, LockOpen, Plus, RotateCcw, Save, CheckCircle2, XCircle, FileText, Maximize2, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
@@ -90,6 +90,21 @@ export function Statistics() {
         </div>
       )}
 
+      {/* Sayfa araçları (eski 2.15/2.16 paritesi): PDF raporu, tam ekran (NOC), özet CSV, son güncelleme */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>Son güncelleme: {new Date(data.lastUpdated).toLocaleTimeString()}</span>
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportSummaryCsv(data)}><Download className="h-4 w-4" /> Özet CSV</Button>
+          <a href="/Statistics/Report" target="_blank" rel="noreferrer">
+            <Button variant="outline" size="sm"><FileText className="h-4 w-4" /> PDF Raporu</Button>
+          </a>
+          <Button variant="outline" size="sm" onClick={() => {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else document.documentElement.requestFullscreen().catch(() => {});
+          }}><Maximize2 className="h-4 w-4" /> Tam Ekran</Button>
+        </div>
+      </div>
+
       {canEdit && (
         <div className="flex flex-wrap items-center gap-2">
           {editing && (
@@ -131,6 +146,31 @@ export function Statistics() {
       />
     </div>
   );
+}
+
+/** Özet CSV (eski 2.15.0 'summary CSV export' paritesi) — mevcut istatistik verisinden. */
+function exportSummaryCsv(d: import("@/lib/stats").StatsData) {
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const L: string[] = [];
+  L.push("Bolum;Anahtar;Deger");
+  L.push(`Sayac;Toplam;${d.counts.total}`); L.push(`Sayac;Calisan;${d.counts.up}`);
+  L.push(`Sayac;Kapali;${d.counts.down}`); L.push(`Sayac;Hata;${d.counts.error}`);
+  L.push(`Kaynak;CPU kullanilan/atanan;${d.cpu.used}/${d.cpu.alloc} ${d.cpu.unit}`);
+  L.push(`Kaynak;RAM kullanilan/atanan;${d.ram.used}/${d.ram.alloc} ${d.ram.unit}`);
+  L.push(`Kaynak;Disk kullanilan/atanan;${d.disk.used}/${d.disk.alloc} ${d.disk.unit}`);
+  L.push(`Ortalama;CPU %;${d.avg.cpu ?? ""}`); L.push(`Ortalama;RAM %;${d.avg.ram ?? ""}`); L.push(`Ortalama;Disk %;${d.avg.disk ?? ""}`);
+  L.push(`Uptime;24 saat %;${d.uptime.h24}`); L.push(`Uptime;7 gun %;${d.uptime.d7}`);
+  L.push(`Kesinti;Adet (7g);${d.outages.count}`); L.push(`Kesinti;Dakika (7g);${d.outages.minutes}`);
+  for (const x of d.osKind) L.push(`OS;${esc(x.name)};${x.value}`);
+  for (const x of d.top.cpu) L.push(`TopCPU;${esc(x.name)};${x.value}`);
+  for (const x of d.top.ram) L.push(`TopRAM;${esc(x.name)};${x.value}`);
+  for (const x of d.top.disk) L.push(`TopDisk;${esc(x.name)};${x.value}`);
+  const blob = new Blob(["﻿" + L.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `vmon-istatistik-ozet_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function StatsSkeleton() {

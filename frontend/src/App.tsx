@@ -17,7 +17,7 @@ const titles: Record<string, { t: string; s: string }> = {
   dashboard: { t: "Dashboard'lar", s: "Özel izleme ekranların — anlık durum" },
   reports: { t: "Raporlar", s: "Erişilebilirlik ve performans raporları" },
   statistics: { t: "İstatistikler", s: "Kapasite ve dağılım analizi" },
-  services: { t: "Servisler", s: "İzlenen servisleri yönet" },
+  services: { t: "İzlemeler", s: "İzlenen hedefleri yönet" },
   credentials: { t: "Kimlik Bilgileri", s: "Kayıtlı kimlik bilgileri" },
   settings: { t: "Ayarlar", s: "Uygulama yapılandırması" },
   users: { t: "Kullanıcılar", s: "Kullanıcı ve yetki yönetimi" },

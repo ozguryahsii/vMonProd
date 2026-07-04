@@ -27,10 +27,15 @@ public abstract class CheckerBase : IServiceChecker
     /// <summary>Health checker'lar, ulaşıldığı halde eşik aşıldıysa true yapar → DOWN değil ERROR.</summary>
     protected bool IsThresholdError;
 
+    /// <summary>Sayısal-metrik checker'ları (Oracle session sayıları vb.) doldurur:
+    /// grafikte yanıt süresi yerine BU değer gösterilir (ResponseTimeMs alanında saklanır).</summary>
+    protected long? OverrideResponseValue;
+
     public async Task<CheckOutcome> CheckAsync(MonitoredService service, Credential? credential, CancellationToken ct)
     {
         CollectedMetrics = null;
         IsThresholdError = false;
+        OverrideResponseValue = null;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, service.TimeoutSeconds)));
@@ -39,7 +44,7 @@ public abstract class CheckerBase : IServiceChecker
             var error = await ExecuteAsync(service, credential, timeoutCts.Token);
             sw.Stop();
             var status = error == null ? CheckStatus.Up : (IsThresholdError ? CheckStatus.Error : CheckStatus.Down);
-            return new CheckOutcome(error == null, sw.ElapsedMilliseconds, error, CollectedMetrics, status);
+            return new CheckOutcome(error == null, OverrideResponseValue ?? sw.ElapsedMilliseconds, error, CollectedMetrics, status);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {

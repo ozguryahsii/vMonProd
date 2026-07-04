@@ -12,6 +12,7 @@ export interface StatusService {
   lastResponseTimeMs: number | null;
   lastError: string | null;
   consecutiveFailures: number;
+  responseTimeThresholdMs: number | null;
   lastCpuPercent: number | null;
   lastRamPercent: number | null;
   lastMaxDiskPercent: number | null;
@@ -53,7 +54,7 @@ export interface MetricsData {
 
 export interface TimeSeriesData {
   since: string;
-  series: { id: number; name: string; points: { t: string; ms: number; up: boolean }[] }[];
+  series: { id: number; name: string; points: { t: string; ms: number; up: boolean; st: number }[] }[];
 }
 export interface MetricsSeriesData {
   series: { id: number; name: string; points: { t: string; cpu: number | null; ram: number | null; disk: number | null }[] }[];
@@ -80,7 +81,8 @@ export interface BoardInput {
 export const getStatus = (signal?: AbortSignal) => apiGet<StatusResponse>("/status", signal);
 export const getBoards = (signal?: AbortSignal) => apiGet<Board[]>("/dashboards", signal);
 export const getBoardsMeta = (signal?: AbortSignal) => apiGet<BoardsMeta>("/dashboards/meta", signal);
-export const getHistory = (id: number, take = 120, signal?: AbortSignal) => apiGet<HistoryData>(`/history/${id}?take=${take}`, signal);
+export const getHistory = (id: number, take = 120, signal?: AbortSignal, minutes = 0) =>
+  apiGet<HistoryData>(`/history/${id}?take=${take}${minutes > 0 ? `&minutes=${minutes}` : ""}`, signal);
 
 export const createBoard = (b: BoardInput) => apiSend<{ id: number }>("POST", "/dashboards", b);
 export const updateBoard = (id: number, b: BoardInput) => apiSend<{ id: number }>("PUT", `/dashboards/${id}`, b);

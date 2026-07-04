@@ -122,7 +122,8 @@ function PieW({ w, d, onDrill }: { w: StatWidgetDef; d: StatsData; onDrill: OnDr
   return (
     <div className="h-full px-2 pb-1">
       <DonutChart data={arr} height="100%"
-        onSliceClick={(name) => onDrill({ source: w.source, value: name, title: `${PIE_TITLE[w.source] ?? w.source}: ${name}` })} />
+        onSliceClick={(name) => onDrill({ source: w.source, value: name, title: `${PIE_TITLE[w.source] ?? w.source}: ${name}` })}
+        onCenterClick={() => onDrill({ source: w.source, title: `${PIE_TITLE[w.source] ?? w.source} — tümü` })} />
     </div>
   );
 }

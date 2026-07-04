@@ -19,7 +19,12 @@ public enum ServiceType
     WindowsHealth = 12,
     LinuxHealth = 13,
     WindowsServiceControl = 14,
-    LinuxServiceControl = 15
+    LinuxServiceControl = 15,
+    // Database Fazı: Oracle sağlık izlemeleri — sayısal sonuç (adet) ResponseTimeMs alanında saklanır,
+    // YavaşlıkEşiği (ResponseTimeThresholdMs) bu sayıya eşik olarak uygulanabilir
+    OracleSysdate = 16,          // SELECT SYSDATE FROM DUAL — bağlantı + gecikme + saat sapması
+    OracleActiveSessions = 17,   // GV$SESSION: TYPE<>'BACKGROUND' AND STATUS='ACTIVE' adedi
+    OracleBlockedSessions = 18   // GV$SESSION: BLOCKING_SESSION IS NOT NULL adedi
 }
 
 /// <summary>Bir kontrolün sonucu: Up=sorunsuz, Down=ulaşılamıyor/bağlantı hatası,

@@ -21,14 +21,24 @@ function ActiveSlice(props: any) {
   );
 }
 
-export function DonutChart({ data, height = 240, onSliceClick, centerLabel }: {
+export function DonutChart({ data, height = 240, onSliceClick, onCenterClick, centerLabel }: {
   data: NameValue[];
   height?: number | string;
   onSliceClick?: (name: string) => void;
+  onCenterClick?: () => void;      // ortadaki toplam sayıya tıkla → tüm kapsam
   centerLabel?: string | number;
 }) {
   const [active, setActive] = useState<number | undefined>(undefined);
   const total = centerLabel ?? data.reduce((a, b) => a + b.value, 0);
+
+  // Lejant yalnız EN BÜYÜK 4 dilimi gösterir (uzun listeler grafiği taşırıyordu);
+  // kalanlar pastada, tooltip'te ve tıklamada aynen var.
+  const top4 = data
+    .map((d, i) => ({ ...d, i }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 4)
+    .map((d) => ({ value: d.name, type: "circle" as const, id: d.name, color: PALETTE[d.i % PALETTE.length] }));
+  const hidden = data.length - top4.length;
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -45,9 +55,10 @@ export function DonutChart({ data, height = 240, onSliceClick, centerLabel }: {
         >
           {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
         </Pie>
-        {/* Ortadaki toplam (eski tasarımdaki graphic text) */}
-        <text x="50%" y="44%" textAnchor="middle" dominantBaseline="middle"
-          style={{ fontSize: 22, fontWeight: 700, fill: "hsl(var(--foreground))" }}>
+        {/* Ortadaki toplam — pastanın TAM merkezinde, tıklanabilir */}
+        <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central"
+          onClick={onCenterClick}
+          style={{ fontSize: 22, fontWeight: 700, fill: "hsl(var(--foreground))", cursor: onCenterClick ? "pointer" : "default" }}>
           {total}
         </text>
         <Tooltip
@@ -57,7 +68,7 @@ export function DonutChart({ data, height = 240, onSliceClick, centerLabel }: {
         />
         <Legend
           verticalAlign="bottom"
-          iconType="circle"
+          payload={hidden > 0 ? [...top4, { value: `+${hidden} diğer`, type: "circle" as const, id: "__more", color: "hsl(var(--muted-foreground))" }] : top4}
           formatter={(v: string) => (
             <span title={v} style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{trunc(v)}</span>
           )}

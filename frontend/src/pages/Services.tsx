@@ -163,7 +163,7 @@ export function Services() {
           {tags.map((t) => <option key={t} value={t}>{t}</option>)}
         </Select>
         <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
-          <Plus className="h-4 w-4" /> Yeni Servis
+          <Plus className="h-4 w-4" /> Yeni İzleme
         </Button>
         <div className="flex gap-1">
           <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={onImportFile} />
@@ -181,7 +181,7 @@ export function Services() {
 
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm">
-          <span className="font-semibold text-primary">{selected.size} servis seçili</span>
+          <span className="font-semibold text-primary">{selected.size} izleme seçili</span>
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)}><SlidersHorizontal className="h-4 w-4" /> Toplu Düzenle</Button>
             <Button variant="destructive" size="sm" onClick={() => setBulkDelOpen(true)}><Trash2 className="h-4 w-4" /> Toplu Sil</Button>
@@ -193,8 +193,8 @@ export function Services() {
       <Card>
         <CardContent className="px-0 py-0">
           {filtered.length === 0 ? (
-            <EmptyState title={data && data.length > 0 ? "Eşleşen servis yok" : "Henüz servis yok"}
-              hint={data && data.length > 0 ? "Filtreleri değiştirmeyi dene." : "Yeni Servis ile ilk servisini ekle."} />
+            <EmptyState title={data && data.length > 0 ? "Eşleşen izleme yok" : "Henüz izleme yok"}
+              hint={data && data.length > 0 ? "Filtreleri değiştirmeyi dene." : "Yeni İzleme ile ilk izlemeni ekle."} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -263,7 +263,7 @@ export function Services() {
         </CardContent>
       </Card>
 
-      <div className="text-xs text-muted-foreground">{filtered.length} / {data?.length ?? 0} servis</div>
+      <div className="text-xs text-muted-foreground">{filtered.length} / {data?.length ?? 0} izleme</div>
 
       <ServiceForm open={formOpen} service={editing} meta={meta} onClose={() => setFormOpen(false)} onSaved={(m) => { setFlash({ ok: true, msg: m }); reload(); }} />
       <BulkEditForm open={bulkOpen} ids={Array.from(selected)} onClose={() => setBulkOpen(false)}

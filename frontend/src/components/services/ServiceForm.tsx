@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Input, Select, Textarea, Field, Switch } from "@/components/ui/input";
 import {
-  type ServiceItem, type ServiceInput, type ServicesMeta, CONTROL_TYPES,
+  type ServiceItem, type ServiceInput, type ServicesMeta,
+  TYPE_META, TYPE_GROUP_ORDER,
   createService, updateService,
 } from "@/lib/services";
 
@@ -42,13 +43,29 @@ export function ServiceForm({
   }, [open, service]);
 
   const set = <K extends keyof ServiceInput>(k: K, v: ServiceInput[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const isControl = CONTROL_TYPES.includes(form.type);
+
+  // Tip kataloğu: kategorili liste + seçili tipin form davranışı (eski dinamik form birebir)
+  const tm = TYPE_META[form.type] ?? TYPE_META.Tcp;
+  const grouped = useMemo(() => {
+    const known = new Set(Object.keys(TYPE_META));
+    const backendTypes = new Set(meta?.types ?? Object.keys(TYPE_META));
+    const groups = TYPE_GROUP_ORDER.map((g) => ({
+      group: g,
+      items: Object.entries(TYPE_META)
+        .filter(([k, m]) => m.group === g && backendTypes.has(k))
+        .map(([k, m]) => ({ value: k, label: m.label })),
+    })).filter((g) => g.items.length > 0);
+    // Backend'de olup katalogda olmayan tipler (ileriye dönük) sona eklenir
+    const extra = (meta?.types ?? []).filter((t) => !known.has(t));
+    if (extra.length > 0) groups.push({ group: "Diğer", items: extra.map((t) => ({ value: t, label: t })) });
+    return groups;
+  }, [meta]);
 
   async function submit() {
     setSaving(true); setErr(null);
     try {
-      if (service) { await updateService(service.id, form); onSaved("Servis güncellendi."); }
-      else { await createService(form); onSaved("Servis eklendi."); }
+      if (service) { await updateService(service.id, form); onSaved("İzleme güncellendi."); }
+      else { await createService(form); onSaved("İzleme eklendi."); }
       onClose();
     } catch (e) {
       setErr((e as Error).message);
@@ -61,8 +78,8 @@ export function ServiceForm({
     <Drawer
       open={open}
       onClose={onClose}
-      title={service ? "Servisi Düzenle" : "Yeni Servis"}
-      description={service ? service.name : "İzlenecek yeni bir servis tanımla"}
+      title={service ? "İzlemeyi Düzenle" : "Yeni İzleme"}
+      description={service ? service.name : "İzlenecek yeni bir hedef tanımla"}
       footer={
         <>
           <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Vazgeç</Button>
@@ -79,48 +96,70 @@ export function ServiceForm({
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Ad"><Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="örn. Intranet Portal" /></Field>
-          <Field label="Tip">
+          <Field label="İzleme Tipi">
             <Select value={form.type} onChange={(e) => set("type", e.target.value)}>
-              {(meta?.types ?? [form.type]).map((t) => <option key={t} value={t}>{t}</option>)}
+              {grouped.map((g) => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.items.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </optgroup>
+              ))}
             </Select>
           </Field>
         </div>
+        <p className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">{tm.hint}</p>
 
         <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <Field label="Hedef (Host/URL/IP)"><Input value={form.target} onChange={(e) => set("target", e.target.value)} placeholder="host.firma.local" /></Field>
+          <div className={tm.port ? "col-span-2" : "col-span-3"}>
+            <Field label={tm.target.label} hint={tm.target.hint}>
+              <Input value={form.target} onChange={(e) => set("target", e.target.value)} className="font-mono text-xs" />
+            </Field>
           </div>
-          <Field label="Port"><Input type="number" value={form.port ?? ""} onChange={(e) => set("port", numOrNull(e.target.value))} placeholder="—" /></Field>
+          {tm.port && (
+            <Field label="Port" hint={tm.port.hint}>
+              <Input type="number" value={form.port ?? ""} onChange={(e) => set("port", numOrNull(e.target.value))} placeholder="—" />
+            </Field>
+          )}
         </div>
 
-        <Field label={isControl ? "Servis adı (Windows servisi / systemd birimi)" : "Ekstra (beklenen kod / DB adı vb.)"}>
-          <Input value={form.extra ?? ""} onChange={(e) => set("extra", e.target.value || null)} placeholder={isControl ? "Spooler / crond" : "opsiyonel"} />
-        </Field>
+        {tm.extra && (
+          <Field label={tm.extra.label} hint={tm.extra.hint}>
+            <Input value={form.extra ?? ""} onChange={(e) => set("extra", e.target.value || null)} className="font-mono text-xs" />
+          </Field>
+        )}
 
-        <Field label="Kimlik Bilgisi">
-          <Select value={form.credentialId ?? ""} onChange={(e) => set("credentialId", e.target.value ? Number(e.target.value) : null)}>
-            <option value="">— Yok —</option>
-            {(meta?.credentials ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        </Field>
+        {tm.cred && (
+          <Field label={tm.cred.label} hint={tm.cred.hint}>
+            <Select value={form.credentialId ?? ""} onChange={(e) => set("credentialId", e.target.value ? Number(e.target.value) : null)}>
+              <option value="">— Yok —</option>
+              {(meta?.credentials ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </Field>
+        )}
 
         <div className="flex flex-wrap gap-6 rounded-lg border border-border/60 bg-muted/30 p-4">
           <Switch checked={form.enabled} onChange={(v) => set("enabled", v)} label="Aktif" />
-          <Switch checked={form.useSsl} onChange={(v) => set("useSsl", v)} label="SSL/TLS" />
-          <Switch checked={form.ignoreCertErrors} onChange={(v) => set("ignoreCertErrors", v)} label="Sertifika hatalarını yoksay" />
+          {tm.ssl && <Switch checked={form.useSsl} onChange={(v) => set("useSsl", v)} label={tm.ssl} />}
+          {tm.cert && <Switch checked={form.ignoreCertErrors} onChange={(v) => set("ignoreCertErrors", v)} label="Sertifika hatalarını yoksay" />}
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <Field label="Aralık (dk)" hint="boş = global"><Input type="number" value={form.intervalMinutesOverride ?? ""} onChange={(e) => set("intervalMinutesOverride", numOrNull(e.target.value))} /></Field>
           <Field label="Zaman aşımı (sn)"><Input type="number" value={form.timeoutSeconds} onChange={(e) => set("timeoutSeconds", Number(e.target.value) || 15)} /></Field>
-          <Field label="Yavaşlık eşiği (ms)" hint="boş = kapalı"><Input type="number" value={form.responseTimeThresholdMs ?? ""} onChange={(e) => set("responseTimeThresholdMs", numOrNull(e.target.value))} /></Field>
+          <Field label={form.type === "OracleActiveSessions" ? "Session eşiği (adet)" : "Yavaşlık eşiği (ms)"} hint="boş = kapalı">
+            <Input type="number" value={form.responseTimeThresholdMs ?? ""} onChange={(e) => set("responseTimeThresholdMs", numOrNull(e.target.value))} />
+          </Field>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <Field label="CPU eşiği (%)"><Input type="number" value={form.cpuThresholdPercent ?? ""} onChange={(e) => set("cpuThresholdPercent", numOrNull(e.target.value))} /></Field>
-          <Field label="RAM eşiği (%)"><Input type="number" value={form.ramThresholdPercent ?? ""} onChange={(e) => set("ramThresholdPercent", numOrNull(e.target.value))} /></Field>
-          <Field label="Disk eşiği (%)"><Input type="number" value={form.diskThresholdPercent ?? ""} onChange={(e) => set("diskThresholdPercent", numOrNull(e.target.value))} /></Field>
-        </div>
+        {tm.health && (
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+            <p className="mb-3 text-sm font-medium text-muted-foreground">Sağlık Eşikleri <span className="font-normal">(aşılırsa DOWN + alarm; boş metrik yalnız ölçülür)</span></p>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="CPU eşiği (%)"><Input type="number" value={form.cpuThresholdPercent ?? ""} onChange={(e) => set("cpuThresholdPercent", numOrNull(e.target.value))} placeholder="örn. 90" /></Field>
+              <Field label="RAM eşiği (%)"><Input type="number" value={form.ramThresholdPercent ?? ""} onChange={(e) => set("ramThresholdPercent", numOrNull(e.target.value))} placeholder="örn. 90" /></Field>
+              <Field label="Disk eşiği (%)"><Input type="number" value={form.diskThresholdPercent ?? ""} onChange={(e) => set("diskThresholdPercent", numOrNull(e.target.value))} placeholder="örn. 85" /></Field>
+            </div>
+          </div>
+        )}
 
         <Field label="Etiketler" hint="virgülle ayır"><Input value={form.keyword ?? ""} onChange={(e) => set("keyword", e.target.value || null)} placeholder="web, üretim" /></Field>
         <Field label="Açıklama"><Textarea value={form.description ?? ""} onChange={(e) => set("description", e.target.value || null)} /></Field>

@@ -55,7 +55,7 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
               setSearch("");
             }
           }}
-          placeholder="Servis ara… (Enter)"
+          placeholder="İzleme ara… (Enter)"
           className="h-9 w-64 rounded-lg border border-input bg-card/60 pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/40"
         />
       </div>

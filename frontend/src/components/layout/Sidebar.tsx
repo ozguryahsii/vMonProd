@@ -13,7 +13,7 @@ const allNav = [
   { to: "/app/dashboard", label: "Dashboard'lar", icon: LayoutDashboard, perm: "dashboards.view" },
   { to: "/app/reports", label: "Raporlar", icon: BarChart3, perm: "dashboards.view" },
   { to: "/app/statistics", label: "İstatistikler", icon: Activity, perm: "dashboards.view" },
-  { to: "/app/services", label: "Servisler", icon: Server, perm: "services.manage" },
+  { to: "/app/services", label: "İzlemeler", icon: Server, perm: "services.manage" },
   { to: "/app/credentials", label: "Kimlik Bilgileri", icon: KeyRound, perm: "credentials.manage" },
   { to: "/app/settings", label: "Ayarlar", icon: Settings, admin: true },
   { to: "/app/users", label: "Kullanıcılar", icon: Users, admin: true },
@@ -38,7 +38,7 @@ export function Sidebar() {
   return (
     <aside className={cn(
       "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border bg-card/40 backdrop-blur-xl transition-[width] duration-200 lg:flex",
-      collapsed ? "w-16" : "w-64"
+      collapsed ? "w-16" : "w-44"
     )}>
       <div className={cn("flex h-16 items-center gap-2.5", collapsed ? "justify-center px-0" : "px-5")}>
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">

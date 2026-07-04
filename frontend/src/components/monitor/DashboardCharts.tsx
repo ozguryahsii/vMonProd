@@ -36,9 +36,24 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
 
     setResp(null); setCpu(null); setRam(null); setDisk(null);
 
+    // Eşik haritası: yavaş noktaları (koyu sarı) işaretlemek için
+    const thrMap = new Map(enabled.map((s) => [s.id, s.responseTimeThresholdMs]));
     if (respIds.length > 0)
       getTimeSeries(respIds, minutes, ctrl.signal).then((d) => {
-        setResp(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.up ? p.ms : null })) })));
+        setResp(d.series.map((s) => {
+          const thr = thrMap.get(s.id) ?? null;
+          return {
+            name: s.name,
+            points: s.points.map((p) => ({
+              t: p.t,
+              v: p.up ? p.ms : null,
+              // down=büyük kırmızı; hata (st=2) veya yavaş (eşik aşımı)=koyu sarı
+              mark: !p.up ? ("down" as const)
+                : p.st === 2 || (thr != null && p.ms > thr) ? ("warn" as const)
+                : undefined,
+            })),
+          };
+        }));
         setTick((t) => t + 1);
       }).catch(() => setResp([]));
     else setResp([]);
@@ -68,6 +83,8 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
           <option value="180">Son 3 saat</option>
           <option value="720">Son 12 saat</option>
           <option value="1440">Son 24 saat</option>
+          <option value="10080">Son 7 gün</option>
+          <option value="43200">Son 1 ay</option>
         </Select>
       </div>
 
@@ -81,16 +98,16 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
             <ServicePicker services={services.filter((s) => s.enabled)} selected={manualIds} onChange={setManualIds} />
           </CardHeader>
           <CardContent>
-            {resp === null ? <Skeleton className="h-[260px] w-full" /> : <MultiLineChart key={`resp-${tick}`} series={resp} unit=" ms" />}
+            {resp === null ? <Skeleton className="h-[260px] w-full" /> : <MultiLineChart key={`resp-${tick}`} series={resp} unit=" ms" longRange={minutes > 1440} />}
           </CardContent>
         </Card>
       )}
 
       {hasHealth && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <MetricCard key={`cpu-${tick}`} title="CPU Kullanımı" data={cpu} />
-          <MetricCard key={`ram-${tick}`} title="RAM Kullanımı" data={ram} />
-          <MetricCard key={`disk-${tick}`} title="Disk Doluluk" data={disk} />
+          <MetricCard key={`cpu-${tick}`} title="CPU Kullanımı" data={cpu} longRange={minutes > 1440} />
+          <MetricCard key={`ram-${tick}`} title="RAM Kullanımı" data={ram} longRange={minutes > 1440} />
+          <MetricCard key={`disk-${tick}`} title="Disk Doluluk" data={disk} longRange={minutes > 1440} />
         </div>
       )}
     </div>
@@ -144,14 +161,14 @@ function ServicePicker({ services, selected, onChange }: {
   );
 }
 
-function MetricCard({ title, data }: { title: string; data: SeriesDef[] | null }) {
+function MetricCard({ title, data, longRange }: { title: string; data: SeriesDef[] | null; longRange?: boolean }) {
   return (
     <Card>
       <CardHeader className="pb-2"><CardTitle className="text-base">{title}</CardTitle></CardHeader>
       <CardContent>
         {data === null ? <Skeleton className="h-[200px] w-full" /> :
           data.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">Sağlık verisi yok</div> :
-          <MultiLineChart series={data} height={200} unit="%" domainMax={100} />}
+          <MultiLineChart series={data} height={200} unit="%" domainMax={100} longRange={longRange} />}
       </CardContent>
     </Card>
   );

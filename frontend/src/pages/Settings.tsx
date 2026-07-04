@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Save, CheckCircle2, XCircle, Mail, MessageSquare, Phone, ShieldCheck,
+  Save, CheckCircle2, XCircle, Mail, ShieldCheck,
   Radio, CalendarClock, Database, Building2, KeyRound, Timer, FlaskConical,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Field, Switch } from "@/components/ui/input";
 import { Skeleton, ErrorState } from "@/components/ui/states";
 import {
-  getSettings, saveSettings, testEmail, testSms, testWhatsapp, testLdap, testSyslog, eolSyncNow,
+  getSettings, saveSettings, testEmail, testLdap, testSyslog, eolSyncNow,
   type AppSettings,
 } from "@/lib/settings";
 import { getCredentials, type CredentialRow } from "@/lib/admin";
@@ -153,41 +153,9 @@ export function Settings() {
           </TestRow>
         </Section>
 
-        {/* SMS */}
-        <Section icon={<MessageSquare className="h-4 w-4" />} title="SMS (Twilio)">
-          <Switch checked={s.smsEnabled} onChange={(v) => set("smsEnabled", v)} label="SMS alarmları açık" />
-          <Field label="Account SID"><Input value={s.smsAccountSid} onChange={(e) => set("smsAccountSid", e.target.value)} /></Field>
-          <Field label="Auth Token" hint={s.hasSmsToken ? "kayıtlı — değiştirmek için yeni girin" : ""}>
-            <Input type="password" autoComplete="new-password" value={newSms} onChange={(e) => setNewSms(e.target.value)}
-              placeholder={s.hasSmsToken ? "•••••• (değiştirmek için girin)" : "token"} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Gönderen"><Input value={s.smsFrom} onChange={(e) => set("smsFrom", e.target.value)} placeholder="+1..." /></Field>
-            <Field label="Alıcılar"><Input value={s.smsRecipients} onChange={(e) => set("smsRecipients", e.target.value)} placeholder="+905..., +905..." /></Field>
-          </div>
-          <TestRow k="sms" msg={testMsg}>
-            <Button variant="outline" size="sm" onClick={() => runTest("sms", () => testSms(""))}><MessageSquare className="h-4 w-4" /> Test SMS</Button>
-          </TestRow>
-        </Section>
-
-        {/* WhatsApp */}
-        <Section icon={<Phone className="h-4 w-4" />} title="WhatsApp (Twilio)">
-          <Switch checked={s.whatsappEnabled} onChange={(v) => set("whatsappEnabled", v)} label="WhatsApp alarmları açık" />
-          <Field label="Account SID"><Input value={s.whatsappAccountSid} onChange={(e) => set("whatsappAccountSid", e.target.value)} /></Field>
-          <Field label="Auth Token" hint={s.hasWhatsappToken ? "kayıtlı — değiştirmek için yeni girin" : ""}>
-            <Input type="password" autoComplete="new-password" value={newWa} onChange={(e) => setNewWa(e.target.value)}
-              placeholder={s.hasWhatsappToken ? "•••••• (değiştirmek için girin)" : "token"} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Gönderen"><Input value={s.whatsappFrom} onChange={(e) => set("whatsappFrom", e.target.value)} placeholder="+1..." /></Field>
-            <Field label="Alıcılar"><Input value={s.whatsappRecipients} onChange={(e) => set("whatsappRecipients", e.target.value)} /></Field>
-          </div>
-          <Field label="Alarm şablonu (Content SID)"><Input value={s.whatsappAlarmTemplateSid} onChange={(e) => set("whatsappAlarmTemplateSid", e.target.value)} placeholder="HX..." /></Field>
-          <Field label="Webhook secret"><Input value={s.whatsappWebhookSecret} onChange={(e) => set("whatsappWebhookSecret", e.target.value)} /></Field>
-          <TestRow k="wa" msg={testMsg}>
-            <Button variant="outline" size="sm" onClick={() => runTest("wa", () => testWhatsapp(""))}><Phone className="h-4 w-4" /> Test WhatsApp</Button>
-          </TestRow>
-        </Section>
+        {/* SMS ve WhatsApp Twilio ayarları KALDIRILDI (kullanıcı isteği):
+            özel kanallar aşağıdaki Bildirim Kanalları'ndan yönetilir. Alanlar DB'de duruyor,
+            klasik arayüzden hâlâ erişilebilir (OTP SMS/WhatsApp kanalı onları kullanır). */}
 
         {/* Güvenlik */}
         <Section icon={<ShieldCheck className="h-4 w-4" />} title="Güvenlik ve Uyumluluk">
@@ -258,7 +226,7 @@ export function Settings() {
       </div>
 
       {/* Kaydet çubuğu */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/80 px-5 py-3 backdrop-blur lg:left-64">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/80 px-5 py-3 backdrop-blur lg:left-44">
         <div className="mx-auto flex max-w-[1500px] items-center justify-end gap-3">
           <span className="hidden text-xs text-muted-foreground sm:inline">Üstteki ayarlar tek seferde kaydedilir; kanallar / yedekler / logo anında uygulanır.</span>
           <Button onClick={doSave} disabled={saving}><Save className="h-4 w-4" /> {saving ? "Kaydediliyor…" : "Ayarları Kaydet"}</Button>

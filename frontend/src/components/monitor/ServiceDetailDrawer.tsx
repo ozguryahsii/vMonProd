@@ -33,6 +33,12 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"start" | "stop" | "restart" | null>(null);
+  const [rangeMin, setRangeMin] = useState(180); // 3s varsayılan; 24s/7g/1a seçilebilir
+
+  const RANGES = [
+    { m: 180, label: "3 saat" }, { m: 1440, label: "24 saat" },
+    { m: 10080, label: "7 gün" }, { m: 43200, label: "1 ay" },
+  ];
 
   const ACTION_LABEL: Record<string, string> = { start: "BAŞLAT", stop: "DURDUR", restart: "YENİDEN BAŞLAT" };
 
@@ -44,15 +50,16 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
     const ctrl = new AbortController();
     setLoading(true); setError(null);
     Promise.all([
-      getHistory(service.id, 120, ctrl.signal),
-      isHealth ? getMetrics(service.id, 1440, ctrl.signal) : Promise.resolve(null),
+      getHistory(service.id, 120, ctrl.signal, rangeMin),
+      isHealth ? getMetrics(service.id, rangeMin, ctrl.signal) : Promise.resolve(null),
     ])
       .then(([h, m]) => { setHist(h); setMetrics(m); })
       .catch((e) => { if ((e as Error).name !== "AbortError") setError((e as Error).message); })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
   };
-  useEffect(() => { setHist(null); setMetrics(null); setFlash(null); return load(); /* eslint-disable-next-line */ }, [service]);
+  useEffect(() => { setFlash(null); return load(); /* eslint-disable-next-line */ }, [service?.id, service?.lastCheckedAt, rangeMin]);
+  useEffect(() => { if (service) { setHist(null); setMetrics(null); } /* eslint-disable-next-line */ }, [service?.id]);
 
   async function act(fn: () => Promise<{ message?: string }>, label: string) {
     setBusy(true); setFlash(null);
@@ -61,9 +68,30 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
     finally { setBusy(false); }
   }
 
-  const checks = (hist?.checks ?? []).slice().reverse().map((c) => ({ t: clock(c.checkedAt), ms: c.responseTimeMs, up: c.isUp }));
-  const mpts = (metrics?.points ?? []).map((p) => ({ t: clock(p.t), cpu: p.cpu, ram: p.ram, disk: p.disk }));
+  // Uzun aralıkta eksende tarih de göster
+  const label = (iso: string) => {
+    const d = new Date(iso);
+    const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return rangeMin > 1440 ? `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} ${hm}` : hm;
+  };
+  const thr = service?.responseTimeThresholdMs ?? null;
+  const checks = (hist?.checks ?? []).slice().reverse().map((c) => ({
+    t: label(c.checkedAt), ms: c.responseTimeMs, up: c.isUp, st: c.status,
+    slow: c.isUp && thr != null && c.responseTimeMs > thr,
+  }));
+  const mpts = (metrics?.points ?? []).map((p) => ({ t: label(p.t), cpu: p.cpu, ram: p.ram, disk: p.disk }));
   const cat = service ? catOf(service) : "down";
+
+  // Durum noktaları: DOWN=büyük kırmızı, Yavaş/Hata=koyu sarı (grafikte kaybolmaz)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const statusDot = (props: any) => {
+    const { cx, cy, payload, index } = props;
+    if (payload?.up === false)
+      return <circle key={index} cx={cx} cy={cy} r={6} fill="hsl(0 84% 55%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
+    if (payload?.st === 2 || payload?.slow)
+      return <circle key={index} cx={cx} cy={cy} r={5} fill="hsl(38 92% 45%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
+    return <g key={index} />;
+  };
 
   return (
     <Drawer open={!!service} onClose={onClose}
@@ -104,19 +132,38 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
           ) : (
             <>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Yanıt Süresi (son {checks.length} kontrol)</h3>
-                {checks.length === 0 ? <EmptyState title="Kontrol geçmişi yok" /> : (
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Yanıt Süresi ({checks.length} kontrol)</h3>
+                  <div className="flex gap-1">
+                    {RANGES.map((r) => (
+                      <Button key={r.m} variant={rangeMin === r.m ? "default" : "ghost"} size="sm"
+                        className="h-7 px-2 text-xs" onClick={() => setRangeMin(r.m)}>{r.label}</Button>
+                    ))}
+                  </div>
+                </div>
+                {checks.length === 0 ? <EmptyState title="Bu aralıkta kontrol yok" /> : (
                   <ResponsiveContainer width="100%" height={200}>
                     <AreaChart data={checks} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                       <defs><linearGradient id="gMs" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(217 91% 60%)" stopOpacity={0.4} /><stop offset="100%" stopColor="hsl(217 91% 60%)" stopOpacity={0} /></linearGradient></defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                      <XAxis dataKey="t" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={30} />
+                      <XAxis dataKey="t" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={34} />
                       <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{ stroke: "hsl(var(--border))" }} contentStyle={tip} formatter={(v: number) => [`${v} ms`, "Yanıt"]} />
-                      <Area type="monotone" dataKey="ms" stroke="hsl(217 91% 60%)" strokeWidth={2} fill="url(#gMs)" />
+                      <Tooltip cursor={{ stroke: "hsl(var(--border))" }} contentStyle={tip}
+                        formatter={(v: number, _n, item) => {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          const p = (item as any)?.payload;
+                          const state = p?.up === false ? " · DOWN" : p?.st === 2 ? " · HATA" : p?.slow ? " · YAVAŞ" : "";
+                          return [`${v} ms${state}`, "Yanıt"];
+                        }} />
+                      <Area type="monotone" dataKey="ms" stroke="hsl(217 91% 60%)" strokeWidth={2} fill="url(#gMs)"
+                        dot={statusDot} activeDot={{ r: 4 }} isAnimationActive={checks.length < 400} />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
+                <div className="mt-1 flex gap-4 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: "hsl(0 84% 55%)" }} /> Down</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "hsl(38 92% 45%)" }} /> Yavaş / Hata</span>
+                </div>
               </div>
 
               {isHealth && mpts.length > 0 && (

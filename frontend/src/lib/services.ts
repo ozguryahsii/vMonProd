@@ -72,6 +72,50 @@ export interface ServicesMeta {
 
 export const CONTROL_TYPES = ["WindowsServiceControl", "LinuxServiceControl"];
 
+/* ================= İzleme tipi kataloğu (eski formdaki typeConfig birebir + Database Fazı) =================
+   Tip seçilince form alanları/etiketleri/ipuçları buna göre değişir. */
+export interface TypeMeta {
+  group: string;
+  label: string;
+  hint: string;
+  target: { label: string; hint?: string };
+  port: { hint: string } | null;          // null = port alanı gizli
+  extra: { label: string; hint?: string } | null;
+  cred: { label: string; hint?: string } | null;
+  ssl: string | null;                     // null = SSL anahtarı gizli; string = etiketi
+  cert: boolean;                          // sertifika-yoksay anahtarı görünür mü
+  health?: boolean;                       // CPU/RAM/Disk eşik bloğu görünür mü
+}
+
+export const TYPE_META: Record<string, TypeMeta> = {
+  Http: { group: "Web / Genel", label: "HTTP / Endpoint URL", hint: "URL'e GET atılır; durum kodu ve yanıt süresi kontrol edilir. Exchange OWA için: https://mail.firma.local/owa/healthcheck.htm", target: { label: "Tam URL *", hint: "örn. https://intranet.firma.local/health" }, port: null, extra: { label: "Beklenen HTTP durum kodu", hint: "Boşsa 2xx/3xx başarılı sayılır. örn. 200" }, cred: { label: "Kimlik (Basic Auth)", hint: "Opsiyonel — korumalı endpoint'ler için." }, ssl: null, cert: true },
+  Tcp: { group: "Web / Genel", label: "Genel TCP Port", hint: "Yalnızca TCP portunun açık olduğu doğrulanır.", target: { label: "Host / IP *" }, port: { hint: "Zorunlu." }, extra: null, cred: null, ssl: null, cert: false },
+  MySql: { group: "Veritabanı", label: "MySQL", hint: "İzleme kullanıcısıyla gerçek login + SELECT 1 çalıştırılır.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "DB izleme kullanıcısı (read-only önerilir)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  MsSql: { group: "Veritabanı", label: "MSSQL", hint: "İzleme kullanıcısıyla gerçek login + SELECT 1 çalıştırılır.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi", hint: "SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  Oracle: { group: "Veritabanı", label: "Oracle", hint: "Read-only izleme kullanıcısıyla login + SELECT 1 FROM DUAL çalıştırılır.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID kullanılacaksa: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "Oracle read-only izleme kullanıcısı." }, ssl: null, cert: false },
+  // ---- Database Fazı: Oracle sağlık izlemeleri ----
+  OracleSysdate: { group: "Veritabanı", label: "Oracle SYSDATE (bağlantı + saat)", hint: "SELECT SYSDATE FROM DUAL çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "CREATE SESSION yetkili izleme kullanıcısı." }, ssl: null, cert: false },
+  OracleActiveSessions: { group: "Veritabanı", label: "Oracle Aktif Sessions", hint: "GV$SESSION'dan background olmayan AKTİF oturum adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "GV$SESSION okuma yetkili kullanıcı (SELECT ON gv_$session)." }, ssl: null, cert: false },
+  OracleBlockedSessions: { group: "Veritabanı", label: "Oracle Blocked Sessions", hint: "Birbirini bloklayan (BLOCKING_SESSION dolu) oturum adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "GV$SESSION okuma yetkili kullanıcı (SELECT ON gv_$session)." }, ssl: null, cert: false },
+  Ldap: { group: "Altyapı", label: "Active Directory / LDAP(S)", hint: "Domain Controller'a yetkili kullanıcıyla gerçek bind yapılır. LDAPS için SSL işaretleyin (port 636).", target: { label: "Domain Controller / IP *" }, port: { hint: "Boşsa 389 (LDAP) / 636 (SSL işaretliyse)." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "AD hesabı (Domain alanını doldurun) veya tam DN." }, ssl: "LDAPS kullan", cert: true },
+  Dns: { group: "Altyapı", label: "DNS", hint: "Hedef DNS sunucusuna doğrudan A kaydı sorgusu atılır (OS resolver kullanılmaz).", target: { label: "DNS Sunucu IP *" }, port: { hint: "Boşsa 53." }, extra: { label: "Test edilecek hostname *", hint: "örn. intranet.firma.local — bu kayıt çözülürse UP." }, cred: null, ssl: null, cert: false },
+  Sftp: { group: "Altyapı", label: "SFTP", hint: "Yetkili kullanıcıyla gerçek SSH/SFTP oturumu açılır ve dizin listelenir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SFTP kullanıcısı." }, ssl: null, cert: false },
+  DhcpWindowsService: { group: "Altyapı", label: "DHCP (Windows servis kontrolü)", hint: "Uzak Windows sunucusunda DHCP Server servisinin Running olduğu WMI ile doğrulanır.", target: { label: "DHCP Sunucusu (host/IP) *" }, port: null, extra: { label: "Windows servis adı", hint: "Boşsa DHCPServer." }, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false },
+  Ping: { group: "Altyapı", label: "Ping (ICMP)", hint: "ICMP echo gönderilir; yanıt gelirse UP.", target: { label: "Host / IP *" }, port: null, extra: { label: "Maks. RTT (ms)", hint: "Opsiyonel — yanıt bu süreden uzunsa DOWN sayılır." }, cred: null, ssl: null, cert: false },
+  Smtp: { group: "Mail (Exchange / Exchange Online)", label: "SMTP", hint: "SMTP'ye bağlanır, 220 banner + EHLO/250 doğrular. On-prem: mail sunucu:25. Exchange Online: smtp.office365.com:25.", target: { label: "Mail Sunucusu (host/IP) *", hint: "örn. mail.firma.local veya smtp.office365.com" }, port: { hint: "Boşsa 25. Implicit TLS (465) için SSL işaretleyin." }, extra: null, cred: null, ssl: "Implicit TLS (465)", cert: true },
+  Imap: { group: "Mail (Exchange / Exchange Online)", label: "IMAP", hint: "IMAP'a bağlanır, \"* OK\" greeting'i doğrular. Exchange Online: outlook.office365.com:993 + SSL.", target: { label: "Mail Sunucusu (host/IP) *", hint: "örn. mail.firma.local veya outlook.office365.com" }, port: { hint: "Boşsa 143 / 993 (SSL işaretliyse)." }, extra: null, cred: null, ssl: "IMAPS (993)", cert: true },
+  WindowsHealth: { group: "Sunucu Sağlığı", label: "Windows Sunucu (CPU/RAM/Disk)", hint: "WMI ile uzak Windows sunucusundan CPU, RAM ve disk doluluk oranları okunur; eşikler aşılırsa alarm üretilir.", target: { label: "Sunucu (host/IP) *" }, port: null, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI okuma yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false, health: true },
+  LinuxHealth: { group: "Sunucu Sağlığı", label: "Linux Sunucu (CPU/RAM/Disk, SSH)", hint: "SSH ile bağlanıp /proc/stat, free ve df okunur (root gerekmez); eşikler aşılırsa alarm üretilir.", target: { label: "Sunucu (host/IP) *" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (sıradan kullanıcı yeterli)." }, ssl: null, cert: false, health: true },
+  WindowsServiceControl: { group: "Servis Durumu (Uzaktan Kontrol)", label: "Windows Servis (start/stop/restart)", hint: "Uzak Windows sunucusunda belirtilen servis çalışıyor mu (WMI) kontrol edilir; dashboard'dan start/stop/restart yapılabilir.", target: { label: "Sunucu (host/IP) *" }, port: null, extra: { label: "Windows Servis Adı *", hint: "örn. W3SVC (IIS), MSSQLSERVER, Spooler" }, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI + servis kontrol yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false },
+  LinuxServiceControl: { group: "Servis Durumu (Uzaktan Kontrol)", label: "Linux Servis (systemd, SSH)", hint: "Uzak Linux sunucusunda systemd servis durumu (SSH) kontrol edilir; dashboard'dan start/stop/restart yapılabilir (sudo gerekir).", target: { label: "Sunucu (host/IP) *" }, port: { hint: "Boşsa 22." }, extra: { label: "systemd Unit Adı *", hint: "örn. nginx, httpd, docker" }, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (start/stop/restart için sudo -n yetkisi gerekir)." }, ssl: null, cert: false },
+};
+
+/** Kategori sırası (eski formdaki optgroup düzeni) */
+export const TYPE_GROUP_ORDER = [
+  "Veritabanı", "Altyapı", "Mail (Exchange / Exchange Online)",
+  "Sunucu Sağlığı", "Servis Durumu (Uzaktan Kontrol)", "Web / Genel",
+];
+
 export const listServices = (signal?: AbortSignal) => apiGet<ServiceItem[]>("/services", signal);
 export const servicesMeta = (signal?: AbortSignal) => apiGet<ServicesMeta>("/services/meta", signal);
 export const createService = (input: ServiceInput) => apiSend<{ id: number }>("POST", "/services", input);

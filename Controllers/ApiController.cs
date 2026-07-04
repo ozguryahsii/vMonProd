@@ -67,7 +67,7 @@ public class ApiController : ControllerBase
             {
                 s.Id, s.Name, s.Type, s.Target, s.Port, s.Enabled,
                 s.LastCheckedAt, s.LastIsUp, s.LastResponseTimeMs, s.LastError,
-                s.ConsecutiveFailures,
+                s.ConsecutiveFailures, s.ResponseTimeThresholdMs,
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
@@ -460,16 +460,23 @@ public class ApiController : ControllerBase
 
     /// <summary>Servis geçmişi: son kontroller + kesintiler.</summary>
     [HttpGet("history/{id:int}")]
-    public async Task<IActionResult> History(int id, [FromQuery] int take = 100, CancellationToken ct = default)
+    public async Task<IActionResult> History(int id, [FromQuery] int take = 100, [FromQuery] int minutes = 0, CancellationToken ct = default)
     {
         if (!Can(Perms.DashboardsView)) return Forbid403();
         var svc = await _db.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (svc == null) return NotFound("Servis bulunamadı");
 
-        var checks = await _db.CheckResults.AsNoTracking()
-            .Where(r => r.ServiceId == id)
+        // minutes > 0: zaman aralığına göre (detay grafiği aralık seçici); yoksa son N kontrol
+        var q = _db.CheckResults.AsNoTracking().Where(r => r.ServiceId == id);
+        if (minutes > 0)
+        {
+            var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 62));
+            q = q.Where(r => r.CheckedAt >= since);
+            take = 3000;
+        }
+        var checks = await q
             .OrderByDescending(r => r.CheckedAt)
-            .Take(Math.Clamp(take, 1, 1000))
+            .Take(Math.Clamp(take, 1, 3000))
             .Select(r => new { r.CheckedAt, r.IsUp, r.Status, r.ResponseTimeMs, r.Error })
             .ToListAsync(ct);
 
@@ -497,7 +504,7 @@ public class ApiController : ControllerBase
         var points = await _db.CheckResults.AsNoTracking()
             .Where(r => idList.Contains(r.ServiceId) && r.CheckedAt >= since)
             .OrderBy(r => r.CheckedAt)
-            .Select(r => new { r.ServiceId, r.CheckedAt, r.ResponseTimeMs, r.IsUp })
+            .Select(r => new { r.ServiceId, r.CheckedAt, r.ResponseTimeMs, r.IsUp, r.Status })
             .ToListAsync(ct);
 
         var names = await _db.Services.AsNoTracking()
@@ -511,8 +518,9 @@ public class ApiController : ControllerBase
             {
                 id,
                 name = names[id],
+                // st: 0=Up 1=Down 2=Error — grafiklerde kırmızı/sarı durum noktaları için
                 points = points.Where(p => p.ServiceId == id)
-                    .Select(p => new { t = p.CheckedAt, ms = p.ResponseTimeMs, up = p.IsUp })
+                    .Select(p => new { t = p.CheckedAt, ms = p.ResponseTimeMs, up = p.IsUp, st = p.Status })
             })
         });
     }
@@ -526,7 +534,7 @@ public class ApiController : ControllerBase
             .Where(x => int.TryParse(x, out _)).Select(int.Parse).Distinct().Take(20).ToList();
         if (idList.Count == 0) return Ok(new { series = Array.Empty<object>() });
 
-        var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 7));
+        var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
         var points = await _db.HealthMetrics.AsNoTracking()
             .Where(m => idList.Contains(m.ServiceId) && m.CheckedAt >= since)
             .OrderBy(m => m.CheckedAt)

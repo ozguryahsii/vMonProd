@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,41 @@ function Pct({ v }: { v: number | null }) {
 }
 
 /** Widget drill-down: eşleşen sunucu listesi + (kaynak metriklerinde) seçilebilir aralıklı trend. */
+type SortKey = "name" | "os" | "status" | "cpu" | "ram" | "disk";
+
 export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onClose: () => void }) {
   const [days, setDays] = useState(7);
   const [data, setData] = useState<StatDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const sorted = useMemo(() => {
+    const list = (data?.servers ?? []).slice();
+    const dir = sortAsc ? 1 : -1;
+    list.sort((a, b) => {
+      if (sortKey === "cpu" || sortKey === "ram" || sortKey === "disk") {
+        const av = a[sortKey] ?? -1, bv = b[sortKey] ?? -1;
+        return (av - bv) * dir;
+      }
+      return String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""), "tr") * dir;
+    });
+    return list;
+  }, [data, sortKey, sortAsc]);
+
+  const clickSort = (k: SortKey) => {
+    if (sortKey === k) setSortAsc((v) => !v);
+    else { setSortKey(k); setSortAsc(k === "name" || k === "os" || k === "status"); }
+  };
+  const SortTh = ({ k, children, center }: { k: SortKey; children: ReactNode; center?: boolean }) => (
+    <th className={cn("cursor-pointer select-none px-3 py-2 font-semibold transition-colors hover:text-primary", center && "text-center")}
+      onClick={() => clickSort(k)}>
+      <span className="inline-flex items-center gap-0.5">
+        {children}
+        {sortKey === k && (sortAsc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </span>
+    </th>
+  );
 
   useEffect(() => { setDays(7); }, [drill?.source, drill?.value]);
   useEffect(() => {
@@ -77,18 +109,19 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
             {data.servers.length === 0 ? <EmptyState title="Eşleşen sunucu yok" /> : (
               <div className="overflow-x-auto rounded-lg border border-border/60">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <th className="px-3 py-2 font-semibold">Sunucu</th>
-                      <th className="px-3 py-2 font-semibold">OS</th>
-                      <th className="px-3 py-2 font-semibold">Durum</th>
-                      <th className="px-3 py-2 text-center font-semibold">CPU</th>
-                      <th className="px-3 py-2 text-center font-semibold">RAM</th>
-                      <th className="px-3 py-2 text-center font-semibold">Disk</th>
+                  {/* Başlık scroll'da sabit; başlığa tıkla → sırala (A-Z/Z-A, büyük-küçük) */}
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-border bg-card text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <SortTh k="name">Sunucu</SortTh>
+                      <SortTh k="os">OS</SortTh>
+                      <SortTh k="status">Durum</SortTh>
+                      <SortTh k="cpu" center>CPU</SortTh>
+                      <SortTh k="ram" center>RAM</SortTh>
+                      <SortTh k="disk" center>Disk</SortTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.servers.map((s) => (
+                    {sorted.map((s) => (
                       <tr key={s.name} className="border-b border-border/40 transition-colors hover:bg-accent/40" title={s.capacity ?? undefined}>
                         <td className="px-3 py-2">
                           <div className="font-medium">{s.name}</div>
