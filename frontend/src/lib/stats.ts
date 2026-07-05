@@ -36,7 +36,7 @@ export interface StatsData {
   dbHealth: {
     counts: { total: number; ok: number; warn: number; err: number; down: number };
     items: {
-      id: number; name: string; target: string; port: number | null; type: string;
+      id: number; name: string; target: string; port: number | null; extra: string | null; type: string;
       value: number | null; status: number; slow: boolean;
       lastError: string | null; lastChecked: string | null;
     }[];

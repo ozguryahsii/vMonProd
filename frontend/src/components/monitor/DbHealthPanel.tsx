@@ -37,8 +37,15 @@ const catDot: Record<string, string> = {
 interface Instance {
   key: string;
   platform: DbPlatform;
-  host: string;
+  dbName: string | null;          // Oracle service name / MSSQL-MySQL veritabanı adı (Extra)
+  hosts: string[];
   services: StatusService[];
+}
+
+/** Extra'dan veritabanı adı: Oracle service name (SID= öneki atılır) / DB adı; boşsa null */
+function dbNameOf(s: StatusService): string | null {
+  const e = (s.extra ?? "").trim().replace(/^SID=/i, "");
+  return e.length > 0 ? e : null;
 }
 
 export function DbHealthPanel({ services, onOpen }: { services: StatusService[]; onOpen: (id: number) => void }) {
@@ -48,16 +55,22 @@ export function DbHealthPanel({ services, onOpen }: { services: StatusService[];
       const meta = DB_METRIC_META[s.type];
       if (!meta) continue;
       const host = `${s.target}${s.port ? `:${s.port}` : ""}`;
-      const key = `${meta.platform}|${host}`;
+      const dbName = dbNameOf(s);
+      // Ortamlar karışmasın: önce ServiceName/DB adına göre grupla (prod/test/preprod ayrışır);
+      // ad yoksa eskisi gibi host bazında grupla.
+      const key = dbName ? `${meta.platform}|db:${dbName.toUpperCase()}` : `${meta.platform}|host:${host}`;
       let inst = map.get(key);
-      if (!inst) { inst = { key, platform: meta.platform, host, services: [] }; map.set(key, inst); }
+      if (!inst) { inst = { key, platform: meta.platform, dbName, hosts: [], services: [] }; map.set(key, inst); }
+      if (!inst.hosts.includes(host)) inst.hosts.push(host);
       inst.services.push(s);
     }
     // Metrikler sabit sırada (saat → aktif → bloklu → uzun → durum → doluluk → replikasyon)
     for (const inst of map.values())
       inst.services.sort((a, b) =>
-        METRIC_ORDER.indexOf(DB_METRIC_META[a.type].metric) - METRIC_ORDER.indexOf(DB_METRIC_META[b.type].metric));
-    return Array.from(map.values()).sort((a, b) => a.platform.localeCompare(b.platform) || a.host.localeCompare(b.host));
+        METRIC_ORDER.indexOf(DB_METRIC_META[a.type].metric) - METRIC_ORDER.indexOf(DB_METRIC_META[b.type].metric)
+        || a.target.localeCompare(b.target));
+    return Array.from(map.values()).sort((a, b) =>
+      a.platform.localeCompare(b.platform) || (a.dbName ?? a.hosts[0] ?? "").localeCompare(b.dbName ?? b.hosts[0] ?? ""));
   }, [services]);
 
   if (instances.length === 0) return null;
@@ -85,8 +98,16 @@ export function DbHealthPanel({ services, onOpen }: { services: StatusService[];
                   <Database className={cn("h-4 w-4", DB_PLATFORM_CLS[inst.platform])} />
                 </span>
                 <div className="min-w-0">
-                  <div className={cn("text-sm font-semibold", DB_PLATFORM_CLS[inst.platform])}>{inst.platform}</div>
-                  <div className="truncate font-mono text-xs text-muted-foreground">{inst.host}</div>
+                  <div className="truncate text-sm font-semibold">
+                    {inst.dbName ? (
+                      <>{inst.dbName} <span className={cn("font-medium", DB_PLATFORM_CLS[inst.platform])}>· {inst.platform}</span></>
+                    ) : (
+                      <span className={DB_PLATFORM_CLS[inst.platform]}>{inst.platform}</span>
+                    )}
+                  </div>
+                  <div className="truncate font-mono text-xs text-muted-foreground" title={inst.hosts.join(" · ")}>
+                    {inst.hosts.join(" · ")}
+                  </div>
                 </div>
                 <span className={cn("ml-auto h-2.5 w-2.5 shrink-0 rounded-full", catDot[worst], worst !== "up" && "animate-pulse")} />
               </div>
@@ -138,6 +159,10 @@ export function DbHealthPanel({ services, onOpen }: { services: StatusService[];
                             style={{ width: `${pct}%` }}
                           />
                         </div>
+                      )}
+                      {inst.hosts.length > 1 && (
+                        // Aynı DB birden çok host'tan izleniyorsa kutucukta hangi düğüm olduğu görünsün
+                        <div className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">{s.target}</div>
                       )}
                     </button>
                   );

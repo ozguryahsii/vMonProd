@@ -450,14 +450,16 @@ function DbHealthW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
   if (items.length === 0) return <DbEmpty />;
   const c = d.dbHealth.counts;
 
-  const groups = new Map<string, { platform: DbPlatform; host: string; items: DbItem[] }>();
+  // Dashboard paneliyle aynı kural: önce ServiceName/DB adına göre grupla (ortamlar ayrışır), ad yoksa host
+  const groups = new Map<string, { platform: DbPlatform; dbName: string | null; host: string; items: DbItem[] }>();
   for (const i of items) {
     const meta = DB_METRIC_META[i.type];
     if (!meta) continue;
     const host = `${i.target}${i.port ? `:${i.port}` : ""}`;
-    const key = `${meta.platform}|${host}`;
+    const dbName = (i.extra ?? "").trim().replace(/^SID=/i, "") || null;
+    const key = dbName ? `${meta.platform}|db:${dbName.toUpperCase()}` : `${meta.platform}|host:${host}`;
     let g = groups.get(key);
-    if (!g) { g = { platform: meta.platform, host, items: [] }; groups.set(key, g); }
+    if (!g) { g = { platform: meta.platform, dbName, host, items: [] }; groups.set(key, g); }
     g.items.push(i);
   }
 
@@ -481,10 +483,11 @@ function DbHealthW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
       </div>
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         {Array.from(groups.values()).map((g) => (
-          <button key={`${g.platform}|${g.host}`} type="button"
+          <button key={`${g.platform}|${g.dbName ?? g.host}`} type="button"
             onClick={() => onDrill({ source: "db_health", value: g.platform, title: `${g.platform} izlemeleri` })}
             className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
-            <span className={cn("font-semibold", DB_PLATFORM_CLS[g.platform])}>{g.platform}</span>
+            {g.dbName && <span className="font-semibold">{g.dbName}</span>}
+            <span className={cn("font-semibold", DB_PLATFORM_CLS[g.platform])}>{g.dbName ? `· ${g.platform}` : g.platform}</span>
             <span className="truncate font-mono text-muted-foreground">{g.host}</span>
             <span className="ml-auto flex flex-wrap justify-end gap-x-2.5 gap-y-0.5">
               {g.items.map((i) => {

@@ -209,6 +209,7 @@ public class StatisticsController : Controller
             name = s.Name,
             target = s.Target,
             port = s.Port,
+            extra = s.Extra,
             type = s.Type.ToString(),
             value = s.LastResponseTimeMs,
             status = s.LastStatus,

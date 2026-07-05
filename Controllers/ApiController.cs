@@ -39,6 +39,7 @@ public class ApiController : ControllerBase
                 Type = s.Type.ToString(),
                 s.Target,
                 s.Port,
+                s.Extra,
                 s.Enabled,
                 s.LastCheckedAt,
                 s.LastIsUp,
@@ -65,7 +66,7 @@ public class ApiController : ControllerBase
             now = DateTime.UtcNow,
             services = services.Select(s => new
             {
-                s.Id, s.Name, s.Type, s.Target, s.Port, s.Enabled,
+                s.Id, s.Name, s.Type, s.Target, s.Port, s.Extra, s.Enabled,
                 s.LastCheckedAt, s.LastIsUp, s.LastResponseTimeMs, s.LastError,
                 s.ConsecutiveFailures, s.ResponseTimeThresholdMs,
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,

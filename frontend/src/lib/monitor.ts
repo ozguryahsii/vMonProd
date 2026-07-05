@@ -6,6 +6,7 @@ export interface StatusService {
   type: string;
   target: string;
   port: number | null;
+  extra: string | null;
   enabled: boolean;
   lastCheckedAt: string | null;
   lastIsUp: boolean | null;
