@@ -7,12 +7,13 @@ import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ServiceDetailDrawer } from "@/components/monitor/ServiceDetailDrawer";
 import { DashboardCharts } from "@/components/monitor/DashboardCharts";
+import { DbHealthPanel } from "@/components/monitor/DbHealthPanel";
 import { BoardForm } from "@/components/monitor/BoardForm";
 import { useAsync } from "@/hooks/useAsync";
 import {
   type StatusService, type Board, type Cat, catOf, getStatus, getBoards, deleteBoard,
 } from "@/lib/monitor";
-import { checkIds } from "@/lib/services";
+import { checkIds, isDbHealthType, fmtDbValue } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const cats: { key: Cat; label: string; num: string; ring: string; dot: string }[] = [
@@ -66,6 +67,9 @@ export function Dashboard() {
   }, [inBoard]);
 
   const visible = active === "all" ? inBoard : inBoard.filter((s) => catOf(s) === active);
+  // DB sağlık izlemeleri kendi panelinde (enstans kartları) gösterilir, genel ızgarada tekrarlanmaz
+  const dbVisible = visible.filter((s) => isDbHealthType(s.type));
+  const gridVisible = visible.filter((s) => !isDbHealthType(s.type));
   // Drawer id ile takip eder → 20sn oto-yenilemede içerik CANLI güncellenir (bayat snapshot yok)
   const detail = detailId != null ? all.find((s) => s.id === detailId) ?? null : null;
 
@@ -141,12 +145,15 @@ export function Dashboard() {
       {/* Grafikler seçili kategoriye göre süzülür (Yavaş'a basınca yalnız yavaşlar çizilir) */}
       <DashboardCharts services={visible} />
 
+      {/* DB izlemeleri enstans (platform+host) kartlarında toplanır */}
+      <DbHealthPanel services={dbVisible} onOpen={setDetailId} />
+
       {visible.length === 0 ? (
         <EmptyState title={inBoard.length === 0 ? "Bu panoda servis yok" : "Bu kategoride servis yok"}
           hint={inBoard.length === 0 ? "Servisler ekranından ekle veya başka pano seç." : "Başka bir kategori seç."} />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visible.map((s) => {
+          {gridVisible.map((s) => {
             const c = catOf(s);
             return (
               <button key={s.id} onClick={() => setDetailId(s.id)}
@@ -171,7 +178,7 @@ export function Dashboard() {
                       {badgeOf[c].label}
                     </span>
                   )}
-                  <span className="text-xs tabular-nums text-muted-foreground">{s.lastIsUp && s.lastResponseTimeMs != null ? `${s.lastResponseTimeMs} ms` : s.type}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">{s.lastIsUp && s.lastResponseTimeMs != null ? fmtDbValue(s.type, s.lastResponseTimeMs) : s.type}</span>
                 </div>
                 {(s.lastCpuPercent != null || s.lastRamPercent != null || s.lastMaxDiskPercent != null) && (
                   <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">

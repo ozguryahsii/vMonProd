@@ -24,7 +24,23 @@ public enum ServiceType
     // YavaşlıkEşiği (ResponseTimeThresholdMs) bu sayıya eşik olarak uygulanabilir
     OracleSysdate = 16,          // SELECT SYSDATE FROM DUAL — bağlantı + gecikme + saat sapması
     OracleActiveSessions = 17,   // GV$SESSION: TYPE<>'BACKGROUND' AND STATUS='ACTIVE' adedi
-    OracleBlockedSessions = 18   // GV$SESSION: BLOCKING_SESSION IS NOT NULL adedi
+    OracleBlockedSessions = 18,  // GV$SESSION: BLOCKING_SESSION IS NOT NULL adedi
+    // DB İzleme Fazı 2: üç platformda simetrik metrik seti (Oracle tamamlama + MSSQL + MySQL)
+    OracleLongQueries = 19,      // GV$SESSION: aktif + LAST_CALL_ET > 60 sn adedi
+    OracleTablespaceStatus = 20, // DBA_TABLESPACES: STATUS='OFFLINE' adedi (>0 ERROR)
+    OracleConnectionUsage = 21,  // V$RESOURCE_LIMIT processes doluluk yüzdesi
+    MsSqlGetDate = 22,           // SELECT GETDATE() — bağlantı + gecikme + saat sapması
+    MsSqlActiveSessions = 23,    // dm_exec_sessions: is_user_process=1 AND status='running' adedi
+    MsSqlBlockedSessions = 24,   // dm_exec_requests: blocking_session_id<>0 adedi (>0 ERROR)
+    MsSqlLongQueries = 25,       // dm_exec_requests: total_elapsed_time > 60 sn adedi
+    MsSqlDbStatus = 26,          // sys.databases: state_desc<>'ONLINE' adedi (>0 ERROR)
+    MsSqlConnectionUsage = 27,   // kullanıcı oturumu / user connections limiti yüzdesi
+    MySqlNow = 28,               // SELECT NOW() — bağlantı + gecikme + saat sapması
+    MySqlActiveSessions = 29,    // PROCESSLIST: COMMAND<>'Sleep' adedi
+    MySqlBlockedSessions = 30,   // INNODB_TRX: trx_state='LOCK WAIT' adedi (>0 ERROR)
+    MySqlLongQueries = 31,       // PROCESSLIST: COMMAND<>'Sleep' AND TIME>60 adedi
+    MySqlReplication = 32,       // replika IO/SQL thread durumu + Seconds_Behind (sn)
+    MySqlConnectionUsage = 33    // PROCESSLIST / max_connections yüzdesi
 }
 
 /// <summary>Bir kontrolün sonucu: Up=sorunsuz, Down=ulaşılamıyor/bağlantı hatası,

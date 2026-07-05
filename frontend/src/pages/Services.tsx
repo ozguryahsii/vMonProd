@@ -13,7 +13,7 @@ import { ServiceForm } from "@/components/services/ServiceForm";
 import { BulkEditForm } from "@/components/services/BulkEditForm";
 import { useAsync } from "@/hooks/useAsync";
 import {
-  type ServiceItem, type ServicesMeta, statusOf, CONTROL_TYPES,
+  type ServiceItem, type ServicesMeta, statusOf, CONTROL_TYPES, fmtDbValue,
   listServices, servicesMeta, deleteService, checkService, serviceAction,
   bulkDelete, importCsv, exportCsvUrl, sampleCsvUrl,
 } from "@/lib/services";
@@ -79,7 +79,7 @@ export function Services() {
 
   async function doCheck(s: ServiceItem) {
     setBusyId(s.id);
-    try { const r = await checkService(s.id); setFlash({ ok: r.isUp, msg: `${s.name}: ${r.isUp ? "çalışıyor" : "kapalı"}${r.responseTimeMs ? ` (${r.responseTimeMs} ms)` : ""}` }); reload(); }
+    try { const r = await checkService(s.id); setFlash({ ok: r.isUp, msg: `${s.name}: ${r.isUp ? "çalışıyor" : "kapalı"}${r.responseTimeMs ? ` (${fmtDbValue(s.type, r.responseTimeMs)})` : ""}` }); reload(); }
     catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }
     finally { setBusyId(null); }
   }
@@ -239,7 +239,7 @@ export function Services() {
                             <span className={cn("h-1.5 w-1.5 rounded-full", st.dot)} /> {st.label}
                           </span>
                         </td>
-                        <td className="px-5 py-3 tabular-nums text-muted-foreground">{s.lastIsUp === true && s.lastResponseTimeMs != null ? `${s.lastResponseTimeMs} ms` : "—"}</td>
+                        <td className="px-5 py-3 tabular-nums text-muted-foreground">{s.lastIsUp === true && s.lastResponseTimeMs != null ? fmtDbValue(s.type, s.lastResponseTimeMs) : "—"}</td>
                         <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" title="Şimdi kontrol et" disabled={busy} onClick={() => doCheck(s)}>

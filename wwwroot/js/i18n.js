@@ -263,6 +263,76 @@
         "Uzak WMI + servis kontrol yetkisi olan domain hesabı (Domain alanını doldurun).": "Domain account with remote WMI + service control rights (fill the Domain field).",
         "SSH kullanıcısı (start/stop/restart için sudo -n yetkisi gerekir).": "SSH user (needs sudo -n rights for start/stop/restart).",
 
+        // ===== DB İzleme Fazı — tip etiketleri (TR=EN özdeş olanlar YAZILMAZ: sonsuz döngü koruması) =====
+        "Oracle SYSDATE (bağlantı + saat)": "Oracle SYSDATE (connection + clock)",
+        "Oracle Aktif Sessions": "Oracle Active Sessions",
+        "Oracle Uzun Süren Sorgular": "Oracle Long-Running Queries",
+        "Oracle Tablespace Durumu": "Oracle Tablespace Status",
+        "Oracle Bağlantı Doluluğu (%)": "Oracle Connection Usage (%)",
+        "MSSQL GETDATE (bağlantı + saat)": "MSSQL GETDATE (connection + clock)",
+        "MSSQL Aktif Sessions": "MSSQL Active Sessions",
+        "MSSQL Uzun Süren Sorgular": "MSSQL Long-Running Queries",
+        "MSSQL Veritabanı Durumu": "MSSQL Database Status",
+        "MSSQL Bağlantı Doluluğu (%)": "MSSQL Connection Usage (%)",
+        "MySQL NOW (bağlantı + saat)": "MySQL NOW (connection + clock)",
+        "MySQL Aktif Sessions": "MySQL Active Sessions",
+        "MySQL Uzun Süren Sorgular": "MySQL Long-Running Queries",
+        "MySQL Replikasyon Sağlığı": "MySQL Replication Health",
+        "MySQL Bağlantı Doluluğu (%)": "MySQL Connection Usage (%)",
+        // DB metrik kısa etiketleri + panel/widget metinleri
+        "Bağlantı & Saat": "Connection & Clock",
+        "Aktif Oturum": "Active Sessions",
+        "Bloklu Oturum": "Blocked Sessions",
+        "Uzun Sorgu": "Long Queries",
+        "Sorunlu Veritabanı": "Problem Databases",
+        "Bağlantı Doluluğu": "Connection Usage",
+        "Replikasyon Gecikmesi": "Replication Lag",
+        "Veritabanı Sağlığı": "Database Health",
+        "DB Bağlantı Doluluğu": "DB Connection Usage",
+        "DB Uyarıları": "DB Alerts",
+        "Sağlıklı": "Healthy",
+        "saat senkron": "clock in sync",
+        "saat sapması!": "clock drift!",
+        "Henüz veritabanı izlemesi yok": "No database monitors yet",
+        "İzlemeler ekranından Veritabanı kategorisinde ekleyebilirsiniz.": "You can add one from the Monitors screen under the Database category.",
+        "Tüm veritabanı izlemeleri sağlıklı 🎉": "All database monitors are healthy 🎉",
+        "Veritabanı izlemeleri": "Database monitors",
+        "Oracle izlemeleri": "Oracle monitors",
+        "MSSQL izlemeleri": "MSSQL monitors",
+        "MySQL izlemeleri": "MySQL monitors",
+        // DB tipi form ipuçları
+        "SELECT SYSDATE FROM DUAL çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.": "Runs SELECT SYSDATE FROM DUAL: connection + latency are charted; produces ERROR if the DB clock drifts more than 60 s from the server.",
+        "GV$SESSION'dan background olmayan AKTİF oturum adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).": "Reads the number of non-background ACTIVE sessions from GV$SESSION; the count is charted. The Slowness Threshold field becomes a threshold on this count (SLOW when exceeded).",
+        "Birbirini bloklayan (BLOCKING_SESSION dolu) oturum adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.": "Reads the number of blocked sessions (BLOCKING_SESSION set); the count is charted. Produces ERROR (alarm) if count > 0.",
+        "60 sn'den uzun süredir aktif çalışan oturum adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).": "Reads the number of sessions active for more than 60 s; the count is charted. The Slowness Threshold field becomes a threshold on this count (SLOW when exceeded).",
+        "OFFLINE tablespace adedi çekilir (READ ONLY sayılmaz); adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.": "Reads the number of OFFLINE tablespaces (READ ONLY not counted); the count is charted. Produces ERROR (alarm) if count > 0.",
+        "processes limitinin yüzde kaçının dolu olduğu çekilir (V$RESOURCE_LIMIT); yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.": "Reads how full the processes limit is in percent (V$RESOURCE_LIMIT); the percentage is charted. If you set e.g. 90 in the Slowness Threshold field, it is marked SLOW when exceeded.",
+        "SELECT GETDATE() çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.": "Runs SELECT GETDATE(): connection + latency are charted; produces ERROR if the DB clock drifts more than 60 s from the server.",
+        "Çalışan (status='running') kullanıcı oturumu adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).": "Reads the number of running user sessions (status='running'); the count is charted. The Slowness Threshold field becomes a threshold on this count (SLOW when exceeded).",
+        "Başka oturum tarafından bloklanan istek adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.": "Reads the number of requests blocked by another session; the count is charted. Produces ERROR (alarm) if count > 0.",
+        "60 sn'den uzun süredir çalışan kullanıcı isteği adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).": "Reads the number of user requests running for more than 60 s; the count is charted. The Slowness Threshold field becomes a threshold on this count (SLOW when exceeded).",
+        "ONLINE olmayan veritabanı adedi çekilir (suspect/recovery/offline yakalar); adet grafiğe yazılır. Adet > 0 ise sorunlu DB adları mesaja yazılıp HATA üretilir.": "Reads the number of databases that are not ONLINE (catches suspect/recovery/offline); the count is charted. If count > 0, the problem database names are written to the message and ERROR is produced.",
+        "Kullanıcı oturumu adedinin bağlantı limitine oranı (%) çekilir; yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.": "Reads the ratio of user sessions to the connection limit (%); the percentage is charted. If you set e.g. 90 in the Slowness Threshold field, it is marked SLOW when exceeded.",
+        "SELECT NOW() çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.": "Runs SELECT NOW(): connection + latency are charted; produces ERROR if the DB clock drifts more than 60 s from the server.",
+        "Uyumayan (COMMAND<>'Sleep') bağlantı adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).": "Reads the number of non-sleeping connections (COMMAND<>'Sleep'); the count is charted. The Slowness Threshold field becomes a threshold on this count (SLOW when exceeded).",
+        "Kilit bekleyen (LOCK WAIT) InnoDB işlem adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.": "Reads the number of InnoDB transactions waiting on a lock (LOCK WAIT); the count is charted. Produces ERROR (alarm) if count > 0.",
+        "60 sn'den uzun süredir çalışan sorgu adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).": "Reads the number of queries running for more than 60 s; the count is charted. The Slowness Threshold field becomes a threshold on this count (SLOW when exceeded).",
+        "Replika IO/SQL thread durumu + kaynağın kaç sn gerisinde olduğu çekilir; gecikme (sn) grafiğe yazılır. Thread durmuşsa HATA; Yavaşlık Eşiği alanı gecikmeye sn eşiği olur.": "Reads the replica IO/SQL thread state + how many seconds behind the source it is; the lag (s) is charted. ERROR if a thread is stopped; the Slowness Threshold field becomes a seconds threshold on the lag.",
+        "Bağlantı adedinin max_connections limitine oranı (%) çekilir; yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.": "Reads the ratio of connections to the max_connections limit (%); the percentage is charted. If you set e.g. 90 in the Slowness Threshold field, it is marked SLOW when exceeded.",
+        // DB tipi alan/kimlik ipuçları
+        "CREATE SESSION yetkili izleme kullanıcısı.": "Monitoring user with CREATE SESSION rights.",
+        "GV$SESSION okuma yetkili kullanıcı (SELECT ON gv_$session).": "User with GV$SESSION read rights (SELECT ON gv_$session).",
+        "DBA_TABLESPACES okuma yetkili kullanıcı (SELECT ON dba_tablespaces).": "User with DBA_TABLESPACES read rights (SELECT ON dba_tablespaces).",
+        "V$RESOURCE_LIMIT okuma yetkili kullanıcı (SELECT ON v_$resource_limit).": "User with V$RESOURCE_LIMIT read rights (SELECT ON v_$resource_limit).",
+        "VIEW SERVER STATE yetkili SQL kullanıcısı; boşsa Windows auth denenir.": "SQL user with VIEW SERVER STATE rights; if empty, Windows auth is tried.",
+        "SQL kullanıcısı; boşsa Windows auth denenir.": "SQL user; if empty, Windows auth is tried.",
+        "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS).": "Monitoring user with PROCESS privilege (GRANT PROCESS).",
+        "REPLICATION CLIENT yetkili kullanıcı (GRANT REPLICATION CLIENT).": "User with REPLICATION CLIENT privilege (GRANT REPLICATION CLIENT).",
+        "MySQL izleme kullanıcısı.": "MySQL monitoring user.",
+        "Opsiyonel — boşsa master.": "Optional — master if empty.",
+        "örn. ORCLPDB1 — SID için: SID=ORCL": "e.g. ORCLPDB1 — for SID: SID=ORCL",
+        "Replika Host / IP": "Replica Host / IP",
+
         // Bildirim Kanalları
         "Bildirim Kanalları": "Notification Channels", "Yeni Entegrasyon": "New Integration",
         "SMS ekle": "Add SMS", "WhatsApp ekle": "Add WhatsApp",
@@ -469,7 +539,16 @@
         "Kesintiler (": "Outages (",
         "Yanıt Süresi (": "Response Time (",
         "son: ": "last: ",
-        "Toplu Düzenle (": "Bulk Edit ("
+        "Toplu Düzenle (": "Bulk Edit (",
+        // DB İzleme Fazı — drawer grafik başlıkları: "<metrik> (N kontrol)"
+        // (önek çevrilir → ikinci geçişte " kontrol)" soneki çevrilir; "Offline Tablespace" TR=EN, girilmez)
+        "Bağlantı & Saat (": "Connection & Clock (",
+        "Aktif Oturum (": "Active Sessions (",
+        "Bloklu Oturum (": "Blocked Sessions (",
+        "Uzun Sorgu (": "Long Queries (",
+        "Sorunlu Veritabanı (": "Problem Databases (",
+        "Bağlantı Doluluğu (": "Connection Usage (",
+        "Replikasyon Gecikmesi (": "Replication Lag ("
     };
 
     const NORM = s => s.replace(/\s+/g, " ").trim();
@@ -489,7 +568,10 @@
         " servis)": " services)",
         " izleme": " monitors",
         " yetki": " permissions",
-        " kayıt (en yeni 500)": " records (newest 500)"
+        " kayıt (en yeni 500)": " records (newest 500)",
+        // DB İzleme Fazı — metrik değer birimleri ("34 adet" → "34", "12 sn" → "12 s")
+        " adet": "",
+        " sn": " s"
     };
 
     // Alt-dize değişimleri (dinamik denetim açıklamaları — örn. "start → İşlem gönderildi (start).")

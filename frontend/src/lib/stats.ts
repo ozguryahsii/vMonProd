@@ -33,6 +33,14 @@ export interface StatsData {
     disk: { name: string; from: number; to: number; delta: number }[];
   };
   heatmap: { rows: string[]; data: [number, number, number][] };
+  dbHealth: {
+    counts: { total: number; ok: number; warn: number; err: number; down: number };
+    items: {
+      id: number; name: string; target: string; port: number | null; type: string;
+      value: number | null; status: number; slow: boolean;
+      lastError: string | null; lastChecked: string | null;
+    }[];
+  };
 }
 
 // ---- Widget düzeni (düzenlenebilir pano) ----

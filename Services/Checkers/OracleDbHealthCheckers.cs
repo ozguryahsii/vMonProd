@@ -95,3 +95,57 @@ public class OracleBlockedSessionsChecker : OracleDbCheckerBase
         return null;
     }
 }
+
+/// <summary>Oracle Uzun Süren Sorgular: 60 sn'den uzun süredir aktif çalışan kullanıcı oturumu adedi.
+/// Adet grafiğe yazılır; YavaşlıkEşiği doluysa aşımı YAVAŞ işaretler.</summary>
+public class OracleLongQueriesChecker : OracleDbCheckerBase
+{
+    public override ServiceType Type => ServiceType.OracleLongQueries;
+
+    protected override async Task<string?> ExecuteAsync(MonitoredService service, Credential? credential, CancellationToken ct)
+    {
+        await using var conn = await OpenAsync(service, credential, ct);
+        var count = await ScalarAsync<long>(conn,
+            "SELECT COUNT(*) FROM GV$SESSION WHERE TYPE <> 'BACKGROUND' AND STATUS = 'ACTIVE' AND LAST_CALL_ET > 60", ct);
+        OverrideResponseValue = count;
+        return null;
+    }
+}
+
+/// <summary>Oracle Tablespace Durumu: OFFLINE tablespace adedi (READ ONLY sayılmaz — o kasıtlı olabilir).
+/// Adet grafiğe yazılır; 0'dan büyükse ERROR üretir.</summary>
+public class OracleTablespaceStatusChecker : OracleDbCheckerBase
+{
+    public override ServiceType Type => ServiceType.OracleTablespaceStatus;
+
+    protected override async Task<string?> ExecuteAsync(MonitoredService service, Credential? credential, CancellationToken ct)
+    {
+        await using var conn = await OpenAsync(service, credential, ct);
+        var count = await ScalarAsync<long>(conn,
+            "SELECT COUNT(*) FROM DBA_TABLESPACES WHERE STATUS = 'OFFLINE'", ct);
+        OverrideResponseValue = count;
+        if (count > 0)
+        {
+            IsThresholdError = true;
+            return $"{count} tablespace OFFLINE durumda";
+        }
+        return null;
+    }
+}
+
+/// <summary>Oracle Bağlantı Doluluğu: processes limitinin yüzde kaçı dolu (V$RESOURCE_LIMIT).
+/// Yüzde grafiğe yazılır; YavaşlıkEşiği doluysa aşımı YAVAŞ işaretler (örn. 90).</summary>
+public class OracleConnectionUsageChecker : OracleDbCheckerBase
+{
+    public override ServiceType Type => ServiceType.OracleConnectionUsage;
+
+    protected override async Task<string?> ExecuteAsync(MonitoredService service, Credential? credential, CancellationToken ct)
+    {
+        await using var conn = await OpenAsync(service, credential, ct);
+        var pct = await ScalarAsync<long>(conn,
+            "SELECT ROUND(CURRENT_UTILIZATION * 100 / TO_NUMBER(TRIM(LIMIT_VALUE))) " +
+            "FROM V$RESOURCE_LIMIT WHERE RESOURCE_NAME = 'processes'", ct);
+        OverrideResponseValue = pct;
+        return null;
+    }
+}

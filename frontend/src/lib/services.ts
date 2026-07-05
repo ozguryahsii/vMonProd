@@ -72,6 +72,52 @@ export interface ServicesMeta {
 
 export const CONTROL_TYPES = ["WindowsServiceControl", "LinuxServiceControl"];
 
+/* ================= DB İzleme Fazı: veritabanı sağlık metrikleri meta'sı =================
+   Bu tiplerde ResponseTimeMs alanında ms DEĞİL metrik değeri (adet / % / sn) saklanır.
+   Kartlar, grafikler ve widget'lar birimi buradan alır. */
+export type DbPlatform = "Oracle" | "MSSQL" | "MySQL";
+export interface DbMetricMeta {
+  platform: DbPlatform;
+  metric: "clock" | "active" | "blocked" | "long" | "status" | "usage" | "repl";
+  unit: "ms" | "adet" | "%" | "sn";
+  short: string;               // kart/panel kısa etiketi
+}
+export const DB_METRIC_META: Record<string, DbMetricMeta> = {
+  OracleSysdate:          { platform: "Oracle", metric: "clock",   unit: "ms",   short: "Bağlantı & Saat" },
+  OracleActiveSessions:   { platform: "Oracle", metric: "active",  unit: "adet", short: "Aktif Oturum" },
+  OracleBlockedSessions:  { platform: "Oracle", metric: "blocked", unit: "adet", short: "Bloklu Oturum" },
+  OracleLongQueries:      { platform: "Oracle", metric: "long",    unit: "adet", short: "Uzun Sorgu" },
+  OracleTablespaceStatus: { platform: "Oracle", metric: "status",  unit: "adet", short: "Offline Tablespace" },
+  OracleConnectionUsage:  { platform: "Oracle", metric: "usage",   unit: "%",    short: "Bağlantı Doluluğu" },
+  MsSqlGetDate:           { platform: "MSSQL",  metric: "clock",   unit: "ms",   short: "Bağlantı & Saat" },
+  MsSqlActiveSessions:    { platform: "MSSQL",  metric: "active",  unit: "adet", short: "Aktif Oturum" },
+  MsSqlBlockedSessions:   { platform: "MSSQL",  metric: "blocked", unit: "adet", short: "Bloklu Oturum" },
+  MsSqlLongQueries:       { platform: "MSSQL",  metric: "long",    unit: "adet", short: "Uzun Sorgu" },
+  MsSqlDbStatus:          { platform: "MSSQL",  metric: "status",  unit: "adet", short: "Sorunlu Veritabanı" },
+  MsSqlConnectionUsage:   { platform: "MSSQL",  metric: "usage",   unit: "%",    short: "Bağlantı Doluluğu" },
+  MySqlNow:               { platform: "MySQL",  metric: "clock",   unit: "ms",   short: "Bağlantı & Saat" },
+  MySqlActiveSessions:    { platform: "MySQL",  metric: "active",  unit: "adet", short: "Aktif Oturum" },
+  MySqlBlockedSessions:   { platform: "MySQL",  metric: "blocked", unit: "adet", short: "Bloklu Oturum" },
+  MySqlLongQueries:       { platform: "MySQL",  metric: "long",    unit: "adet", short: "Uzun Sorgu" },
+  MySqlReplication:       { platform: "MySQL",  metric: "repl",    unit: "sn",   short: "Replikasyon Gecikmesi" },
+  MySqlConnectionUsage:   { platform: "MySQL",  metric: "usage",   unit: "%",    short: "Bağlantı Doluluğu" },
+};
+export const isDbHealthType = (t: string) => t in DB_METRIC_META;
+
+/** DB metriği değer biçimlendirme: "34 oturum", "%71", "12 sn", "45 ms" */
+export function fmtDbValue(type: string, v: number | null | undefined): string {
+  if (v == null) return "—";
+  const m = DB_METRIC_META[type];
+  if (!m) return `${v} ms`;
+  if (m.unit === "%") return `%${v}`;
+  return `${v} ${m.unit}`;
+}
+
+/** Platform marka rengi (metin sınıfı) */
+export const DB_PLATFORM_CLS: Record<DbPlatform, string> = {
+  Oracle: "text-red-400", MSSQL: "text-sky-400", MySQL: "text-teal-400",
+};
+
 /* ================= İzleme tipi kataloğu (eski formdaki typeConfig birebir + Database Fazı) =================
    Tip seçilince form alanları/etiketleri/ipuçları buna göre değişir. */
 export interface TypeMeta {
@@ -97,6 +143,21 @@ export const TYPE_META: Record<string, TypeMeta> = {
   OracleSysdate: { group: "Veritabanı", label: "Oracle SYSDATE (bağlantı + saat)", hint: "SELECT SYSDATE FROM DUAL çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "CREATE SESSION yetkili izleme kullanıcısı." }, ssl: null, cert: false },
   OracleActiveSessions: { group: "Veritabanı", label: "Oracle Aktif Sessions", hint: "GV$SESSION'dan background olmayan AKTİF oturum adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "GV$SESSION okuma yetkili kullanıcı (SELECT ON gv_$session)." }, ssl: null, cert: false },
   OracleBlockedSessions: { group: "Veritabanı", label: "Oracle Blocked Sessions", hint: "Birbirini bloklayan (BLOCKING_SESSION dolu) oturum adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "GV$SESSION okuma yetkili kullanıcı (SELECT ON gv_$session)." }, ssl: null, cert: false },
+  OracleLongQueries: { group: "Veritabanı", label: "Oracle Uzun Süren Sorgular", hint: "60 sn'den uzun süredir aktif çalışan oturum adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "GV$SESSION okuma yetkili kullanıcı (SELECT ON gv_$session)." }, ssl: null, cert: false },
+  OracleTablespaceStatus: { group: "Veritabanı", label: "Oracle Tablespace Durumu", hint: "OFFLINE tablespace adedi çekilir (READ ONLY sayılmaz); adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "DBA_TABLESPACES okuma yetkili kullanıcı (SELECT ON dba_tablespaces)." }, ssl: null, cert: false },
+  OracleConnectionUsage: { group: "Veritabanı", label: "Oracle Bağlantı Doluluğu (%)", hint: "processes limitinin yüzde kaçının dolu olduğu çekilir (V$RESOURCE_LIMIT); yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "V$RESOURCE_LIMIT okuma yetkili kullanıcı (SELECT ON v_$resource_limit)." }, ssl: null, cert: false },
+  MsSqlGetDate: { group: "Veritabanı", label: "MSSQL GETDATE (bağlantı + saat)", hint: "SELECT GETDATE() çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — boşsa master." }, cred: { label: "Kimlik Bilgisi", hint: "SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MsSqlActiveSessions: { group: "Veritabanı", label: "MSSQL Aktif Sessions", hint: "Çalışan (status='running') kullanıcı oturumu adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — boşsa master." }, cred: { label: "Kimlik Bilgisi", hint: "VIEW SERVER STATE yetkili SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MsSqlBlockedSessions: { group: "Veritabanı", label: "MSSQL Blocked Sessions", hint: "Başka oturum tarafından bloklanan istek adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — boşsa master." }, cred: { label: "Kimlik Bilgisi", hint: "VIEW SERVER STATE yetkili SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MsSqlLongQueries: { group: "Veritabanı", label: "MSSQL Uzun Süren Sorgular", hint: "60 sn'den uzun süredir çalışan kullanıcı isteği adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — boşsa master." }, cred: { label: "Kimlik Bilgisi", hint: "VIEW SERVER STATE yetkili SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MsSqlDbStatus: { group: "Veritabanı", label: "MSSQL Veritabanı Durumu", hint: "ONLINE olmayan veritabanı adedi çekilir (suspect/recovery/offline yakalar); adet grafiğe yazılır. Adet > 0 ise sorunlu DB adları mesaja yazılıp HATA üretilir.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — boşsa master." }, cred: { label: "Kimlik Bilgisi", hint: "VIEW SERVER STATE yetkili SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MsSqlConnectionUsage: { group: "Veritabanı", label: "MSSQL Bağlantı Doluluğu (%)", hint: "Kullanıcı oturumu adedinin bağlantı limitine oranı (%) çekilir; yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — boşsa master." }, cred: { label: "Kimlik Bilgisi", hint: "VIEW SERVER STATE yetkili SQL kullanıcısı; boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MySqlNow: { group: "Veritabanı", label: "MySQL NOW (bağlantı + saat)", hint: "SELECT NOW() çalıştırılır: bağlantı + gecikme grafiğe yazılır; DB saati sunucudan 60 sn'den fazla sapıyorsa HATA üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "MySQL izleme kullanıcısı." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  MySqlActiveSessions: { group: "Veritabanı", label: "MySQL Aktif Sessions", hint: "Uyumayan (COMMAND<>'Sleep') bağlantı adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  MySqlBlockedSessions: { group: "Veritabanı", label: "MySQL Blocked Sessions", hint: "Kilit bekleyen (LOCK WAIT) InnoDB işlem adedi çekilir; adet grafiğe yazılır. Adet > 0 ise HATA (alarm) üretir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  MySqlLongQueries: { group: "Veritabanı", label: "MySQL Uzun Süren Sorgular", hint: "60 sn'den uzun süredir çalışan sorgu adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  MySqlReplication: { group: "Veritabanı", label: "MySQL Replikasyon Sağlığı", hint: "Replika IO/SQL thread durumu + kaynağın kaç sn gerisinde olduğu çekilir; gecikme (sn) grafiğe yazılır. Thread durmuşsa HATA; Yavaşlık Eşiği alanı gecikmeye sn eşiği olur.", target: { label: "Replika Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "REPLICATION CLIENT yetkili kullanıcı (GRANT REPLICATION CLIENT)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  MySqlConnectionUsage: { group: "Veritabanı", label: "MySQL Bağlantı Doluluğu (%)", hint: "Bağlantı adedinin max_connections limitine oranı (%) çekilir; yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
   Ldap: { group: "Altyapı", label: "Active Directory / LDAP(S)", hint: "Domain Controller'a yetkili kullanıcıyla gerçek bind yapılır. LDAPS için SSL işaretleyin (port 636).", target: { label: "Domain Controller / IP *" }, port: { hint: "Boşsa 389 (LDAP) / 636 (SSL işaretliyse)." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "AD hesabı (Domain alanını doldurun) veya tam DN." }, ssl: "LDAPS kullan", cert: true },
   Dns: { group: "Altyapı", label: "DNS", hint: "Hedef DNS sunucusuna doğrudan A kaydı sorgusu atılır (OS resolver kullanılmaz).", target: { label: "DNS Sunucu IP *" }, port: { hint: "Boşsa 53." }, extra: { label: "Test edilecek hostname *", hint: "örn. intranet.firma.local — bu kayıt çözülürse UP." }, cred: null, ssl: null, cert: false },
   Sftp: { group: "Altyapı", label: "SFTP", hint: "Yetkili kullanıcıyla gerçek SSH/SFTP oturumu açılır ve dizin listelenir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SFTP kullanıcısı." }, ssl: null, cert: false },

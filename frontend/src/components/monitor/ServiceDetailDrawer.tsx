@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { type StatusService, catOf, getHistory, getMetrics, type HistoryData, type MetricsData } from "@/lib/monitor";
-import { CONTROL_TYPES, checkService, serviceAction } from "@/lib/services";
+import { CONTROL_TYPES, DB_METRIC_META, fmtDbValue, checkService, serviceAction } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const badge: Record<string, { label: string; cls: string }> = {
@@ -54,6 +54,8 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
 
   const isHealth = service?.type === "WindowsHealth" || service?.type === "LinuxHealth";
   const isControl = service ? CONTROL_TYPES.includes(service.type) : false;
+  // DB metrik izlemesi: grafikte ms değil adet/%/sn gösterilir
+  const dbMeta = service ? DB_METRIC_META[service.type] ?? null : null;
 
   const load = () => {
     if (!service) return;
@@ -112,7 +114,7 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", badge[cat].cls)}>{badge[cat].label}</span>
-            {service.lastResponseTimeMs != null && service.lastIsUp && <span className="text-sm text-muted-foreground">{service.lastResponseTimeMs} ms</span>}
+            {service.lastResponseTimeMs != null && service.lastIsUp && <span className="text-sm text-muted-foreground">{fmtDbValue(service.type, service.lastResponseTimeMs)}</span>}
             {service.lastCheckedAt && <span className="text-xs text-muted-foreground">son: {dt(service.lastCheckedAt)}</span>}
             <div className="ml-auto flex gap-1">
               <Button variant="outline" size="sm" disabled={busy} onClick={() => act(() => checkService(service.id), "Kontrol")}>
@@ -144,7 +146,7 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
             <>
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Yanıt Süresi ({checks.length} kontrol)</h3>
+                  <h3 className="text-sm font-semibold">{dbMeta ? `${dbMeta.short} (${checks.length} kontrol)` : `Yanıt Süresi (${checks.length} kontrol)`}</h3>
                   <div className="flex gap-1">
                     {RANGES.map((r) => (
                       <Button key={r.m} variant={rangeMin === r.m ? "default" : "ghost"} size="sm"
@@ -164,7 +166,7 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           const p = (item as any)?.payload;
                           const state = p?.st === 2 ? " · HATA" : p?.slow ? " · YAVAŞ" : p?.up === false ? " · DOWN" : "";
-                          return [`${v} ms${state}`, "Yanıt"];
+                          return [`${fmtDbValue(service.type, v)}${state}`, dbMeta ? dbMeta.short : "Yanıt"];
                         }} />
                       <Area type="monotone" dataKey="ms" stroke="hsl(217 91% 60%)" strokeWidth={2} fill="url(#gMs)"
                         dot={statusDot} activeDot={{ r: 4 }} isAnimationActive={checks.length < 400} />

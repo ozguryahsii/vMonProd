@@ -3,6 +3,7 @@ import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { DonutChart } from "@/components/charts/DonutChart";
 import type { StatsData, StatWidgetDef } from "@/lib/stats";
 import type { Drill } from "./StatDetailDrawer";
+import { DB_METRIC_META, DB_PLATFORM_CLS, fmtDbValue, type DbPlatform } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 type OnDrill = (d: Drill) => void;
@@ -44,6 +45,10 @@ export const WIDGET_CATALOG: CatalogItem[] = [
   { type: "outage", source: "outage", label: "Kesinti özeti (7 gün)", group: "İçgörü", w: 6, h: 4 },
   { type: "os_eol", source: "os_eol", label: "Destek sonu (EOL) OS", group: "İçgörü", w: 6, h: 4 },
   { type: "heatmap", source: "heatmap", label: "CPU ısı haritası (24s)", group: "İçgörü", w: 12, h: 5 },
+  // DB İzleme Fazı — veritabanı sağlık widget'ları
+  { type: "db_health", source: "db_health", label: "Veritabanı Sağlığı", group: "Veritabanı", w: 12, h: 4 },
+  { type: "db_usage", source: "db_usage", label: "DB Bağlantı Doluluğu", group: "Veritabanı", w: 6, h: 4 },
+  { type: "db_alerts", source: "db_alerts", label: "DB Uyarıları", group: "Veritabanı", w: 6, h: 4 },
 ];
 
 export function widgetLabel(w: StatWidgetDef): string {
@@ -71,6 +76,9 @@ export function WidgetRenderer({ w, data, onDrill }: { w: StatWidgetDef; data: S
     case "outage": return <Outage d={data} onDrill={onDrill} />;
     case "os_eol": return <OsEol d={data} onDrill={onDrill} />;
     case "heatmap": return <Heatmap d={data} />;
+    case "db_health": return <DbHealthW d={data} onDrill={onDrill} />;
+    case "db_usage": return <DbUsageW d={data} onDrill={onDrill} />;
+    case "db_alerts": return <DbAlertsW d={data} onDrill={onDrill} />;
     default: return <div className="p-4 text-sm text-muted-foreground">Bilinmeyen widget: {w.type}</div>;
   }
 }
@@ -398,4 +406,157 @@ function Heatmap({ d }: { d: StatsData }) {
 
 function Empty() {
   return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Veri yok</div>;
+}
+
+/* ================= DB İzleme Fazı widget'ları ================= */
+
+type DbItem = StatsData["dbHealth"]["items"][number];
+
+/** DB izlemesinin durum sınıfı: 0=up (slow=YAVAŞ), 1=down, 2=hata */
+function dbCat(i: DbItem): "up" | "slow" | "down" | "error" {
+  if (i.status === 1) return "down";
+  if (i.status === 2) return "error";
+  return i.slow ? "slow" : "up";
+}
+const dbCatCls: Record<string, string> = {
+  up: "text-emerald-400", slow: "text-amber-400", down: "text-rose-400", error: "text-orange-400",
+};
+
+function DbEmpty() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+      <span>Henüz veritabanı izlemesi yok</span>
+      <span className="text-xs">İzlemeler ekranından Veritabanı kategorisinde ekleyebilirsiniz.</span>
+    </div>
+  );
+}
+
+/** Veritabanı Sağlığı: enstans (platform+host) grupları + metrik rozetleri; tıkla → DB listesi */
+function DbHealthW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
+  const items = d.dbHealth?.items ?? [];
+  if (items.length === 0) return <DbEmpty />;
+  const c = d.dbHealth.counts;
+
+  const groups = new Map<string, { platform: DbPlatform; host: string; items: DbItem[] }>();
+  for (const i of items) {
+    const meta = DB_METRIC_META[i.type];
+    if (!meta) continue;
+    const host = `${i.target}${i.port ? `:${i.port}` : ""}`;
+    const key = `${meta.platform}|${host}`;
+    let g = groups.get(key);
+    if (!g) { g = { platform: meta.platform, host, items: [] }; groups.set(key, g); }
+    g.items.push(i);
+  }
+
+  const counters: { label: string; v: number; cls: string }[] = [
+    { label: "Sağlıklı", v: c.ok, cls: "text-emerald-400" },
+    { label: "Yavaş", v: c.warn, cls: "text-amber-400" },
+    { label: "Hata", v: c.err, cls: "text-orange-400" },
+    { label: "Kapalı", v: c.down, cls: "text-rose-400" },
+  ];
+
+  return (
+    <div className="flex h-full flex-col gap-2 px-4 py-2">
+      <div className="flex items-center justify-around">
+        {counters.map((x) => (
+          <button key={x.label} type="button" className="text-center transition-transform hover:scale-110"
+            onClick={() => onDrill({ source: "db_health", title: "Veritabanı izlemeleri" })}>
+            <div className={cn("text-2xl font-bold tabular-nums", x.cls)}>{x.v}</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{x.label}</div>
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+        {Array.from(groups.values()).map((g) => (
+          <button key={`${g.platform}|${g.host}`} type="button"
+            onClick={() => onDrill({ source: "db_health", value: g.platform, title: `${g.platform} izlemeleri` })}
+            className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
+            <span className={cn("font-semibold", DB_PLATFORM_CLS[g.platform])}>{g.platform}</span>
+            <span className="truncate font-mono text-muted-foreground">{g.host}</span>
+            <span className="ml-auto flex flex-wrap justify-end gap-x-2.5 gap-y-0.5">
+              {g.items.map((i) => {
+                const cat = dbCat(i);
+                return (
+                  <span key={i.id} className="whitespace-nowrap tabular-nums" title={i.lastError ?? i.name}>
+                    <span className="text-muted-foreground">{DB_METRIC_META[i.type].short}: </span>
+                    <span className={cn("font-semibold", cat === "up" ? "text-foreground" : dbCatCls[cat])}>
+                      {cat === "down" ? "KAPALI" : fmtDbValue(i.type, i.value)}
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** DB Bağlantı Doluluğu: ConnectionUsage izlemeleri % çubuklarıyla (dolu → kırmızı) */
+function DbUsageW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
+  const items = (d.dbHealth?.items ?? [])
+    .filter((i) => DB_METRIC_META[i.type]?.metric === "usage")
+    .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  if (items.length === 0) return <DbEmpty />;
+  return (
+    <div className="h-full space-y-2 overflow-y-auto px-4 py-2">
+      {items.map((i) => {
+        const meta = DB_METRIC_META[i.type];
+        const pct = Math.max(0, Math.min(100, i.value ?? 0));
+        const bar = pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
+        return (
+          <button key={i.id} type="button" className="block w-full text-left"
+            onClick={() => onDrill({ source: "db_health", value: meta.platform, title: `${meta.platform} izlemeleri` })}>
+            <div className="flex justify-between text-xs">
+              <span className="truncate pr-1"><span className={cn("font-semibold", DB_PLATFORM_CLS[meta.platform])}>{meta.platform}</span> {i.target}{i.port ? `:${i.port}` : ""}</span>
+              <span className={cn("shrink-0 tabular-nums font-semibold", dbCat(i) === "down" ? "text-rose-400" : "text-muted-foreground")}>
+                {dbCat(i) === "down" ? "KAPALI" : `%${pct}`}
+              </span>
+            </div>
+            <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className={cn("h-full rounded-full transition-all", bar)} style={{ width: `${pct}%` }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** DB Uyarıları: sorunlu (kapalı/hata/yavaş) DB izlemeleri listesi; hepsi sağlıklıysa kutlama */
+function DbAlertsW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
+  const all = d.dbHealth?.items ?? [];
+  if (all.length === 0) return <DbEmpty />;
+  const sevOrder = { down: 0, error: 1, slow: 2, up: 3 } as const;
+  const problems = all.filter((i) => dbCat(i) !== "up")
+    .sort((a, b) => sevOrder[dbCat(a)] - sevOrder[dbCat(b)]);
+  if (problems.length === 0)
+    return <div className="flex h-full items-center justify-center text-sm text-emerald-400">Tüm veritabanı izlemeleri sağlıklı 🎉</div>;
+  const catLabel: Record<string, string> = { down: "KAPALI", error: "HATA", slow: "YAVAŞ" };
+  const catBadge: Record<string, string> = {
+    down: "bg-rose-500/15 text-rose-400", error: "bg-orange-500/15 text-orange-400", slow: "bg-amber-500/15 text-amber-400",
+  };
+  return (
+    <div className="h-full space-y-1.5 overflow-y-auto px-4 py-2">
+      {problems.map((i) => {
+        const meta = DB_METRIC_META[i.type];
+        const cat = dbCat(i);
+        return (
+          <button key={i.id} type="button"
+            onClick={() => onDrill({ source: "db_health", value: meta.platform, title: `${meta.platform} izlemeleri` })}
+            className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{i.name}</span>
+              <span className="block truncate text-[10px] text-muted-foreground" title={i.lastError ?? undefined}>
+                <span className={DB_PLATFORM_CLS[meta.platform]}>{meta.platform}</span> · {meta.short}
+                {i.lastError ? ` — ${i.lastError}` : cat !== "down" && i.value != null ? ` — ${fmtDbValue(i.type, i.value)}` : ""}
+              </span>
+            </span>
+            <span className={cn("shrink-0 rounded px-1.5 py-0.5 font-semibold", catBadge[cat])}>{catLabel[cat]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }

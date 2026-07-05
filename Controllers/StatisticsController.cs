@@ -199,6 +199,34 @@ public class StatisticsController : Controller
             disk = Rising(daily.Where(x => x.Disk.HasValue).Select(x => (x.ServiceId, x.Day, x.Disk!.Value)))
         };
 
+        // DB İzleme Fazı: veritabanı sağlık izlemeleri özeti (İstatistikler DB widget'ları)
+        var dbSvcAll = await DbHealthServicesAsync();
+        var dbItems = dbSvcAll.Select(s => new
+        {
+            id = s.Id,
+            name = s.Name,
+            target = s.Target,
+            port = s.Port,
+            type = s.Type.ToString(),
+            value = s.LastResponseTimeMs,
+            status = s.LastStatus,
+            slow = s.LastStatus == 0 && s.ResponseTimeThresholdMs.HasValue && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,
+            lastError = s.LastError,
+            lastChecked = s.LastCheckedAt
+        }).ToList();
+        var dbHealth = new
+        {
+            counts = new
+            {
+                total = dbItems.Count,
+                ok = dbItems.Count(x => x.status == 0 && !x.slow),
+                warn = dbItems.Count(x => x.status == 0 && x.slow),
+                err = dbItems.Count(x => x.status == 2),
+                down = dbItems.Count(x => x.status == 1)
+            },
+            items = dbItems
+        };
+
         // Isı haritası: son 24s, saat bazında DB-tarafı ortalama; en yoğun 24 sunucu
         var hourly = await _db.HealthMetrics.AsNoTracking()
             .Where(m => ids.Contains(m.ServiceId) && m.CheckedAt >= since24 && m.CpuPercent != null)
@@ -233,7 +261,8 @@ public class StatisticsController : Controller
             fleet,
             capacity,
             rising,
-            heatmap = new { rows = heatRows, data = heatData }
+            heatmap = new { rows = heatRows, data = heatData },
+            dbHealth
         };
     }
 
@@ -250,6 +279,17 @@ public class StatisticsController : Controller
         await _db.Services.AsNoTracking()
             .Where(s => s.Enabled && (s.Type == ServiceType.WindowsHealth || s.Type == ServiceType.LinuxHealth))
             .ToListAsync();
+
+    /// <summary>DB İzleme Fazı tipleri (ServiceType 16-33): metrik değeri ResponseTimeMs alanında taşınır.</summary>
+    private async Task<List<MonitoredService>> DbHealthServicesAsync() =>
+        await _db.Services.AsNoTracking()
+            .Where(s => s.Enabled && s.Type >= ServiceType.OracleSysdate && s.Type <= ServiceType.MySqlConnectionUsage)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+
+    /// <summary>DB izleme tipinin platform adı (drill listesinde OS kolonu yerine gösterilir).</summary>
+    private static string DbPlatform(ServiceType t) =>
+        t.ToString().StartsWith("Oracle") ? "Oracle" : t.ToString().StartsWith("MsSql") ? "MSSQL" : "MySQL";
 
     /// <summary>Bir widget'a/pasta dilimine tıklanınca: ilgili sunucu listesini + (kaynak metrikse) 7 günlük trendi döner.</summary>
     [HttpGet]
@@ -279,6 +319,32 @@ public class StatisticsController : Controller
                     status = s.LastStatus is >= 0 and < 3 ? new[] { "Up", "Down", "Hata" }[s.LastStatus] : "?",
                     cpu = s.LastCpuPercent, ram = s.LastRamPercent, disk = s.LastMaxDiskPercent,
                     capacity = s.CapacityInfo, lastChecked = s.LastCheckedAt
+                }).ToList(),
+                trend = (object?)null
+            });
+        }
+
+        // DB İzleme Fazı widget'ları: veritabanı izleme listesi (value = platform filtresi, boşsa tümü)
+        if (source == "db_health")
+        {
+            var dbs = await DbHealthServicesAsync();
+            if (!string.IsNullOrWhiteSpace(value))
+                dbs = dbs.Where(s => string.Equals(DbPlatform(s.Type), value, StringComparison.OrdinalIgnoreCase)).ToList();
+            string Unit(ServiceType t) => t is ServiceType.OracleSysdate or ServiceType.MsSqlGetDate or ServiceType.MySqlNow ? "ms"
+                : t is ServiceType.OracleConnectionUsage or ServiceType.MsSqlConnectionUsage or ServiceType.MySqlConnectionUsage ? "%"
+                : t == ServiceType.MySqlReplication ? "sn" : "adet";
+            var dbStatusText = new[] { "Up", "Down", "Hata" };
+            return Json(new
+            {
+                count = dbs.Count,
+                servers = dbs.Select(s => new
+                {
+                    name = s.Name, target = s.Target + (s.Port.HasValue ? $":{s.Port}" : ""),
+                    os = DbPlatform(s.Type),
+                    status = s.LastStatus is >= 0 and < 3 ? dbStatusText[s.LastStatus] : "?",
+                    cpu = (double?)null, ram = (double?)null, disk = (double?)null,
+                    capacity = s.LastResponseTimeMs.HasValue ? $"{s.LastResponseTimeMs} {Unit(s.Type)}" : null,
+                    lastChecked = s.LastCheckedAt
                 }).ToList(),
                 trend = (object?)null
             });
@@ -463,5 +529,9 @@ public class StatisticsController : Controller
         new() { Type="rising",   Source="rising",        X=6, Y=25, W=6, H=4, SortOrder=20 },
         new() { Type="os_eol",   Source="os_eol",        X=0, Y=29, W=3, H=4, SortOrder=21 },
         new() { Type="heatmap",  Source="heatmap",       X=3, Y=29, W=9, H=5, SortOrder=22 },
+        // DB İzleme Fazı — veritabanı sağlık widget'ları
+        new() { Type="db_health",Source="db_health",     X=0, Y=34, W=12, H=4, SortOrder=23 },
+        new() { Type="db_usage", Source="db_usage",      X=0, Y=38, W=6, H=4, SortOrder=24 },
+        new() { Type="db_alerts",Source="db_alerts",     X=6, Y=38, W=6, H=4, SortOrder=25 },
     };
 }
