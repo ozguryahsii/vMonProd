@@ -142,7 +142,8 @@ export function Services() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Arama/filtre çubuğu: sayfa scroll'unda üst çubuğun (top-16) altına YAPIŞIR */}
+      <div className="sticky top-16 z-20 -mx-5 flex flex-wrap items-center gap-3 border-b border-border/60 bg-background/95 px-5 py-3 backdrop-blur">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, hedef veya etiket ara…" className="pl-9" />
@@ -196,11 +197,12 @@ export function Services() {
             <EmptyState title={data && data.length > 0 ? "Eşleşen izleme yok" : "Henüz izleme yok"}
               hint={data && data.length > 0 ? "Filtreleri değiştirmeyi dene." : "Yeni İzleme ile ilk izlemeni ekle."} />
           ) : (
-            // Liste kendi içinde kayar → üstteki arama/filtre çubuğu ve tablo başlığı SABİT kalır
-            <div className="max-h-[calc(100vh-330px)] overflow-auto">
+            // Tam sayfa liste (iç pencere YOK); tablo başlığı sayfa scroll'unda
+            // üst çubuk (4rem) + filtre çubuğu (~4rem) altına yapışır
+            <div>
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-border bg-card text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <thead className="sticky top-32 z-10">
+                  <tr className="border-b border-border bg-background/95 text-left text-[11px] uppercase tracking-wider text-muted-foreground backdrop-blur">
                     <th className="w-10 px-4 py-3">
                       <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll}
                         className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]" />
