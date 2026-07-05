@@ -44,12 +44,14 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
           const thr = thrMap.get(s.id) ?? null;
           return {
             name: s.name,
+            // Eski davranış: down anı da DEĞERİYLE çizilir (timeout süresi spike olur),
+            // kırmızı nokta çizginin ÜZERİNDE tepede görünür — ayrı şerit yok.
+            // Öncelik: HATA (st=2, eşik aşımı) / yavaş → koyu sarı; gerçek down → büyük kırmızı.
             points: s.points.map((p) => ({
               t: p.t,
-              v: p.up ? p.ms : null,
-              // down=büyük kırmızı; hata (st=2) veya yavaş (eşik aşımı)=koyu sarı
-              mark: !p.up ? ("down" as const)
-                : p.st === 2 || (thr != null && p.ms > thr) ? ("warn" as const)
+              v: p.ms,
+              mark: p.st === 2 || (p.up && thr != null && p.ms > thr) ? ("warn" as const)
+                : !p.up ? ("down" as const)
                 : undefined,
             })),
           };
@@ -93,7 +95,7 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>Yanıt Süreleri</CardTitle>
-              <CardDescription>{manualIds.size > 0 ? `${manualIds.size} seçili servis` : "En yavaş 12 servis"} (ms) — kapalı anlar boş bırakılır</CardDescription>
+              <CardDescription>{manualIds.size > 0 ? `${manualIds.size} seçili servis` : "En yavaş 12 servis"} (ms) — 🔴 down · 🟡 yavaş/hata çizgi üzerinde işaretlenir</CardDescription>
             </div>
             <ServicePicker services={services.filter((s) => s.enabled)} selected={manualIds} onChange={setManualIds} />
           </CardHeader>

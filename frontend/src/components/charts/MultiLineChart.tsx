@@ -1,4 +1,4 @@
-import { Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, Scatter, ComposedChart } from "recharts";
+import { Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, LineChart } from "recharts";
 
 export interface SeriesDef {
   name: string;
@@ -11,8 +11,11 @@ const PALETTE = [
   "hsl(330 80% 60%)", "hsl(60 70% 45%)", "hsl(200 70% 55%)", "hsl(0 0% 60%)",
 ];
 
-/** Çok-servisli çizgi grafik. Noktalar GERÇEK zamana göre sıralanır (parça parça görünme düzeltmesi).
- * mark'lı noktalar durum işareti olarak çizilir: down=BÜYÜK KIRMIZI, warn(yavaş/hata)=koyu sarı. */
+/** Çok-servisli çizgi grafik — eski tasarım davranışı:
+ *  - noktalar GERÇEK zamana göre sıralanır (kopukluk yok)
+ *  - durum işaretleri ÇİZGİNİN ÜZERİNDE kendi değerinde çizilir (down=büyük kırmızı,
+ *    yavaş/hata=koyu sarı) — ayrı şerit/katman yok, lejant temiz
+ *  - animasyon ve hover tooltip (servis adı + değer) korunur */
 export function MultiLineChart({ series, height = 260, unit = "", domainMax, longRange = false }: {
   series: SeriesDef[];
   height?: number;
@@ -26,27 +29,34 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
     return longRange ? `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} ${hm}` : hm;
   };
 
-  // Zaman damgasıyla birleştir + SIRALA (etiket-sıralı birleştirme grafiği bölüyordu)
-  const rows = new Map<number, Record<string, number | string | null>>();
-  const marks: { ts: number; name: string; y: number; kind: "down" | "warn" }[] = [];
+  // Zaman damgasıyla birleştir + sırala; işaret bilgisi seri-bazlı sütunda taşınır (name__m)
+  const rows = new Map<number, Record<string, number | string | null | undefined>>();
   for (const s of series)
     for (const p of s.points) {
       const ts = new Date(p.t).getTime();
       if (!rows.has(ts)) rows.set(ts, { ts });
-      if (p.v != null) rows.get(ts)![s.name] = p.v;
-      if (p.mark) marks.push({ ts, name: s.name, y: p.v ?? 0, kind: p.mark });
+      const row = rows.get(ts)!;
+      if (p.v != null) row[s.name] = p.v;
+      if (p.mark) row[`${s.name}__m`] = p.mark;
     }
   const data = Array.from(rows.values()).sort((a, b) => (a.ts as number) - (b.ts as number));
 
-  // İşaret serileri: her satıra downY/warnY değerleri (Scatter noktaları)
-  for (const m of marks) {
-    const row = rows.get(m.ts)!;
-    if (m.kind === "down") row.__down = m.y; else row.__warn = m.y;
-  }
+  // Durum noktası: yalnız işaretli noktalarda, çizginin üzerinde (eski görünüm)
+  const makeDot = (name: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (props: any) => {
+      const { cx, cy, payload, index } = props;
+      const m = payload?.[`${name}__m`];
+      if (m === "down")
+        return <circle key={`${name}-${index}`} cx={cx} cy={cy} r={6} fill="hsl(0 84% 55%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
+      if (m === "warn")
+        return <circle key={`${name}-${index}`} cx={cx} cy={cy} r={5} fill="hsl(38 92% 45%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
+      return <g key={`${name}-${index}`} />;
+    };
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
         <XAxis dataKey="ts" type="number" scale="time" domain={["dataMin", "dataMax"]}
           tickFormatter={(v) => fmt(v as number)}
@@ -55,21 +65,21 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
         <Tooltip
           labelFormatter={(v) => fmt(v as number)}
           contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" }}
-          formatter={(v: number, n: string) => (n.startsWith("__") ? [null, null] : [`${v}${unit}`, n])}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={(v: number, n: string, item: any) => {
+            const m = item?.payload?.[`${n}__m`];
+            const state = m === "down" ? " · DOWN" : m === "warn" ? " · YAVAŞ/HATA" : "";
+            return [`${v}${unit}${state}`, n];
+          }}
         />
         {series.length <= 12 && (
-          <Legend iconType="circle" formatter={(v) => (v.startsWith("__") ? null : <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{v}</span>)} />
+          <Legend iconType="circle" formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{v}</span>} />
         )}
         {series.map((s, i) => (
           <Line key={s.name} type="monotone" dataKey={s.name} stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={1.8} dot={false} connectNulls animationDuration={900} />
+            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls animationDuration={900} />
         ))}
-        {/* Durum işaretleri: down=büyük kırmızı, yavaş/hata=koyu sarı */}
-        <Scatter dataKey="__down" fill="hsl(0 84% 55%)" shape={(p: { cx?: number; cy?: number }) => (
-          <circle cx={p.cx} cy={p.cy} r={6} fill="hsl(0 84% 55%)" stroke="hsl(var(--card))" strokeWidth={1.5} />)} legendType="none" />
-        <Scatter dataKey="__warn" fill="hsl(38 92% 45%)" shape={(p: { cx?: number; cy?: number }) => (
-          <circle cx={p.cx} cy={p.cy} r={5} fill="hsl(38 92% 45%)" stroke="hsl(var(--card))" strokeWidth={1.5} />)} legendType="none" />
-      </ComposedChart>
+      </LineChart>
     </ResponsiveContainer>
   );
 }

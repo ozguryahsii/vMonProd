@@ -86,10 +86,11 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const statusDot = (props: any) => {
     const { cx, cy, payload, index } = props;
-    if (payload?.up === false)
-      return <circle key={index} cx={cx} cy={cy} r={6} fill="hsl(0 84% 55%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
+    // ÖNCE hata/yavaş (st=2 eşik aşımı up=false gelse bile HATA'dır → koyu sarı); sonra gerçek down → kırmızı
     if (payload?.st === 2 || payload?.slow)
       return <circle key={index} cx={cx} cy={cy} r={5} fill="hsl(38 92% 45%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
+    if (payload?.up === false)
+      return <circle key={index} cx={cx} cy={cy} r={6} fill="hsl(0 84% 55%)" stroke="hsl(var(--card))" strokeWidth={1.5} />;
     return <g key={index} />;
   };
 
@@ -152,7 +153,7 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
                         formatter={(v: number, _n, item) => {
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           const p = (item as any)?.payload;
-                          const state = p?.up === false ? " · DOWN" : p?.st === 2 ? " · HATA" : p?.slow ? " · YAVAŞ" : "";
+                          const state = p?.st === 2 ? " · HATA" : p?.slow ? " · YAVAŞ" : p?.up === false ? " · DOWN" : "";
                           return [`${v} ms${state}`, "Yanıt"];
                         }} />
                       <Area type="monotone" dataKey="ms" stroke="hsl(217 91% 60%)" strokeWidth={2} fill="url(#gMs)"
