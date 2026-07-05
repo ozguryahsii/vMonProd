@@ -470,15 +470,35 @@ public class ApiController : ControllerBase
         var q = _db.CheckResults.AsNoTracking().Where(r => r.ServiceId == id);
         if (minutes > 0)
         {
-            var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 62));
+            minutes = Math.Clamp(minutes, 5, 60 * 24 * 62);
+            var since = DateTime.UtcNow.AddMinutes(-minutes);
             q = q.Where(r => r.CheckedAt >= since);
-            take = 3000;
+            take = 10000;
         }
         var checks = await q
             .OrderByDescending(r => r.CheckedAt)
-            .Take(Math.Clamp(take, 1, 3000))
+            .Take(Math.Clamp(take, 1, 10000))
             .Select(r => new { r.CheckedAt, r.IsUp, r.Status, r.ResponseTimeMs, r.Error })
             .ToListAsync(ct);
+
+        // Uzun aralıkta sunucu tarafı özetleme (~400 kova): ms=maks, DOWN/HATA kova içinde korunur
+        if (minutes > 0 && checks.Count > 600)
+        {
+            var bucketTicks = Math.Max(TimeSpan.TicksPerSecond, TimeSpan.FromMinutes(minutes).Ticks / 400);
+            checks = checks
+                .GroupBy(c => c.CheckedAt.Ticks / bucketTicks)
+                .OrderByDescending(g => g.Key)
+                .Select(g => new
+                {
+                    CheckedAt = new DateTime(g.Key * bucketTicks, DateTimeKind.Utc),
+                    IsUp = !g.Any(x => !x.IsUp && x.Status != (int)Models.CheckStatus.Error),
+                    Status = g.Any(x => x.Status == (int)Models.CheckStatus.Error) ? (int)Models.CheckStatus.Error
+                           : g.Any(x => !x.IsUp) ? (int)Models.CheckStatus.Down : (int)Models.CheckStatus.Up,
+                    ResponseTimeMs = g.Max(x => x.ResponseTimeMs),
+                    Error = g.Select(x => x.Error).FirstOrDefault(e => e != null)
+                })
+                .ToList();
+        }
 
         var outages = await _db.Outages.AsNoTracking()
             .Where(o => o.ServiceId == id)
@@ -501,9 +521,8 @@ public class ApiController : ControllerBase
 
         var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
 
-        var points = await _db.CheckResults.AsNoTracking()
+        var raw = await _db.CheckResults.AsNoTracking()
             .Where(r => idList.Contains(r.ServiceId) && r.CheckedAt >= since)
-            .OrderBy(r => r.CheckedAt)
             .Select(r => new { r.ServiceId, r.CheckedAt, r.ResponseTimeMs, r.IsUp, r.Status })
             .ToListAsync(ct);
 
@@ -511,16 +530,32 @@ public class ApiController : ControllerBase
             .Where(s => idList.Contains(s.Id))
             .ToDictionaryAsync(s => s.Id, s => s.Name, ct);
 
+        // SUNUCU TARAFI ÖZETLEME: uzun aralıklarda ham satır sayısı (1 ay × 12 servis > 100k)
+        // tarayıcıyı donduruyordu. Seri başına ~300 zaman kovası: ms=maks (spike korunur),
+        // kova içinde herhangi bir DOWN/HATA varsa durum noktası korunur → özellik kaybı yok.
+        const int targetPoints = 300;
+        var bucketTicks = Math.Max(TimeSpan.TicksPerSecond,
+            TimeSpan.FromMinutes(minutes).Ticks / targetPoints);
+
         return Ok(new
         {
             since,
+            // st: 0=Up 1=Down 2=Error — grafiklerde kırmızı/sarı durum noktaları için
             series = idList.Where(id => names.ContainsKey(id)).Select(id => new
             {
                 id,
                 name = names[id],
-                // st: 0=Up 1=Down 2=Error — grafiklerde kırmızı/sarı durum noktaları için
-                points = points.Where(p => p.ServiceId == id)
-                    .Select(p => new { t = p.CheckedAt, ms = p.ResponseTimeMs, up = p.IsUp, st = p.Status })
+                points = raw.Where(p => p.ServiceId == id)
+                    .GroupBy(p => p.CheckedAt.Ticks / bucketTicks)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new
+                    {
+                        t = new DateTime(g.Key * bucketTicks, DateTimeKind.Utc),
+                        ms = g.Max(x => x.ResponseTimeMs),
+                        up = !g.Any(x => !x.IsUp && x.Status != (int)Models.CheckStatus.Error),
+                        st = g.Any(x => x.Status == (int)Models.CheckStatus.Error) ? 2
+                           : g.Any(x => !x.IsUp) ? 1 : 0
+                    })
             })
         });
     }
@@ -534,14 +569,18 @@ public class ApiController : ControllerBase
             .Where(x => int.TryParse(x, out _)).Select(int.Parse).Distinct().Take(20).ToList();
         if (idList.Count == 0) return Ok(new { series = Array.Empty<object>() });
 
-        var since = DateTime.UtcNow.AddMinutes(-Math.Clamp(minutes, 5, 60 * 24 * 31));
-        var points = await _db.HealthMetrics.AsNoTracking()
+        minutes = Math.Clamp(minutes, 5, 60 * 24 * 31);
+        var since = DateTime.UtcNow.AddMinutes(-minutes);
+        var raw = await _db.HealthMetrics.AsNoTracking()
             .Where(m => idList.Contains(m.ServiceId) && m.CheckedAt >= since)
-            .OrderBy(m => m.CheckedAt)
             .Select(m => new { m.ServiceId, m.CheckedAt, m.CpuPercent, m.RamPercent, m.MaxDiskPercent })
             .ToListAsync(ct);
         var names = await _db.Services.AsNoTracking().Where(s => idList.Contains(s.Id))
             .ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+
+        // Sunucu tarafı özetleme (bkz. timeseries): seri başına ~300 kova, ortalama değerler
+        const int targetPoints = 300;
+        var bucketTicks = Math.Max(TimeSpan.TicksPerSecond, TimeSpan.FromMinutes(minutes).Ticks / targetPoints);
 
         return Ok(new
         {
@@ -549,8 +588,16 @@ public class ApiController : ControllerBase
             {
                 id,
                 name = names[id],
-                points = points.Where(p => p.ServiceId == id)
-                    .Select(p => new { t = p.CheckedAt, cpu = p.CpuPercent, ram = p.RamPercent, disk = p.MaxDiskPercent })
+                points = raw.Where(p => p.ServiceId == id)
+                    .GroupBy(p => p.CheckedAt.Ticks / bucketTicks)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new
+                    {
+                        t = new DateTime(g.Key * bucketTicks, DateTimeKind.Utc),
+                        cpu = Avg(g.Select(x => x.CpuPercent)),
+                        ram = Avg(g.Select(x => x.RamPercent)),
+                        disk = Avg(g.Select(x => x.MaxDiskPercent))
+                    })
             })
         });
     }
@@ -1545,6 +1592,13 @@ public class ApiController : ControllerBase
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync("credential.delete", c.Name, ct: ct);
         return Ok(new { ok = true });
+    }
+
+    /// <summary>Nullable double ortalaması (kova özetleme yardımcıcısı).</summary>
+    private static double? Avg(IEnumerable<double?> xs)
+    {
+        var l = xs.Where(x => x.HasValue).Select(x => x!.Value).ToList();
+        return l.Count > 0 ? Math.Round(l.Average(), 1) : (double?)null;
     }
 
     private bool Can(string perm) => User.Can(perm);

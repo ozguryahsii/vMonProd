@@ -9,16 +9,8 @@ import { type StatusService, getTimeSeries, getMetricsSeries } from "@/lib/monit
 import { cn } from "@/lib/utils";
 
 const HEALTH_TYPES = ["WindowsHealth", "LinuxHealth"];
-
-/** Uzun aralıklarda nokta sayısını azalt (performans): işaretli (down/warn) noktalar HER ZAMAN korunur. */
-function thin<T extends { mark?: string }>(points: T[], max = 240): T[] {
-  if (points.length <= max) return points;
-  const step = Math.ceil(points.length / max);
-  const out: T[] = [];
-  for (let i = 0; i < points.length; i++)
-    if (i % step === 0 || points[i].mark || i === points.length - 1) out.push(points[i]);
-  return out;
-}
+// NOT: istemci tarafı inceltme kaldırıldı — backend artık seri başına ~300 kovalı özet döndürür
+// (sunucu tarafı özetleme; spike'lar max ile, down/hata durumları kova içinde korunur).
 
 /** Eski dashboard'daki canlı grafikler: Yanıt Süreleri + CPU/RAM/Disk (panodaki servislerden). */
 export function DashboardCharts({ services }: { services: StatusService[] }) {
@@ -57,13 +49,13 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
             // Eski davranış: down anı da DEĞERİYLE çizilir (timeout süresi spike olur),
             // kırmızı nokta çizginin ÜZERİNDE tepede görünür — ayrı şerit yok.
             // Öncelik: HATA (st=2, eşik aşımı) / yavaş → koyu sarı; gerçek down → büyük kırmızı.
-            points: thin(s.points.map((p) => ({
+            points: s.points.map((p) => ({
               t: p.t,
               v: p.ms,
               mark: p.st === 2 || (p.up && thr != null && p.ms > thr) ? ("warn" as const)
                 : !p.up ? ("down" as const)
                 : undefined,
-            }))),
+            })),
           };
         }));
         setTick((t) => t + 1);
@@ -72,9 +64,9 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
 
     if (healthIds.length > 0)
       getMetricsSeries(healthIds, minutes, ctrl.signal).then((d) => {
-        setCpu(d.series.map((s) => ({ name: s.name, points: thin(s.points.map((p) => ({ t: p.t, v: p.cpu }))) })));
-        setRam(d.series.map((s) => ({ name: s.name, points: thin(s.points.map((p) => ({ t: p.t, v: p.ram }))) })));
-        setDisk(d.series.map((s) => ({ name: s.name, points: thin(s.points.map((p) => ({ t: p.t, v: p.disk }))) })));
+        setCpu(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.cpu })) })));
+        setRam(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.ram })) })));
+        setDisk(d.series.map((s) => ({ name: s.name, points: s.points.map((p) => ({ t: p.t, v: p.disk })) })));
         setTick((t) => t + 1);
       }).catch(() => { setCpu([]); setRam([]); setDisk([]); });
     else { setCpu([]); setRam([]); setDisk([]); }

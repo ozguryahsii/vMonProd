@@ -55,9 +55,6 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
     };
 
   return (
-    // chart-reveal: GPU'da çalışan perde animasyonu — nokta sayısından bağımsız sabit maliyet
-    // (Recharts'ın JS nokta-animasyonu büyük veride donduruyordu; bu yöntem her aralıkta akıcı)
-    <div className="chart-reveal h-full w-full">
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
@@ -79,11 +76,12 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
           <Legend iconType="circle" formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{v}</span>} />
         )}
         {series.map((s, i) => (
+          // Gerçek çizgi animasyonu GERİ: backend artık seri başına ~300 kovalı özet döndüğü
+          // için (100k ham satır yok) animasyon her aralıkta akıcı çalışır
           <Line key={s.name} type="monotone" dataKey={s.name} stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls isAnimationActive={false} />
+            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls animationDuration={900} />
         ))}
       </LineChart>
     </ResponsiveContainer>
-    </div>
   );
 }
