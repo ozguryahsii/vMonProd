@@ -1385,14 +1385,22 @@ public class ApiController : ControllerBase
     /// sorgusunun aksine Oracle/MSSQL/PG/MySQL'de de çalışır).</summary>
     [HttpGet("audit")]
     public async Task<IActionResult> AuditList([FromQuery] string? q, [FromQuery] string? act,
-        [FromQuery] int days = 0, [FromQuery] int take = 500, CancellationToken ct = default)
+        [FromQuery] int days = 0, [FromQuery] int take = 500,
+        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null, CancellationToken ct = default)
     {
         if (!User.IsAppAdmin()) return Forbid403();
-        take = Math.Clamp(take, 50, 5000);
+        take = Math.Clamp(take, 50, 20000);
         Response.Headers["Cache-Control"] = "no-store";
 
         var query = _db.AuditLogs.AsNoTracking().AsQueryable();
-        if (days > 0)
+        // Tarih aralığı (dışa aktarım için): from/to doluysa days yok sayılır; to günü DAHİL
+        if (from.HasValue) query = query.Where(a => a.At >= from.Value);
+        if (to.HasValue)
+        {
+            var toEnd = to.Value.TimeOfDay == TimeSpan.Zero ? to.Value.Date.AddDays(1) : to.Value;
+            query = query.Where(a => a.At < toEnd);
+        }
+        if (days > 0 && !from.HasValue && !to.HasValue)
         {
             var since = DateTime.UtcNow.AddDays(-Math.Min(days, 3650));
             query = query.Where(a => a.At >= since);

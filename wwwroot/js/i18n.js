@@ -126,6 +126,40 @@
         "Ayarları Kaydet": "Save Settings", "Ayarlar kaydedildi.": "Settings saved.",
         "Çalışıyor…": "Running…", "Başarılı ✅": "Success ✅", "Başarısız": "Failed",
         "Yeniden dene": "Retry", "Son yenileme:": "Last refresh:",
+        // ---- React SPA parti 3: dinamik ekran kalıntıları ----
+        "Kesintiler": "Outages", "sürüyor": "ongoing",
+        "Bu aralıkta kesinti yok 🎉": "No outages in this range 🎉",
+        "Son 7 günde kesinti yok 🎉": "No outages in the last 7 days 🎉",
+        "Kaynak Kullanımı (24s)": "Resource Usage (24h)",
+        "Ortalama CPU trendi": "Average CPU trend",
+        "Ortalama RAM trendi": "Average RAM trend",
+        "Ortalama DISK trendi": "Average DISK trend",
+        "En yavaş 12 servis (ms) — 🔴 down · 🟡 yavaş/hata çizgi üzerinde işaretlenir":
+            "Slowest 12 services (ms) — 🔴 down · 🟡 slow/error marked on the line",
+        "Down": "Down", "Yavaş / Hata": "Slow / Error",
+        "Otomatik (en yavaş 12)": "Auto (slowest 12)",
+        "⟲ Otomatik (en yavaş 12)": "⟲ Auto (slowest 12)",
+        "En son kontrol sonuçları": "Latest check results",
+        "Anlık servis durumu": "Live service status",
+        "Tüm servislerin ortalama uptime yüzdesi": "Average uptime percentage of all services",
+        "satıra tıklayarak detay": "click a row for details",
+        "· satıra tıklayarak detay": "· click a row for details",
+        "Bu panoda servis yok": "No services on this board",
+        "Bu kategoride servis yok": "No services in this category",
+        "Başka bir kategori seç.": "Pick another category.",
+        "Servisler ekranından ekle veya başka pano seç.": "Add from Monitors or pick another board.",
+        "Filtreleri değiştirmeyi dene.": "Try changing the filters.",
+        "Yeni İzleme ile ilk izlemeni ekle.": "Add your first monitor with New Monitor.",
+        "Henüz veri yok": "No data yet",
+        "Servisler kontrol edildikçe grafik dolacak.": "The chart will fill as services get checked.",
+        "Eşleşen sunucu yok": "No matching servers",
+        "Sağlık verisi olan sunucu yok": "No servers with health data",
+        "İstatistikler yalnız Windows/Linux Sağlık tipiyle izlenen sunuculardan gelir.":
+            "Statistics come only from servers monitored with Windows/Linux Health types.",
+        "Düzen kaydedildi.": "Layout saved.", "Varsayılan düzene dönüldü.": "Reset to default layout.",
+        "Atanan": "Allocated", "atanan": "allocated", "kullanılan": "used",
+        "PDF Raporu": "PDF Report", "Tam Ekran": "Fullscreen", "Özet CSV": "Summary CSV",
+        "Son güncelleme:": "Last updated:",
         // ---- /React SPA ----
         // Navigasyon / kullanıcı menüsü
         "Dashboard'lar": "Dashboards", "Raporlar": "Reports", "Servisler": "Services",
@@ -431,7 +465,11 @@
     };
 
     const PREFIX = {
-        "Son yenileme: ": "Last refresh: "
+        "Son yenileme: ": "Last refresh: ",
+        "Kesintiler (": "Outages (",
+        "Yanıt Süresi (": "Response Time (",
+        "son: ": "last: ",
+        "Toplu Düzenle (": "Bulk Edit ("
     };
 
     const NORM = s => s.replace(/\s+/g, " ").trim();
@@ -441,7 +479,18 @@
     for (const k in TEXT) NORMMAP[NORM(k)] = TEXT[k];
 
     // Sonek eşlemeleri (dinamik önekli/sayılı metinler — örn. "123 kayıt gösteriliyor")
-    const SUFFIX = { " kayıt gösteriliyor": " records shown" };
+    const SUFFIX = {
+        " kayıt gösteriliyor": " records shown",
+        " kontrol)": " checks)",
+        " sunucu": " servers",
+        " kesinti": " outages",
+        " seçili servis": " selected services",
+        " izleme seçili": " monitors selected",
+        " servis)": " services)",
+        " izleme": " monitors",
+        " yetki": " permissions",
+        " kayıt (en yeni 500)": " records (newest 500)"
+    };
 
     // Alt-dize değişimleri (dinamik denetim açıklamaları — örn. "start → İşlem gönderildi (start).")
     const REPLACE = { "İşlem gönderildi": "Action sent" };
@@ -520,11 +569,21 @@
         const mo = new MutationObserver(muts => {
             const seen = new Set();
             muts.forEach(m => {
+                // React SPA: sanal DOM her render'da metni TÜRKÇE'ye geri yazar (characterData) —
+                // bunu da yakala ve yeniden çevir. Döngü güvenli: EN metin sözlükte yok → yazma olmaz.
+                if (m.type === "characterData" && m.target && m.target.nodeType === 3) {
+                    const p = m.target.parentNode;
+                    if (p && !SKIP.has(p.nodeName)) {
+                        const v = translateText(m.target.nodeValue);
+                        if (v !== null) m.target.nodeValue = v;
+                    }
+                    return;
+                }
                 const t = (m.target && m.target.nodeType === 1) ? m.target : null;
                 if (t && !seen.has(t)) { seen.add(t); run(t); }
             });
         });
-        mo.observe(document.body, { childList: true, subtree: true });
+        mo.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
 
     if (document.body) start();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, Sector } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector } from "recharts";
 import type { NameValue } from "@/lib/stats";
 
 const PALETTE = [
@@ -14,66 +14,83 @@ const trunc = (s: string, n = 22) => (s.length > n ? s.slice(0, n - 1) + "…" :
 function ActiveSlice(props: any) {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
   return (
-    <g>
-      <Sector cx={cx} cy={cy} innerRadius={innerRadius - 2} outerRadius={outerRadius + 7}
-        startAngle={startAngle} endAngle={endAngle} fill={fill} style={{ filter: "drop-shadow(0 6px 14px rgba(0,0,0,.45))" }} />
-    </g>
+    <Sector cx={cx} cy={cy} innerRadius={innerRadius - 2} outerRadius={outerRadius + 7}
+      startAngle={startAngle} endAngle={endAngle} fill={fill} style={{ filter: "drop-shadow(0 6px 14px rgba(0,0,0,.45))" }} />
   );
 }
 
+/** Donut: lejant HTML olarak AYRI (en büyük 4 + "+N diğer") → pasta kendi alanında tam ortalanır,
+ * toplam sayı overlay ile HER ZAMAN tam merkezde ve tıklanabilir. */
 export function DonutChart({ data, height = 240, onSliceClick, onCenterClick, centerLabel }: {
   data: NameValue[];
   height?: number | string;
   onSliceClick?: (name: string) => void;
-  onCenterClick?: () => void;      // ortadaki toplam sayıya tıkla → tüm kapsam
+  onCenterClick?: () => void;
   centerLabel?: string | number;
 }) {
   const [active, setActive] = useState<number | undefined>(undefined);
   const total = centerLabel ?? data.reduce((a, b) => a + b.value, 0);
 
-  // Lejant yalnız EN BÜYÜK 4 dilimi gösterir (uzun listeler grafiği taşırıyordu);
-  // kalanlar pastada, tooltip'te ve tıklamada aynen var.
   const top4 = data
-    .map((d, i) => ({ ...d, i }))
+    .map((d, i) => ({ ...d, color: PALETTE[i % PALETTE.length] }))
     .sort((a, b) => b.value - a.value)
-    .slice(0, 4)
-    .map((d) => ({ value: d.name, type: "circle" as const, id: d.name, color: PALETTE[d.i % PALETTE.length] }));
+    .slice(0, 4);
   const hidden = data.length - top4.length;
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <PieChart>
-        <Pie
-          data={data} dataKey="value" nameKey="name" cx="50%" cy="46%"
-          innerRadius="46%" outerRadius="72%" paddingAngle={2} stroke="none"
-          activeIndex={active} activeShape={ActiveSlice}
-          onMouseEnter={(_, i) => setActive(i)}
-          onMouseLeave={() => setActive(undefined)}
-          onClick={(entry) => onSliceClick?.((entry as unknown as NameValue).name)}
-          style={onSliceClick ? { cursor: "pointer" } : undefined}
-          animationDuration={700}
-        >
-          {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-        </Pie>
-        {/* Ortadaki toplam — pastanın TAM merkezinde, tıklanabilir */}
-        <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central"
+    <div className="flex h-full w-full flex-col" style={typeof height === "number" ? { height } : undefined}>
+      {/* Pasta alanı — lejant burada DEĞİL, bu yüzden merkez = gerçek merkez */}
+      <div className="relative min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data} dataKey="value" nameKey="name" cx="50%" cy="50%"
+              innerRadius="52%" outerRadius="80%" paddingAngle={2} stroke="none"
+              activeIndex={active} activeShape={ActiveSlice}
+              onMouseEnter={(_, i) => setActive(i)}
+              onMouseLeave={() => setActive(undefined)}
+              onClick={(entry) => onSliceClick?.((entry as unknown as NameValue).name)}
+              style={onSliceClick ? { cursor: "pointer" } : undefined}
+              animationDuration={700}
+            >
+              {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+            </Pie>
+            <Tooltip
+              cursor={false}
+              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" }}
+              itemStyle={{ color: "hsl(var(--foreground))" }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        {/* Toplam — mutlak konumla TAM merkez, tıklanabilir */}
+        <button
+          type="button"
           onClick={onCenterClick}
-          style={{ fontSize: 22, fontWeight: 700, fill: "hsl(var(--foreground))", cursor: onCenterClick ? "pointer" : "default" }}>
+          disabled={!onCenterClick}
+          className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full px-2 text-2xl font-bold tabular-nums text-foreground transition-transform enabled:cursor-pointer enabled:hover:scale-110"
+          title={onCenterClick ? "Tümünü listele" : undefined}
+        >
           {total}
-        </text>
-        <Tooltip
-          cursor={false}
-          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" }}
-          itemStyle={{ color: "hsl(var(--foreground))" }}
-        />
-        <Legend
-          verticalAlign="bottom"
-          payload={hidden > 0 ? [...top4, { value: `+${hidden} diğer`, type: "circle" as const, id: "__more", color: "hsl(var(--muted-foreground))" }] : top4}
-          formatter={(v: string) => (
-            <span title={v} style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{trunc(v)}</span>
-          )}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+        </button>
+      </div>
+
+      {/* HTML lejant: en büyük 4 + kalan sayısı (taşma yok; tam ad title'da) */}
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 pb-1 pt-1.5 text-[11px] text-muted-foreground">
+        {top4.map((d) => (
+          <button key={d.name} type="button" title={d.name}
+            onClick={() => onSliceClick?.(d.name)}
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            style={onSliceClick ? undefined : { cursor: "default" }}>
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color }} />
+            {trunc(d.name)}
+          </button>
+        ))}
+        {hidden > 0 && (
+          <button type="button" onClick={onCenterClick} className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground" /> +{hidden} diğer
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

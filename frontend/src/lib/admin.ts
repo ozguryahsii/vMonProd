@@ -5,9 +5,10 @@ export interface AuditRow {
   id: number; at: string; user: string; ip: string | null;
   action: string; target: string | null; detail: string | null; success: boolean;
 }
-export const getAudit = (q: string, act: string, days: number, take = 500, signal?: AbortSignal) =>
+export const getAudit = (q: string, act: string, days: number, take = 500, signal?: AbortSignal, from = "", to = "") =>
   apiGet<{ rows: AuditRow[]; actions: string[] }>(
-    `/audit?q=${encodeURIComponent(q)}&act=${encodeURIComponent(act)}&days=${days}&take=${take}`, signal);
+    `/audit?q=${encodeURIComponent(q)}&act=${encodeURIComponent(act)}&days=${days}&take=${take}` +
+    (from ? `&from=${from}` : "") + (to ? `&to=${to}` : ""), signal);
 export const verifyAudit = () => apiSend<{ ok: boolean; message: string }>("POST", "/audit/verify");
 
 // ---- Kullanıcılar ----

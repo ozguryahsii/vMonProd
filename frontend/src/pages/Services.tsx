@@ -196,10 +196,11 @@ export function Services() {
             <EmptyState title={data && data.length > 0 ? "Eşleşen izleme yok" : "Henüz izleme yok"}
               hint={data && data.length > 0 ? "Filtreleri değiştirmeyi dene." : "Yeni İzleme ile ilk izlemeni ekle."} />
           ) : (
-            <div className="overflow-x-auto">
+            {/* Liste kendi içinde kayar → üstteki arama/filtre çubuğu ve tablo başlığı SABİT kalır */}
+            <div className="max-h-[calc(100vh-330px)] overflow-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-border bg-card text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="w-10 px-4 py-3">
                       <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll}
                         className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]" />
