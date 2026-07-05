@@ -19,6 +19,16 @@ const badge: Record<string, { label: string; cls: string }> = {
 };
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const dt = (iso: string) => new Date(iso).toLocaleString();
+
+/** Kesinti süresi: "48 dk" / "2 sa 15 dk" / "3 gün 4 sa" (bitiş yoksa şu ana kadar). */
+function duration(startIso: string, endIso: string | null): string {
+  const ms = (endIso ? new Date(endIso).getTime() : Date.now()) - new Date(startIso).getTime();
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return `${mins} dk`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h} sa ${mins % 60} dk`;
+  return `${Math.floor(h / 24)} gün ${h % 24} sa`;
+}
 const tip = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" };
 
 export function ServiceDetailDrawer({ service, onClose, onChanged }: {
@@ -193,9 +203,13 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
                   <div className="space-y-2">
                     {hist!.outages.map((o, i) => (
                       <div key={i} className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
-                        <div className="flex items-center justify-between">
+                        {/* Sol: başlangıç (kırmızı) · Orta: süre (gri) · Sağ: bitiş (pastel yeşil) / sürüyor (kırmızı) */}
+                        <div className="flex items-center justify-between gap-2">
                           <span className="font-medium text-rose-400">{dt(o.startedAt)}</span>
-                          <span className="text-xs text-muted-foreground">{o.endedAt ? dt(o.endedAt) : "sürüyor"}</span>
+                          <span className="text-xs text-muted-foreground">{duration(o.startedAt, o.endedAt)}</span>
+                          {o.endedAt
+                            ? <span className="font-medium text-emerald-300/80">{dt(o.endedAt)}</span>
+                            : <span className="animate-pulse font-medium text-rose-400">sürüyor</span>}
                         </div>
                         {o.firstError && <div className="mt-1 text-xs text-muted-foreground">{o.firstError}</div>}
                       </div>
