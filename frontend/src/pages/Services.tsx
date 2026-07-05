@@ -196,7 +196,7 @@ export function Services() {
             <EmptyState title={data && data.length > 0 ? "Eşleşen izleme yok" : "Henüz izleme yok"}
               hint={data && data.length > 0 ? "Filtreleri değiştirmeyi dene." : "Yeni İzleme ile ilk izlemeni ekle."} />
           ) : (
-            {/* Liste kendi içinde kayar → üstteki arama/filtre çubuğu ve tablo başlığı SABİT kalır */}
+            // Liste kendi içinde kayar → üstteki arama/filtre çubuğu ve tablo başlığı SABİT kalır
             <div className="max-h-[calc(100vh-330px)] overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
