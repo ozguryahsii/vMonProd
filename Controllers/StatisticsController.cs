@@ -89,7 +89,9 @@ public class StatisticsController : Controller
             .OrderByDescending(s => sel(s)).Take(10)
             .Select(s => (object)new { name = s.Name, value = Math.Round(sel(s)!.Value, 1), os = s.OsName }).ToList();
 
-        // Kritik
+        // Kritik: CPU/RAM/Disk ≥85 + eşik aşımı (tek kutuda)
+        var cpuHot = svc.Count(s => s.LastCpuPercent >= 85);
+        var ramHot = svc.Count(s => s.LastRamPercent >= 85);
         var diskFull = svc.Count(s => s.LastMaxDiskPercent >= 85);
         var breach = svc.Count(s => s.LastStatus == 2);
 
@@ -253,7 +255,7 @@ public class StatisticsController : Controller
             osVersion,
             tags,
             top = new { cpu = Top(s => s.LastCpuPercent), ram = Top(s => s.LastRamPercent), disk = Top(s => s.LastMaxDiskPercent) },
-            critical = new { diskFull, breach },
+            critical = new { diskFull, breach, cpuHot, ramHot },
             histogram = new { cpu = Band(s => s.LastCpuPercent), ram = Band(s => s.LastRamPercent), disk = Band(s => s.LastMaxDiskPercent) },
             osEol,
             uptime = new { h24 = upH24, d7 = upD7 },
@@ -368,6 +370,8 @@ public class StatisticsController : Controller
             "down" => all.Where(s => s.LastStatus == 1),
             "error" => all.Where(s => s.LastStatus == 2),
             "disk_full" => all.Where(s => s.LastMaxDiskPercent >= 85),
+            "cpu_full" => all.Where(s => s.LastCpuPercent >= 85),
+            "ram_full" => all.Where(s => s.LastRamPercent >= 85),
             "outage" => all.Where(s => outageIds!.Contains(s.Id)),
             "os_kind" => string.IsNullOrWhiteSpace(value) ? all
                 : all.Where(s => string.Equals(s.OsKind, value, StringComparison.OrdinalIgnoreCase)),

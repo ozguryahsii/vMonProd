@@ -17,7 +17,7 @@ export interface StatsData {
     ram: { name: string; value: number; os: string | null }[];
     disk: { name: string; value: number; os: string | null }[];
   };
-  critical: { diskFull: number; breach: number };
+  critical: { diskFull: number; breach: number; cpuHot: number; ramHot: number };
   osEol: {
     real: boolean; count: number; soonCount: number;
     items: { name: string; value: number; status: string; eol: string | null; days: number | null }[];

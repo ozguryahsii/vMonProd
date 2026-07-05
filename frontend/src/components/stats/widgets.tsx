@@ -227,11 +227,24 @@ function BigPair({ a, b }: {
   );
 }
 function Critical({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
-  return <BigPair
-    a={{ label: "Disk ≥85%", v: String(d.critical.diskFull), cls: d.critical.diskFull > 0 ? "text-rose-400" : "text-emerald-400",
-         onClick: () => onDrill({ source: "disk_full", title: "Disk doluluğu ≥85% sunucular" }) }}
-    b={{ label: "Eşik aşımı", v: String(d.critical.breach), cls: d.critical.breach > 0 ? "text-orange-400" : "text-emerald-400",
-         onClick: () => onDrill({ source: "error", title: "Eşik aşımı (hata) sunucular" }) }} />;
+  // Tek kutuda 4 kritik gösterge: CPU/RAM/Disk ≥85 + eşik aşımı
+  const items = [
+    { label: "CPU ≥85%", v: d.critical.cpuHot ?? 0, warn: "text-rose-400", source: "cpu_full", title: "CPU kullanımı ≥85% sunucular" },
+    { label: "RAM ≥85%", v: d.critical.ramHot ?? 0, warn: "text-rose-400", source: "ram_full", title: "RAM kullanımı ≥85% sunucular" },
+    { label: "Disk ≥85%", v: d.critical.diskFull, warn: "text-rose-400", source: "disk_full", title: "Disk doluluğu ≥85% sunucular" },
+    { label: "Eşik aşımı", v: d.critical.breach, warn: "text-orange-400", source: "error", title: "Eşik aşımı (hata) sunucular" },
+  ];
+  return (
+    <div className="flex h-full items-center justify-around">
+      {items.map((x) => (
+        <button key={x.label} type="button" onClick={() => onDrill({ source: x.source, title: x.title })}
+          className="cursor-pointer rounded-lg px-2 py-1 text-center transition-transform hover:scale-110">
+          <div className={cn("text-3xl font-bold tabular-nums", x.v > 0 ? x.warn : "text-emerald-400")}>{x.v}</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">{x.label}</div>
+        </button>
+      ))}
+    </div>
+  );
 }
 function UptimeW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
   const open = () => onDrill({ source: "up", title: "Çalışan sunucular" });
