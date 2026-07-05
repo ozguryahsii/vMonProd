@@ -136,7 +136,7 @@
         "Ortalama DISK trendi": "Average DISK trend",
         "En yavaş 12 servis (ms) — 🔴 down · 🟡 yavaş/hata çizgi üzerinde işaretlenir":
             "Slowest 12 services (ms) — 🔴 down · 🟡 slow/error marked on the line",
-        "Down": "Down", "Yavaş / Hata": "Slow / Error",
+        "Yavaş / Hata": "Slow / Error",
         "Otomatik (en yavaş 12)": "Auto (slowest 12)",
         "⟲ Otomatik (en yavaş 12)": "⟲ Auto (slowest 12)",
         "En son kontrol sonuçları": "Latest check results",
@@ -532,7 +532,7 @@
         els.forEach(el => {
             if (!isLeafProse(el)) return;
             const en = PROSE[NORM(el.textContent)];   // EN sonuç tekrar eşleşmez → döngü olmaz
-            if (en != null) el.textContent = en;
+            if (en != null && en !== el.textContent) el.textContent = en;
         });
     }
 
@@ -545,7 +545,7 @@
         });
         const nodes = []; let n;
         while ((n = w.nextNode())) nodes.push(n);
-        nodes.forEach(node => { const v = translateText(node.nodeValue); if (v !== null) node.nodeValue = v; });
+        nodes.forEach(node => { const v = translateText(node.nodeValue); if (v !== null && v !== node.nodeValue) node.nodeValue = v; });
     }
 
     function translateAttrs(root) {
@@ -575,7 +575,9 @@
                     const p = m.target.parentNode;
                     if (p && !SKIP.has(p.nodeName)) {
                         const v = translateText(m.target.nodeValue);
-                        if (v !== null) m.target.nodeValue = v;
+                        // KRİTİK: değer DEĞİŞMİYORSA yazma — aynı değeri yazmak yeni mutation
+                        // üretir ve sözlükte TR=EN özdeş giriş varsa SONSUZ DÖNGÜ olur (donma).
+                        if (v !== null && v !== m.target.nodeValue) m.target.nodeValue = v;
                     }
                     return;
                 }
