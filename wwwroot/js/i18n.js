@@ -579,7 +579,7 @@
     };
 
     // Alt-dize değişimleri (dinamik denetim açıklamaları — örn. "start → İşlem gönderildi (start).")
-    const REPLACE = { "İşlem gönderildi": "Action sent" };
+    const REPLACE = { "İşlem gönderildi": "Action sent", "sapma:": "drift:" };
 
     function translateText(value) {
         const key = value.trim();

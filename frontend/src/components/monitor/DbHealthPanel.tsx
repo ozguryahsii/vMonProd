@@ -21,6 +21,12 @@ const PLATFORM_BADGE: Record<DbPlatform, string> = {
   MySQL: "bg-teal-500/10 ring-teal-500/30",
 };
 
+/** Checker hata mesajından sapma saniyesini ayıklar: "DB saati sapması: 123 sn (...)" */
+export function parseDrift(err: string | null): number | null {
+  const m = err?.match(/sapması:\s*(\d+)\s*sn/);
+  return m ? Number(m[1]) : null;
+}
+
 const catText: Record<string, string> = {
   up: "text-emerald-400", slow: "text-amber-400", down: "text-rose-400", error: "text-orange-400",
 };
@@ -85,13 +91,14 @@ export function DbHealthPanel({ services, onOpen }: { services: StatusService[];
                 <span className={cn("ml-auto h-2.5 w-2.5 shrink-0 rounded-full", catDot[worst], worst !== "up" && "animate-pulse")} />
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {inst.services.map((s) => {
                   const meta = DB_METRIC_META[s.type];
                   const c = catOf(s);
                   const Icon = METRIC_ICON[meta.metric] ?? Database;
                   const v = s.lastResponseTimeMs;
                   const pct = meta.unit === "%" ? Math.max(0, Math.min(100, v ?? 0)) : null;
+                  const drift = meta.metric === "clock" ? parseDrift(s.lastError) : null;
                   return (
                     <button
                       key={s.id}
@@ -108,20 +115,28 @@ export function DbHealthPanel({ services, onOpen }: { services: StatusService[];
                         <Icon className="h-3 w-3 shrink-0" />
                         <span className="truncate">{meta.short}</span>
                       </div>
-                      <div className={cn("mt-1 text-lg font-bold leading-none tabular-nums", c === "up" ? "text-foreground" : catText[c])}>
-                        {c === "down" ? "KAPALI" : fmtDbValue(s.type, v)}
-                      </div>
+                      {meta.metric === "clock" ? (
+                        // Saat kutusu: DURUM büyük punto, yanıt süresi altta küçük gri (+ sapma oranı)
+                        <>
+                          <div className={cn("mt-1 text-sm font-extrabold uppercase leading-none tracking-wide",
+                            c === "down" ? "text-rose-400" : c === "error" ? "text-orange-400" : "text-emerald-400")}>
+                            {c === "down" ? "KAPALI" : c === "error" ? "saat sapması!" : "saat senkron"}
+                          </div>
+                          <div className="mt-1 text-[10px] tabular-nums text-muted-foreground">
+                            {c === "down" ? "—" : `${v ?? "—"} ms${drift != null ? ` · sapma: ${drift} sn` : ""}`}
+                          </div>
+                        </>
+                      ) : (
+                        <div className={cn("mt-1 text-lg font-bold leading-none tabular-nums", c === "up" ? "text-foreground" : catText[c])}>
+                          {c === "down" ? "KAPALI" : fmtDbValue(s.type, v)}
+                        </div>
+                      )}
                       {pct != null && c !== "down" && (
                         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
                           <div
                             className={cn("h-full rounded-full transition-all", pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500")}
                             style={{ width: `${pct}%` }}
                           />
-                        </div>
-                      )}
-                      {meta.metric === "clock" && c !== "down" && (
-                        <div className={cn("mt-0.5 text-[10px]", c === "error" ? "text-orange-400" : "text-muted-foreground")}>
-                          {c === "error" ? "saat sapması!" : "saat senkron"}
                         </div>
                       )}
                     </button>
