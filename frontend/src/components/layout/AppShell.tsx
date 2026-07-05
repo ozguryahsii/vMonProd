@@ -5,17 +5,43 @@ import { Topbar } from "./Topbar";
 import { useMe } from "@/hooks/useMe";
 import { logout } from "@/lib/me";
 
-/** Boşta oturum oto-kapatma — 15 dk hareketsizlik (PCI DSS 8.2.8, klasik arayüzle aynı). */
+/** Boşta oturum oto-kapatma — 15 dk GERÇEK hareketsizlik (PCI DSS 8.2.8).
+ * Önceki sürümdeki hata: 'scroll' iç kaydırma alanlarından window'a kabarcıklanmaz →
+ * kullanıcı aktifken sayaç sıfırlanmıyordu. Çözüm:
+ *  - capture:true + geniş olay seti (pointermove/wheel dahil) → HER etkileşim sayılır
+ *  - setTimeout yerine son-aktivite damgası + 30sn'lik kontrol (uyku/sekme dönüşünde de doğru)
+ *  - aktifken 5 dk'da bir sunucuya heartbeat → kayan cookie süresi de tazelenir */
 function useIdleLogout(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const IDLE_MS = 15 * 60 * 1000;
-    let t: ReturnType<typeof setTimeout>;
-    const reset = () => { clearTimeout(t); t = setTimeout(() => { logout().catch(() => { window.location.href = "/Account/Login"; }); }, IDLE_MS); };
-    const evs = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
-    evs.forEach((ev) => window.addEventListener(ev, reset, { passive: true }));
-    reset();
-    return () => { clearTimeout(t); evs.forEach((ev) => window.removeEventListener(ev, reset)); };
+    let last = Date.now();
+    let lastBeat = Date.now();
+    const activity = () => { last = Date.now(); };
+
+    const evs = ["pointermove", "mousemove", "mousedown", "keydown", "click", "scroll", "wheel", "touchstart"] as const;
+    evs.forEach((ev) => window.addEventListener(ev, activity, { passive: true, capture: true }));
+    const onVis = () => { if (document.visibilityState === "visible") activity(); };
+    document.addEventListener("visibilitychange", onVis);
+
+    const iv = setInterval(() => {
+      const idle = Date.now() - last;
+      if (idle >= IDLE_MS) {
+        logout().catch(() => { window.location.href = "/Account/Login"; });
+        return;
+      }
+      // Aktifken sunucu oturumunu canlı tut (kayan süre tazelenir)
+      if (Date.now() - lastBeat >= 5 * 60 * 1000 && idle < 5 * 60 * 1000) {
+        lastBeat = Date.now();
+        fetch("/api/me", { credentials: "same-origin" }).catch(() => {});
+      }
+    }, 30 * 1000);
+
+    return () => {
+      clearInterval(iv);
+      evs.forEach((ev) => window.removeEventListener(ev, activity, { capture: true } as EventListenerOptions));
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [enabled]);
 }
 

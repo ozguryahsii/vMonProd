@@ -189,6 +189,43 @@ body {
 .about-legacy details > summary .bi-chevron-up { display: none; }
 .about-legacy details > *:not(summary) { margin-top: 0.75rem; }
 
+/* Grafik perde animasyonu: GPU clip-path — veri büyüklüğünden bağımsız, akıcı ve kararlı */
+.chart-reveal { animation: chartReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes chartReveal {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.4; }
+  to   { clip-path: inset(0 0 0 0);   opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .chart-reveal { animation: none; } }
+
+/* vMon logosu — kalp atışı (klasik arayüzdeki logoBeat birebir) */
+.logo-beat {
+  transform-origin: center;
+  animation: logoBeat 2.2s ease-in-out infinite, logoGlow 2.2s ease-in-out infinite;
+}
+.logo-beat svg {
+  transform-origin: center;
+  animation: logoBeatInner 2.2s ease-in-out infinite;
+}
+@keyframes logoBeat {
+  0%, 100% { transform: scale(1); }
+  8%  { transform: scale(1.14); }
+  16% { transform: scale(0.97); }
+  26% { transform: scale(1.08); }
+  40% { transform: scale(1); }
+}
+@keyframes logoBeatInner {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  8%  { transform: scale(1.18) rotate(-4deg); }
+  20% { transform: scale(0.94) rotate(3deg); }
+  32% { transform: scale(1.1) rotate(0deg); }
+  45% { transform: scale(1); }
+}
+@keyframes logoGlow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5); }
+  50% { box-shadow: 0 0 0 9px hsl(var(--primary) / 0); }
+}
+@media (prefers-reduced-motion: reduce) { .logo-beat, .logo-beat svg { animation: none; } }
+
 /* Skeleton shimmer */
 .skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); border-radius: 0.5rem; }
 .skeleton::after {

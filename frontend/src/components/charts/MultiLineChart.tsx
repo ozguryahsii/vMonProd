@@ -40,8 +40,6 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
       if (p.mark) row[`${s.name}__m`] = p.mark;
     }
   const data = Array.from(rows.values()).sort((a, b) => (a.ts as number) - (b.ts as number));
-  // Büyük veri setinde (uzun aralık) animasyon donmaya yol açıyor → kapat; kısa aralıklarda animasyon sürer
-  const animMs = data.length > 400 ? 0 : 900;
 
   // Durum noktası: yalnız işaretli noktalarda, çizginin üzerinde (eski görünüm)
   const makeDot = (name: string) =>
@@ -57,6 +55,9 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
     };
 
   return (
+    // chart-reveal: GPU'da çalışan perde animasyonu — nokta sayısından bağımsız sabit maliyet
+    // (Recharts'ın JS nokta-animasyonu büyük veride donduruyordu; bu yöntem her aralıkta akıcı)
+    <div className="chart-reveal h-full w-full">
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
@@ -79,9 +80,10 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
         )}
         {series.map((s, i) => (
           <Line key={s.name} type="monotone" dataKey={s.name} stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls animationDuration={animMs} isAnimationActive={animMs > 0} />
+            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls isAnimationActive={false} />
         ))}
       </LineChart>
     </ResponsiveContainer>
+    </div>
   );
 }

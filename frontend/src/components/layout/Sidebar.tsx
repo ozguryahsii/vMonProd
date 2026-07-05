@@ -41,7 +41,7 @@ export function Sidebar() {
       collapsed ? "w-16" : "w-44"
     )}>
       <div className={cn("flex h-16 items-center gap-2.5", collapsed ? "justify-center px-0" : "px-5")}>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
+        <span className="logo-beat grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
           <Activity className="h-5 w-5 text-white" />
         </span>
         {!collapsed && (
