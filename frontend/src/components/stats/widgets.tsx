@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, Line, LineChart } from "recharts";
+import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, Line, LineChart } from "recharts";
 import { DonutChart } from "@/components/charts/DonutChart";
 import type { StatsData, StatWidgetDef } from "@/lib/stats";
 import type { Drill } from "./StatDetailDrawer";
@@ -35,7 +35,7 @@ export const WIDGET_CATALOG: CatalogItem[] = [
   { type: "gauge", source: "avg_ram", label: "Ort. RAM %", group: "Gösterge", w: 4, h: 3 },
   { type: "gauge", source: "avg_disk", label: "Ort. Disk %", group: "Gösterge", w: 4, h: 3 },
   { type: "fleet", source: "fleet", label: "Filo trendi (30 gün)", group: "İçgörü", w: 12, h: 4 },
-  { type: "top", source: "top", label: "Top kaynak tüketenler", group: "İçgörü", w: 12, h: 4 },
+  { type: "top", source: "top", label: "Top 10 Kaynak Tüketen", group: "İçgörü", w: 12, h: 4 },
   { type: "critical", source: "critical", label: "Kritik durum", group: "İçgörü", w: 4, h: 2 },
   { type: "uptime", source: "uptime", label: "Erişilebilirlik (uptime)", group: "İçgörü", w: 4, h: 2 },
   { type: "histogram", source: "histogram", label: "Kullanım dağılımı", group: "İçgörü", w: 6, h: 4 },
@@ -68,7 +68,7 @@ export function WidgetRenderer({ w, data, onDrill }: { w: StatWidgetDef; data: S
     case "histogram": return <Histogram d={data} onDrill={onDrill} />;
     case "capacity": return <Capacity d={data} />;
     case "rising": return <Rising d={data} onDrill={onDrill} />;
-    case "outage": return <Outage d={data} />;
+    case "outage": return <Outage d={data} onDrill={onDrill} />;
     case "os_eol": return <OsEol d={data} onDrill={onDrill} />;
     case "heatmap": return <Heatmap d={data} />;
     default: return <div className="p-4 text-sm text-muted-foreground">Bilinmeyen widget: {w.type}</div>;
@@ -181,7 +181,7 @@ function MiniTop({ title, items, onClick }: { title: string; items: { name: stri
       <button type="button" onClick={onClick}
         className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-primary">{title}</button>
       <div className="space-y-1.5">
-        {items.slice(0, 5).map((i) => (
+        {items.slice(0, 10).map((i) => (
           <div key={i.name}>
             <div className="flex justify-between text-xs"><span className="truncate pr-1">{i.name}</span><span className="shrink-0 tabular-nums text-muted-foreground">%{i.value}</span></div>
             <div className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${(i.value / max) * 100}%` }} /></div>
@@ -234,29 +234,25 @@ function UptimeW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
 
 const BANDS = ["0-20", "20-40", "40-60", "60-80", "80-100"];
 function Histogram({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
+  // Eski tasarım: DİKEY gruplu çubuklar; çubuğa tıkla → o metrik + bandın sunucuları (2.15.2)
   const rows = BANDS.map((b, i) => ({ band: b, CPU: d.histogram.cpu[i] ?? 0, RAM: d.histogram.ram[i] ?? 0, Disk: d.histogram.disk[i] ?? 0 }));
-  // Noktaya tıkla → o bandın sunucuları (eski 2.15.2 davranışı)
-  const dot = (metric: string, color: string) => ({
-    r: 5, cursor: "pointer",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onClick: (_: any, p: any) => {
-      const band = p?.payload?.band as string | undefined;
-      if (band) onDrill({ source: `hist_${metric}`, value: band, title: `${metric.toUpperCase()} %${band} bandındaki sunucular` });
-    },
-    stroke: color, fill: color,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const click = (metric: string) => (entry: any) => {
+    const band = entry?.band ?? entry?.payload?.band;
+    if (band) onDrill({ source: `hist_${metric}`, value: band, title: `${metric.toUpperCase()} %${band} bandındaki sunucular` });
+  };
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={rows} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+      <BarChart data={rows} margin={{ top: 8, right: 8, left: -20, bottom: 0 }} barCategoryGap="22%">
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
         <XAxis dataKey="band" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <Tooltip contentStyle={tip} />
-        <Legend iconType="circle" formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{v} (noktaya tıkla)</span>} />
-        <Line type="monotone" dataKey="CPU" stroke="hsl(358 85% 55%)" strokeWidth={2} dot activeDot={dot("cpu", "hsl(358 85% 55%)")} />
-        <Line type="monotone" dataKey="RAM" stroke="hsl(271 76% 63%)" strokeWidth={2} dot activeDot={dot("ram", "hsl(271 76% 63%)")} />
-        <Line type="monotone" dataKey="Disk" stroke="hsl(174 62% 47%)" strokeWidth={2} dot activeDot={dot("disk", "hsl(174 62% 47%)")} />
-      </LineChart>
+        <Tooltip cursor={{ fill: "hsl(var(--accent) / 0.4)" }} contentStyle={tip} />
+        <Legend iconType="circle" formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{v}</span>} />
+        <Bar dataKey="CPU" fill="hsl(358 85% 55%)" radius={[3, 3, 0, 0]} cursor="pointer" onClick={click("cpu")} animationDuration={700} />
+        <Bar dataKey="RAM" fill="hsl(271 76% 63%)" radius={[3, 3, 0, 0]} cursor="pointer" onClick={click("ram")} animationDuration={700} />
+        <Bar dataKey="Disk" fill="hsl(174 62% 47%)" radius={[3, 3, 0, 0]} cursor="pointer" onClick={click("disk")} animationDuration={700} />
+      </BarChart>
     </ResponsiveContainer>
   );
 }
@@ -323,10 +319,12 @@ function Rising({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
   );
 }
 
-function Outage({ d }: { d: StatsData }) {
+function Outage({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
   const max = Math.max(1, ...d.outages.daily.map((x) => x.value));
+  const open = () => onDrill({ source: "outage", title: "Son 7 günde kesinti yaşayan sunucular" });
   return (
-    <div className="flex h-full flex-col gap-2 px-4 py-2">
+    <button type="button" onClick={open}
+      className="flex h-full w-full cursor-pointer flex-col gap-2 px-4 py-2 text-left transition-colors hover:bg-accent/20">
       <div className="flex items-center justify-around">
         <div className="text-center"><div className="text-2xl font-bold tabular-nums text-rose-400">{d.outages.count}</div><div className="text-[11px] uppercase text-muted-foreground">kesinti</div></div>
         <div className="text-center"><div className="text-2xl font-bold tabular-nums text-amber-400">{d.outages.minutes}</div><div className="text-[11px] uppercase text-muted-foreground">dakika</div></div>
@@ -344,7 +342,7 @@ function Outage({ d }: { d: StatsData }) {
         ))}
         {d.outages.worst.length === 0 && <p className="text-center text-xs text-muted-foreground">Son 7 günde kesinti yok 🎉</p>}
       </div>
-    </div>
+    </button>
   );
 }
 

@@ -284,15 +284,31 @@ public class StatisticsController : Controller
             });
         }
 
+        // Kesinti kaynağı: son 7 günde kesinti yaşayan sunucular (kesinti özeti widget'ı tıklaması)
+        HashSet<int>? outageIds = null;
+        if (source == "outage")
+        {
+            var since7 = DateTime.UtcNow.AddDays(-7);
+            outageIds = (await _db.Outages.AsNoTracking()
+                .Where(o => o.StartedAt >= since7 || o.EndedAt == null || o.EndedAt >= since7)
+                .Select(o => o.ServiceId).Distinct().ToListAsync()).ToHashSet();
+        }
+
+        // NOT: pasta ORTASINA tıklanınca value BOŞ gelir → o kaynağın TÜMÜ döner
+        // (önceden null değer OsKind==null eşleşmesi yapıp yanlış liste getiriyordu).
         IEnumerable<MonitoredService> sel = source switch
         {
             "up" => all.Where(s => s.LastStatus == 0),
             "down" => all.Where(s => s.LastStatus == 1),
             "error" => all.Where(s => s.LastStatus == 2),
             "disk_full" => all.Where(s => s.LastMaxDiskPercent >= 85),
-            "os_kind" => all.Where(s => string.Equals(s.OsKind, value, StringComparison.OrdinalIgnoreCase)),
-            "os_version" => all.Where(s => string.Equals(s.OsName, value, StringComparison.OrdinalIgnoreCase)),
-            "tag" => all.Where(s => MonitoredService.SplitKeywords(s.Keyword).Any(t => string.Equals(t, value, StringComparison.OrdinalIgnoreCase))),
+            "outage" => all.Where(s => outageIds!.Contains(s.Id)),
+            "os_kind" => string.IsNullOrWhiteSpace(value) ? all
+                : all.Where(s => string.Equals(s.OsKind, value, StringComparison.OrdinalIgnoreCase)),
+            "os_version" => string.IsNullOrWhiteSpace(value) ? all
+                : all.Where(s => string.Equals(s.OsName, value, StringComparison.OrdinalIgnoreCase)),
+            "tag" => string.IsNullOrWhiteSpace(value) ? all.Where(s => !string.IsNullOrWhiteSpace(s.Keyword))
+                : all.Where(s => MonitoredService.SplitKeywords(s.Keyword).Any(t => string.Equals(t, value, StringComparison.OrdinalIgnoreCase))),
             _ => all   // total_servers, cpu, ram, disk, avg_* → tüm sağlık sunucuları
         };
 
