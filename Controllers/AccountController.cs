@@ -248,7 +248,7 @@ public class AccountController : Controller
 
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             return Redirect(returnUrl);
-        return RedirectToAction("Index", "Home");
+        return Redirect("/app/dashboard");   // klasik arayüz emekli — giriş sonrası yeni tasarım
     }
 
     private void WritePrefCookies(string? theme, string? lang)

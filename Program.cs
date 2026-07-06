@@ -338,6 +338,44 @@ if (!bcfg.Configured)
     });
 }
 
+// KLASİK ARAYÜZ EMEKLİ: eski Razor ekran adresleri kalıcı olarak SPA'ya yönlenir — yeni tasarım ANA arayüzdür.
+// SPA'nın hâlâ kullandığı klasik uçlar AYNEN çalışır: Statistics/Data|Detail|SaveLayout|ResetLayout|OutageDay|Report,
+// Services/SampleCsv, Account/* (login/otp/logout/SetPreference), Setup, Home/About (React About içeriği buradan
+// çeker — yalnız tarayıcıdan text/html ile doğrudan açılırsa /app/about'a yönlenir), Home/Error.
+app.Use(async (ctx, next) =>
+{
+    if (HttpMethods.IsGet(ctx.Request.Method))
+    {
+        var p = ctx.Request.Path.Value ?? "";
+        static bool Is(string path, string seg) =>
+            path.Equals(seg, StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith(seg + "/", StringComparison.OrdinalIgnoreCase);
+
+        string? to = null;
+        if (Is(p, "/Services") && !Is(p, "/Services/SampleCsv")) to = "/app/services";
+        else if (Is(p, "/Dashboards")) to = "/app/dashboard";
+        else if (Is(p, "/Reports")) to = "/app/reports";
+        else if (Is(p, "/Users")) to = "/app/users";
+        else if (Is(p, "/Audit")) to = "/app/audit";
+        else if (Is(p, "/Credentials")) to = "/app/credentials";
+        else if (Is(p, "/Settings")) to = "/app/settings";
+        else if (Is(p, "/SmsProviders")) to = "/app/settings";
+        else if (Is(p, "/Mutabakat")) to = "/app/dashboard";          // Mutabakat UI emekli; servis kodu iz olarak durur
+        else if (Is(p, "/Account/Profile")) to = "/app/profile";
+        else if (Is(p, "/Home/Index")) to = "/app/dashboard";
+        else if (Is(p, "/Statistics")
+                 && !Is(p, "/Statistics/Data") && !Is(p, "/Statistics/Detail")
+                 && !Is(p, "/Statistics/Report") && !Is(p, "/Statistics/SaveLayout")
+                 && !Is(p, "/Statistics/ResetLayout") && !Is(p, "/Statistics/OutageDay"))
+            to = "/app/statistics";
+        else if (Is(p, "/Home/About") && ctx.Request.Headers.Accept.ToString().Contains("text/html"))
+            to = "/app/about";
+
+        if (to != null) { ctx.Response.Redirect(to, permanent: true); return; }
+    }
+    await next();
+});
+
 // Erişim kapısı: AuthEnabled ise, giriş yapmamış kullanıcıyı login'e yönlendir.
 // Statik dosyalar (UseStaticFiles yukarıda) ve /Account herkese açıktır.
 app.Use(async (ctx, next) =>
@@ -380,9 +418,8 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// React SPA (Yol A) — /app altında sunulur; eski Razor arayüz / kökünde AYNEN çalışmaya devam eder.
+// React SPA — ANA ARAYÜZ. Klasik Razor ekranları emekli edildi (yukarıdaki yönlendirme katmanı).
 // Statik varlıklar (/app/assets/*) UseStaticFiles ile; SPA derin linkleri (/app/dashboard vb.) index.html'e düşer.
-// Not: frontend derlenmemişse (wwwroot/app yoksa) yalnız /app 404 döner; kökteki uygulama etkilenmez.
 app.MapGet("/app", () => Results.Redirect("/app/dashboard"));
 app.MapFallbackToFile("/app/{**slug}", "app/index.html");
 

@@ -10,8 +10,8 @@ public class HomeController : MvcBase
     private readonly ILogger<HomeController> _logger;
     public HomeController(ILogger<HomeController> logger) => _logger = logger;
 
-    // Ayrı "Dashboard" ekranı kaldırıldı; ana dashboard artık Dashboard'lar içindeki sabit "Hepsi" sekmesi.
-    public IActionResult Index() => RedirectToAction("Index", "Dashboards");
+    // Klasik arayüz emekli: kök adres doğrudan yeni tasarıma (React SPA) gider.
+    public IActionResult Index() => Redirect("/app/dashboard");
 
     public IActionResult About() => View();
 
