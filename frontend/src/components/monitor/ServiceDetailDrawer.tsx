@@ -7,8 +7,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
-import { type StatusService, catOf, getHistory, getMetrics, type HistoryData, type MetricsData } from "@/lib/monitor";
-import { CONTROL_TYPES, DB_METRIC_META, fmtDbValue, checkService, serviceAction } from "@/lib/services";
+import { type StatusService, catOf, getHistory, getMetrics, getDbDetail, type HistoryData, type MetricsData, type DbDetailData } from "@/lib/monitor";
+import { CONTROL_TYPES, DB_METRIC_META, fmtDbValue, hasDbDetail, checkService, serviceAction } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const badge: Record<string, { label: string; cls: string }> = {
@@ -44,6 +44,8 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const [flash, setFlash] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"start" | "stop" | "restart" | null>(null);
   const [rangeMin, setRangeMin] = useState(180); // 3s varsayılan; 24s/7g/1a seçilebilir
+  const [dbDetail, setDbDetail] = useState<DbDetailData | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
 
   const RANGES = [
     { m: 180, label: "3 saat" }, { m: 1440, label: "24 saat" },
@@ -56,6 +58,18 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const isControl = service ? CONTROL_TYPES.includes(service.type) : false;
   // DB metrik izlemesi: grafikte ms değil adet/%/sn gösterilir
   const dbMeta = service ? DB_METRIC_META[service.type] ?? null : null;
+  const showDbDetail = service ? hasDbDetail(service.type) : false;
+
+  // DB detay listesi CANLI çekilir; DB'yi yormamak için yalnız açılışta + elle yenilemede (oto-poll YOK)
+  const loadDbDetail = () => {
+    if (!service || !hasDbDetail(service.type)) { setDbDetail(null); return; }
+    setDbLoading(true);
+    getDbDetail(service.id)
+      .then(setDbDetail)
+      .catch((e) => setDbDetail({ supported: true, error: (e as Error).message }))
+      .finally(() => setDbLoading(false));
+  };
+  useEffect(() => { setDbDetail(null); loadDbDetail(); /* eslint-disable-next-line */ }, [service?.id]);
 
   const load = () => {
     if (!service) return;
@@ -178,6 +192,46 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
                   <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "hsl(38 92% 45%)" }} /> Yavaş / Hata</span>
                 </div>
               </div>
+
+              {showDbDetail && (
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">
+                      {dbDetail?.title ?? "Detay"}
+                      {dbDetail?.rows && <span className="ml-1.5 text-xs font-normal text-muted-foreground">({dbDetail.rows.length})</span>}
+                    </h3>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={dbLoading} onClick={loadDbDetail}>
+                      <RefreshCw className={cn("h-3.5 w-3.5", dbLoading && "animate-spin")} /> Yenile
+                    </Button>
+                  </div>
+                  {dbLoading && !dbDetail ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : dbDetail?.error ? (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{dbDetail.error}</div>
+                  ) : !dbDetail?.rows || dbDetail.rows.length === 0 ? (
+                    <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">Kayıt yok 🎉</div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-border/60">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-muted/40 text-muted-foreground">
+                          <tr>{dbDetail.columns!.map((c) => <th key={c} className="whitespace-nowrap px-2.5 py-1.5 font-medium">{c}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {dbDetail.rows.map((row, ri) => (
+                            <tr key={ri} className="border-t border-border/40">
+                              {row.map((cell, ci) => (
+                                <td key={ci} className={cn("px-2.5 py-1.5 align-top tabular-nums", ci === row.length - 1 && dbDetail.columns![ci]?.includes("Sorgu") && "max-w-[240px] truncate font-mono")}
+                                  title={cell}>{cell || "—"}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {dbDetail?.note && <div className="mt-1 text-[10px] text-muted-foreground">{dbDetail.note}</div>}
+                </div>
+              )}
 
               {isHealth && mpts.length > 0 && (
                 <div>

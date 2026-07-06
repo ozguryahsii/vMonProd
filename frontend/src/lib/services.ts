@@ -104,6 +104,13 @@ export const DB_METRIC_META: Record<string, DbMetricMeta> = {
 };
 export const isDbHealthType = (t: string) => t in DB_METRIC_META;
 
+/** Metrik kutusuna tıklayınca yan panelde canlı liste (kim/hangisi/ne kadar) gösterilebilen tipler:
+ *  aktif/bloklu oturum, uzun sorgu, (Oracle tablespace / MSSQL DB durumu). */
+export const hasDbDetail = (t: string) => {
+  const m = DB_METRIC_META[t];
+  return !!m && (m.metric === "active" || m.metric === "blocked" || m.metric === "long" || m.metric === "status");
+};
+
 /** DB metriği değer biçimlendirme: "34 oturum", "%71", "12 sn", "45 ms" */
 export function fmtDbValue(type: string, v: number | null | undefined): string {
   if (v == null) return "—";

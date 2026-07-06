@@ -81,6 +81,26 @@ public class ApiController : ControllerBase
         });
     }
 
+    /// <summary>DB İzleme detay çekmecesi: bir DB sağlık metriğinin (aktif/bloklu oturum, uzun sorgu,
+    /// offline tablespace) CANLI ayrıntı listesi. İstek üzerine çalışır — dashboard yenilemesine bağlı değil.</summary>
+    [HttpGet("db-detail/{id:int}")]
+    public async Task<IActionResult> DbDetail(int id, [FromServices] DbDetailService detail, CancellationToken ct)
+    {
+        if (!Can(Perms.DashboardsView)) return Forbid403();
+        var svc = await _db.Services.Include(s => s.Credential).AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (svc == null) return NotFound("İzleme bulunamadı");
+        try
+        {
+            var r = await detail.GetAsync(svc, svc.Credential, ct);
+            if (r == null) return Ok(new { supported = false });
+            return Ok(new { supported = true, title = r.Title, columns = r.Columns, rows = r.Rows, note = r.Note });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { supported = true, error = ex.GetBaseException().Message });
+        }
+    }
+
     /// <summary>React SPA dashboard için tek çağrıda toplu veri: KPI'lar, 24s uptime serisi, durum dağılımı, son servisler.</summary>
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard(CancellationToken ct)

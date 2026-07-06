@@ -113,6 +113,9 @@ builder.Services.AddSingleton<ISecretProtector>(secrets);
 // Lisans Fazı L1: offline imzalı key doğrulama (bootstrap.json'daki LicenseKey'den yüklenir)
 builder.Services.AddSingleton<LicenseService>();
 
+// DB İzleme detay çekmecesi (metrik kutusuna tıklayınca canlı oturum/sorgu/tablespace listesi)
+builder.Services.AddScoped<DbDetailService>();
+
 if (bcfg.Configured)
 {
     var dbPass = DbProviderConfig.ResolvePassword(bcfg, secrets);

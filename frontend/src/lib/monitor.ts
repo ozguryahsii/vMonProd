@@ -89,3 +89,14 @@ export const createBoard = (b: BoardInput) => apiSend<{ id: number }>("POST", "/
 export const updateBoard = (id: number, b: BoardInput) => apiSend<{ id: number }>("PUT", `/dashboards/${id}`, b);
 export const deleteBoard = (id: number) => apiSend<{ ok: boolean }>("DELETE", `/dashboards/${id}`);
 export const getMetrics = (id: number, minutes = 1440, signal?: AbortSignal) => apiGet<MetricsData>(`/metrics/${id}?minutes=${minutes}`, signal);
+
+// DB İzleme detayı (metrik kutusuna tıklayınca canlı oturum/sorgu/tablespace listesi)
+export interface DbDetailData {
+  supported: boolean;
+  title?: string;
+  columns?: string[];
+  rows?: string[][];
+  note?: string | null;
+  error?: string;
+}
+export const getDbDetail = (id: number, signal?: AbortSignal) => apiGet<DbDetailData>(`/db-detail/${id}`, signal);
