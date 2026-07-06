@@ -145,5 +145,17 @@ static int CmdIssue(string[] args)
         : "Makine   : BAGLI DEGIL — key her makinede calisir! (--machine onerilir)");
     Console.WriteLine();
     Console.WriteLine(key);
+
+    // Konsol uzun satırı sarar → kopyalarken araya satır sonu girip key bozulabilir.
+    // Bu yüzden key'i tek satır olarak bir .txt'ye de yazıyoruz; müşteriye bu dosyadan gönderin.
+    try
+    {
+        var safeCo = new string(company.Where(c => char.IsLetterOrDigit(c)).ToArray());
+        var outFile = Path.Combine(Directory.GetCurrentDirectory(), $"vmon-lisans-{safeCo}-{ed}-{DateTime.Today:yyyyMMdd}.txt");
+        File.WriteAllText(outFile, key);
+        Console.WriteLine();
+        Console.WriteLine($"(Key ayrica dosyaya yazildi — kopyalarken bozulmamasi icin bunu kullanin: {outFile})");
+    }
+    catch { /* dosya yazilamazsa konsoldaki key yeterli */ }
     return 0;
 }

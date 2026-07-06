@@ -73,7 +73,7 @@ public sealed class LicenseService
     /// <summary>Yeni key uygula: doğrula, bootstrap.json'a kalıcı yaz, durumu tazele.</summary>
     public (bool ok, string error) Apply(string key)
     {
-        key = (key ?? "").Trim();
+        key = Clean(key);   // satır kırılması/boşluk temizlenmiş hali saklanır
         if (!TryParse(key, out var info, out var err)) return (false, err);
         if (info!.IsExpired) return (false, "Bu lisansın süresi dolmuş (bitiş: " + info.ExpiresAt.ToString("dd.MM.yyyy") + "). Yeni bir key alın.");
         lock (_lock)
@@ -106,10 +106,16 @@ public sealed class LicenseService
     }
 
     /// <summary>Key'i çözüp imzasını doğrular; kaydetmez. Setup sihirbazı ve Apply kullanır.</summary>
+    /// <summary>Key'i kopya-yapıştır kirinden arındırır: konsol satır kırılması, boşluk, sekme,
+    /// görünmez birleşme karakterleri (soft-hyphen/BOM/zero-width) atılır. Müşteri key'i mesajdan/
+    /// e-postadan yapıştırırken araya satır sonu girmesi çok yaygın — parser bunları tolere etmeli.</summary>
+    public static string Clean(string? key) =>
+        new string((key ?? "").Where(c => !char.IsWhiteSpace(c) && c is not ('­' or '﻿' or '​' or '‌' or '‍')).ToArray());
+
     public static bool TryParse(string? key, out LicenseInfo? info, out string error)
     {
         info = null; error = "";
-        key = (key ?? "").Trim();
+        key = Clean(key);
         if (key.Length == 0) { error = "Lisans key boş."; return false; }
 
         var parts = key.Split('.');
