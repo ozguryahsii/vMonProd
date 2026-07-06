@@ -45,13 +45,13 @@ export function Sidebar() {
           <Activity className="h-5 w-5 text-white" />
         </span>
         {!collapsed && (
-          <>
+          <div className="flex min-w-0 flex-col justify-center leading-none">
             <span className="text-lg font-bold tracking-tight">vMon</span>
-            {/* Lisans Fazı L1: sol üst rozet = lisans paketi (eski PRE rozetinin yeri) */}
+            {/* Lisans Fazı L1: paket rozeti "vMon" ALTINDA (dar yan panele sığar; eski PRE rozetinin yeri) */}
             <span
               title={me?.license ? `${me.license.company} · bitiş: ${me.license.expires} (${me.license.daysLeft} gün)` : undefined}
               className={cn(
-                "ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                "mt-1 w-fit rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide",
                 me?.license?.edition === "Enterprise" ? "bg-amber-500/15 text-amber-400"
                   : me?.license?.edition === "Standard" ? "bg-sky-500/15 text-sky-400"
                   : "bg-primary/15 text-primary"
@@ -59,7 +59,7 @@ export function Sidebar() {
             >
               {me?.license?.edition ?? "…"}
             </span>
-          </>
+          </div>
         )}
       </div>
 
