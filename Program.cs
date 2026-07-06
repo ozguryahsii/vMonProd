@@ -110,6 +110,9 @@ builder.Services.AddSingleton(bootstrap);
 builder.Services.AddSingleton(bcfg);
 builder.Services.AddSingleton<ISecretProtector>(secrets);
 
+// Lisans Fazı L1: offline imzalı key doğrulama (bootstrap.json'daki LicenseKey'den yüklenir)
+builder.Services.AddSingleton<LicenseService>();
+
 if (bcfg.Configured)
 {
     var dbPass = DbProviderConfig.ResolvePassword(bcfg, secrets);
@@ -335,6 +338,35 @@ if (!bcfg.Configured)
                   || path.StartsWithSegments("/js") || path.Equals("/favicon.ico");
         if (!allow) { ctx.Response.Redirect("/Setup"); return; }
         await next();
+    });
+}
+
+// LİSANS KAPISI: yapılandırılmış kurulumda lisans yok/geçersiz/SÜRESİ DOLMUŞ ise uygulama kilitlenir;
+// yalnız /Account/License (yenileme ekranı) + statik varlıklar açık kalır. Basic (free) dahil HERKES key ister.
+if (bcfg.Configured)
+{
+    app.Use(async (ctx, next) =>
+    {
+        var lic = ctx.RequestServices.GetRequiredService<LicenseService>();
+        if (lic.IsUsable) { await next(); return; }
+
+        var path = ctx.Request.Path;
+        bool allow = path.StartsWithSegments("/Account/License")
+                  || path.StartsWithSegments("/Account/Logout")
+                  || path.StartsWithSegments("/Home/Error")
+                  || path.StartsWithSegments("/lib") || path.StartsWithSegments("/css")
+                  || path.StartsWithSegments("/js") || path.StartsWithSegments("/img")
+                  || path.Value == "/favicon.ico";
+        if (allow) { await next(); return; }
+
+        if (path.StartsWithSegments("/api"))
+        {
+            ctx.Response.StatusCode = 403;
+            ctx.Response.ContentType = "text/plain; charset=utf-8";
+            await ctx.Response.WriteAsync("Lisans gerekli veya süresi dolmuş. Lütfen yeni lisans key girin (/Account/License).");
+            return;
+        }
+        ctx.Response.Redirect("/Account/License");
     });
 }
 

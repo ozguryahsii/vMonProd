@@ -1,0 +1,92 @@
+@using vMonitor.Services
+@{
+    Layout = null;
+    var en = Context.Request.Cookies["vmon_lang"] == "en";
+    string T(string tr, string eng) => en ? eng : tr;
+    var status = (LicenseStatus?)ViewBag.Status ?? LicenseStatus.Missing;
+    var info = (LicenseInfo?)ViewBag.Info;
+    ViewData["Title"] = T("Lisans", "License");
+}
+<!DOCTYPE html>
+<html lang="@(en ? "en" : "tr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@T("Lisans", "License") — vMon</title>
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" asp-append-version="true" />
+    <script src="~/lib/tailwind/tailwind.js" asp-append-version="true"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { brand: { 400:'#f87171',500:'#ed1c24',600:'#d4151c' } } } } };
+    </script>
+    <style>
+        body{background:radial-gradient(1200px 600px at 50% -10%, rgba(237,28,36,.12), transparent 60%), linear-gradient(160deg,#0f172a,#1e293b);}
+        .lic-btn{transition:transform .15s ease, box-shadow .15s ease;}
+        .lic-btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(237,28,36,.4);}
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 font-sans">
+    <div class="w-full max-w-lg">
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-brand-500 shadow-lg shadow-brand-500/40 mb-3">
+                <i class="bi bi-key-fill text-white text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white">vMon — @T("Lisans", "License")</h1>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            @if (status == LicenseStatus.Expired && info != null)
+            {
+                <div class="bg-amber-50 text-amber-800 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-sm">
+                    <i class="bi bi-hourglass-bottom"></i>
+                    <b>@T("Lisansınızın süresi doldu.", "Your license has expired.")</b>
+                    @T("Paket", "Edition"): <b>@info.Edition</b> · @T("Bitiş", "Expired on"): <b>@info.ExpiresAt.ToString("dd.MM.yyyy")</b>.
+                    @T("Uygulamayı kullanmaya devam etmek için yeni bir lisans key girin (Basic/ücretsiz paket dahil lisanslar yıllık yenilenir).",
+                       "Enter a new license key to continue using the application (all licenses, including the free Basic edition, renew yearly).")
+                </div>
+            }
+            else if (status == LicenseStatus.Missing)
+            {
+                <div class="bg-sky-50 text-sky-800 border border-sky-200 rounded-xl px-4 py-3 mb-4 text-sm">
+                    <i class="bi bi-info-circle"></i>
+                    @T("Bu kurulumda lisans key tanımlı değil. vMon'u kullanmak için (ücretsiz Basic paket dahil) bir lisans key gereklidir.",
+                       "No license key is defined for this installation. A license key is required to use vMon (including the free Basic edition).")
+                </div>
+            }
+            else if (status == LicenseStatus.Invalid)
+            {
+                <div class="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl px-4 py-3 mb-4 text-sm">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    @T("Kayıtlı lisans key geçersiz. Lütfen geçerli bir key girin.",
+                       "The stored license key is invalid. Please enter a valid key.")
+                </div>
+            }
+
+            @if (ViewBag.Error != null)
+            {
+                <div class="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl px-4 py-3 mb-4 text-sm flex items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i> @ViewBag.Error
+                </div>
+            }
+
+            <form method="post" asp-action="License" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5">@T("Lisans Key", "License Key")</label>
+                    <textarea name="key" rows="4" autofocus spellcheck="false"
+                              placeholder="VMON1.xxxxx.xxxxx"
+                              class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-mono focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none"></textarea>
+                </div>
+                <button type="submit"
+                        class="lic-btn w-full rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5">
+                    <i class="bi bi-check2-circle"></i> @T("Lisansı Uygula", "Apply License")
+                </button>
+            </form>
+
+            <p class="text-xs text-slate-400 mt-4">
+                @T("Lisans key almak için satıcınızla iletişime geçin. Paketler: Basic (ücretsiz), Standard, Enterprise — tümü yıllık yenilenir.",
+                   "Contact your vendor to obtain a license key. Editions: Basic (free), Standard, Enterprise — all renew yearly.")
+            </p>
+        </div>
+    </div>
+</body>
+</html>

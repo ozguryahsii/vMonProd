@@ -56,15 +56,35 @@
     </div>
 
     <div class="steps">
-        <div class="s active" data-step="1"><span class="n">1</span> Veritabanı</div>
-        <div class="s" data-step="2"><span class="n">2</span> Şirket</div>
-        <div class="s" data-step="3"><span class="n">3</span> Yönetici</div>
-        <div class="s" data-step="4"><span class="n">4</span> E-posta</div>
+        <div class="s active" data-step="1"><span class="n">1</span> Lisans</div>
+        <div class="s" data-step="2"><span class="n">2</span> Veritabanı</div>
+        <div class="s" data-step="3"><span class="n">3</span> Şirket</div>
+        <div class="s" data-step="4"><span class="n">4</span> Yönetici</div>
+        <div class="s" data-step="5"><span class="n">5</span> E-posta</div>
     </div>
 
     <div class="card">
-        <!-- ADIM 1: Veritabanı -->
+        <!-- ADIM 1: Lisans (Lisans Fazı L1 — key olmadan kurulum İLERLEYEMEZ; Basic yalnız SQLite) -->
         <section class="step" data-step="1">
+            <h2>Lisans key</h2>
+            <p class="sub">vMon kurulumu için bir lisans key gereklidir — <b>ücretsiz Basic paket dahil</b>.
+               Key'iniz yoksa satıcınızdan ücretsiz Basic key isteyin. Tüm lisanslar yıllıktır.</p>
+            <label>Lisans Key *</label>
+            <textarea name="LicenseKey" id="LicenseKey" rows="3" spellcheck="false" placeholder="VMON1.xxxxx.xxxxx" style="width:100%;font-family:monospace;font-size:.8rem;"></textarea>
+            <button type="button" class="btn btn-o" id="btnValidateLic" style="margin-top:1rem;"><i class="bi bi-key"></i> Lisansı Doğrula</button>
+            <div class="msg" id="licMsg"></div>
+            <div class="hint" style="margin-top:.6rem;"><i class="bi bi-info-circle"></i>
+                Paketler: <b>Basic</b> (ücretsiz — 40 izleme, 1 kullanıcı, SQLite, e-posta bildirimi, 5 dashboard) ·
+                <b>Standard</b> (200 izleme, 5 kullanıcı, tüm veritabanları ve bildirim kanalları) ·
+                <b>Enterprise</b> (sınırsız).</div>
+            <div class="btns">
+                <span></span>
+                <button type="button" class="btn btn-p" data-next>İleri <i class="bi bi-arrow-right"></i></button>
+            </div>
+        </section>
+
+        <!-- ADIM 2: Veritabanı -->
+        <section class="step hidden" data-step="2">
             <h2>Veritabanı bağlantısı</h2>
             <p class="sub">Uygulamanın verilerini saklayacağı veritabanını seçin. (Bu adım atlanamaz.)</p>
             <label>Veritabanı türü *</label>
@@ -125,13 +145,13 @@
             </div>
 
             <div class="btns">
-                <span></span>
+                <button type="button" class="btn btn-o" data-back><i class="bi bi-arrow-left"></i> Geri</button>
                 <button type="button" class="btn btn-p" data-next>İleri <i class="bi bi-arrow-right"></i></button>
             </div>
         </section>
 
-        <!-- ADIM 2: Şirket -->
-        <section class="step hidden" data-step="2">
+        <!-- ADIM 3: Şirket -->
+        <section class="step hidden" data-step="3">
             <h2>Şirket bilgisi</h2>
             <p class="sub">Müşteri/şirket adı — arayüzde markalama için kullanılır.</p>
             <label>Şirket adı *</label>
@@ -142,8 +162,8 @@
             </div>
         </section>
 
-        <!-- ADIM 3: Yönetici -->
-        <section class="step hidden" data-step="3">
+        <!-- ADIM 4: Yönetici -->
+        <section class="step hidden" data-step="4">
             <h2>Yönetici hesabı</h2>
             <p class="sub">Şifreli giriş yapacağın <b>yerel yönetici</b> hesabını oluştur. (LDAP'ı sonra Ayarlar'dan bağlarsın; senkron sonrası bu yerel hesabı Kullanıcılar'dan silebilirsin.)</p>
             <label>Yönetici kullanıcı adı *</label>
@@ -159,8 +179,8 @@
             </div>
         </section>
 
-        <!-- ADIM 4: SMTP -->
-        <section class="step hidden" data-step="4">
+        <!-- ADIM 5: SMTP -->
+        <section class="step hidden" data-step="5">
             <h2>E-posta (SMTP)</h2>
             <p class="sub">Alarm e-postaları için SMTP relay. <b>Bu adım atlanabilir.</b> Doldurursanız ilerlemeden önce test zorunludur.</p>
             <label class="chk"><input type="checkbox" name="SmtpEnabled" id="SmtpEnabled" /> SMTP yapılandır</label>
@@ -192,6 +212,7 @@
 <script>
 (function () {
     let step = 1, dbTested = false, smtpTested = false;
+    let licOk = false, licSqliteOnly = false;
     const provider = document.getElementById("Provider");
 
     function gather() {
@@ -244,6 +265,26 @@
         return r.json();
     }
 
+    // Lisans doğrulama (adım 1) — Basic ise DB seçenekleri SQLite'a kilitlenir
+    document.getElementById('LicenseKey').addEventListener('input', () => { licOk = false; document.getElementById('licMsg').textContent = ''; });
+    document.getElementById('btnValidateLic').addEventListener('click', async function () {
+        const m = document.getElementById('licMsg'); msg(m, true, 'Doğrulanıyor...'); this.disabled = true;
+        try {
+            const d = await post('/Setup/ValidateLicense', gather());
+            msg(m, d.ok, d.message);
+            licOk = d.ok;
+            if (d.ok) {
+                licSqliteOnly = !!d.sqliteOnly;
+                provider.querySelectorAll('option').forEach(o => {
+                    o.disabled = licSqliteOnly && o.value !== 'Sqlite';
+                });
+                if (licSqliteOnly) { provider.value = 'Sqlite'; onProvider(); }
+            }
+        }
+        catch (e) { msg(m, false, 'Hata: ' + e.message); }
+        finally { this.disabled = false; }
+    });
+
     document.getElementById('btnTestDb').addEventListener('click', async function () {
         const m = document.getElementById('dbMsg'); msg(m, true, 'Test ediliyor...'); this.disabled = true;
         try { const d = await post('/Setup/TestDb', gather()); msg(m, d.ok, d.message); dbTested = d.ok; }
@@ -274,13 +315,16 @@
 
     // İleri/Geri
     document.querySelectorAll('[data-next]').forEach(b => b.addEventListener('click', () => {
-        if (step === 1 && provider.value !== 'Sqlite' && !dbTested) {
+        if (step === 1 && !licOk) {
+            msg(document.getElementById('licMsg'), false, 'Devam etmeden önce lisans key girin ve doğrulayın (ücretsiz Basic paket için de zorunlu).'); return;
+        }
+        if (step === 2 && provider.value !== 'Sqlite' && !dbTested) {
             msg(document.getElementById('dbMsg'), false, 'Devam etmeden önce bağlantıyı test edin.'); return;
         }
-        if (step === 2 && !document.getElementById('CompanyName').value.trim()) {
+        if (step === 3 && !document.getElementById('CompanyName').value.trim()) {
             alert('Şirket adı zorunlu.'); return;
         }
-        if (step === 3) {
+        if (step === 4) {
             const u = document.getElementById('AdminUsers').value.trim();
             const p = document.getElementById('AdminPassword').value;
             const p2 = document.getElementById('AdminPassword2').value;

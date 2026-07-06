@@ -16,15 +16,21 @@ public class CheckRunner
     private readonly ILogger<CheckRunner> _logger;
     private readonly Dictionary<ServiceType, IServiceChecker> _checkers;
 
-    public CheckRunner(AppDbContext db, EmailService email, SmsService sms, WhatsappService whatsapp, IEnumerable<IServiceChecker> checkers, ILogger<CheckRunner> logger)
+    public CheckRunner(AppDbContext db, EmailService email, SmsService sms, WhatsappService whatsapp, IEnumerable<IServiceChecker> checkers, ILogger<CheckRunner> logger, LicenseService license)
     {
         _db = db;
         _email = email;
         _sms = sms;
         _whatsapp = whatsapp;
         _logger = logger;
+        _license = license;
         _checkers = checkers.ToDictionary(c => c.Type);
     }
+
+    private readonly LicenseService _license;
+
+    /// <summary>Lisans: Basic paket yalnız e-posta bildirimi destekler — SMS/WhatsApp gönderimi atlanır.</summary>
+    private bool EmailOnly => _license.Current?.EmailOnlyNotifications == true;
 
     public async Task<CheckOutcome> RunCheckAsync(int serviceId, MonitorSettings settings, CancellationToken ct = default)
     {
@@ -283,6 +289,7 @@ public class CheckRunner
 
     private async Task TrySendSmsAsync(MonitorSettings settings, MonitoredService svc, string text, string kind, CancellationToken ct)
     {
+        if (EmailOnly) return;
         try
         {
             var (ok, msg) = await _sms.SendAsync(settings, SmsService.ParseRecipients(settings.SmsRecipients), text, ct);
@@ -293,6 +300,7 @@ public class CheckRunner
 
     private async Task TrySendWhatsappAsync(MonitorSettings settings, MonitoredService svc, string text, CancellationToken ct)
     {
+        if (EmailOnly) return;
         try
         {
             var (ok, msg) = await _whatsapp.SendAsync(settings, WhatsappService.ParseRecipients(settings.WhatsappRecipients), text, ct);
@@ -303,6 +311,7 @@ public class CheckRunner
 
     private async Task TrySendWhatsappTemplateAsync(MonitorSettings settings, MonitoredService svc, Dictionary<string, string> vars, CancellationToken ct)
     {
+        if (EmailOnly) return;
         try
         {
             var recipients = WhatsappService.ParseRecipients(settings.WhatsappRecipients);

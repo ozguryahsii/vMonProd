@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- vMon lisans üretme aracı — YALNIZ satıcıda çalışır, release paketine GİRMEZ.
+       CI kök dizinde vMonitor.csproj publish ettiği için bu proje pakete dahil olmaz. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>vmon-lic</AssemblyName>
+    <RootNamespace>VmonLic</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

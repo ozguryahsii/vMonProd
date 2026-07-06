@@ -30,6 +30,10 @@ public class BootstrapConfig
     // SQLite
     public string SqlitePath { get; set; } = "";
 
+    /// <summary>Lisans key (VMON1.payload.imza) — DB'den ÖNCE gerekir (Basic yalnız SQLite kurabilir),
+    /// bu yüzden DB'de değil burada durur. Boş/geçersiz/süresi dolmuş → lisans kapısı uygulamayı kilitler.</summary>
+    public string LicenseKey { get; set; } = "";
+
     // Vault ile DB şifresi çözme (opsiyonel). Bootstrap'ta Credentials tablosu yok → vault bilgisi burada.
     public bool UseVault { get; set; } = false;
     public string VaultUrl { get; set; } = "";

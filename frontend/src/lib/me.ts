@@ -1,5 +1,12 @@
 import { apiGet } from "./api";
 
+export interface MeLicense {
+  edition: "Basic" | "Standard" | "Enterprise";
+  company: string;
+  expires: string;    // yyyy-MM-dd
+  daysLeft: number;
+}
+
 export interface Me {
   sam: string | null;
   displayName: string | null;
@@ -10,6 +17,7 @@ export interface Me {
   theme: "dark" | "light";
   lang: "tr" | "en";
   companyName: string;
+  license: MeLicense | null;
 }
 
 export const getMe = (signal?: AbortSignal) => apiGet<Me>("/me", signal);

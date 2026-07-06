@@ -47,7 +47,18 @@ export function Sidebar() {
         {!collapsed && (
           <>
             <span className="text-lg font-bold tracking-tight">vMon</span>
-            <span className="ml-auto rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">PRE</span>
+            {/* Lisans Fazı L1: sol üst rozet = lisans paketi (eski PRE rozetinin yeri) */}
+            <span
+              title={me?.license ? `${me.license.company} · bitiş: ${me.license.expires} (${me.license.daysLeft} gün)` : undefined}
+              className={cn(
+                "ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                me?.license?.edition === "Enterprise" ? "bg-amber-500/15 text-amber-400"
+                  : me?.license?.edition === "Standard" ? "bg-sky-500/15 text-sky-400"
+                  : "bg-primary/15 text-primary"
+              )}
+            >
+              {me?.license?.edition ?? "…"}
+            </span>
           </>
         )}
       </div>

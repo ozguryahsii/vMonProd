@@ -15,14 +15,16 @@ public class ApiController : ControllerBase
     private readonly CheckRunner _runner;
     private readonly EmailService _email;
     private readonly AuditService _audit;
+    private readonly LicenseService _lic;
 
-    public ApiController(AppDbContext db, SettingsService settings, CheckRunner runner, EmailService email, AuditService audit)
+    public ApiController(AppDbContext db, SettingsService settings, CheckRunner runner, EmailService email, AuditService audit, LicenseService lic)
     {
         _db = db;
         _settings = settings;
         _runner = runner;
         _email = email;
         _audit = audit;
+        _lic = lic;
     }
 
     /// <summary>Dashboard'un periyodik yenilemesi için tüm servislerin anlık durumu.</summary>
@@ -222,6 +224,13 @@ public class ApiController : ControllerBase
     public async Task<IActionResult> ServiceCreate([FromBody] ServiceInput m, CancellationToken ct)
     {
         if (!Can(Perms.ServicesManage)) return Forbid403();
+        // Lisans limiti: Basic 40 / Standard 200 / Enterprise sınırsız izleme
+        if (_lic.Current is { } lim)
+        {
+            var total = await _db.Services.CountAsync(ct);
+            if (total >= lim.MaxMonitors)
+                return BadRequest($"Lisans limiti: {lim.Edition} paket en fazla {lim.MaxMonitors} izleme destekler (şu an {total}). Daha fazla izleme için üst pakete geçin.");
+        }
         var err = ValidateInput(m, out var type);
         if (err != null) return BadRequest(err);
         var s = new MonitoredService();
@@ -369,6 +378,14 @@ public class ApiController : ControllerBase
         string content;
         using (var reader = new StreamReader(csvFile.OpenReadStream(), System.Text.Encoding.UTF8, true))
             content = await reader.ReadToEndAsync(ct);
+        // Lisans limiti: dosyadaki satırlar limiti aşacaksa içe aktarım baştan reddedilir
+        if (_lic.Current is { } lim && lim.MaxMonitors != int.MaxValue)
+        {
+            var total = await _db.Services.CountAsync(ct);
+            var rows = content.Split('\n').Count(l => !string.IsNullOrWhiteSpace(l)) - 1;   // başlık hariç kaba sayım
+            if (rows > 0 && total + rows > lim.MaxMonitors)
+                return BadRequest($"Lisans limiti: {lim.Edition} paket en fazla {lim.MaxMonitors} izleme destekler (şu an {total}, dosyada ~{rows} satır). Daha fazlası için üst pakete geçin.");
+        }
         var result = await ServiceCsvHelper.ImportAsync(_db, content, ct);
         if (result.Added > 0)
             await _audit.LogAsync("service.import", null, $"{result.Added} servis CSV ile eklendi, {result.Skipped} atlandı.", ct: ct);
@@ -680,6 +697,13 @@ public class ApiController : ControllerBase
     {
         if (!Can(Perms.DashboardsManage)) return Forbid403();
         if (string.IsNullOrWhiteSpace(m.Name)) return BadRequest("Ad zorunlu.");
+        // Lisans limiti: Basic en fazla 5 dashboard
+        if (_lic.Current is { } lim)
+        {
+            var total = await _db.Dashboards.CountAsync(ct);
+            if (total >= lim.MaxDashboards)
+                return BadRequest($"Lisans limiti: {lim.Edition} paket en fazla {lim.MaxDashboards} dashboard destekler. Sınırsız dashboard için Standard/Enterprise pakete geçin.");
+        }
         var d = new DashboardDef();
         ApplyBoard(d, m);
         _db.Dashboards.Add(d);
@@ -974,7 +998,11 @@ public class ApiController : ControllerBase
             perms,
             theme,
             lang,
-            companyName = settings.CompanyName
+            companyName = settings.CompanyName,
+            // Lisans Fazı L1: sol üst rozet + Hakkında kalan gün bilgisi buradan beslenir
+            license = _lic.Current is { } lic
+                ? new { edition = lic.Edition.ToString(), company = lic.Company, expires = lic.ExpiresAt.ToString("yyyy-MM-dd"), daysLeft = lic.DaysLeft }
+                : null
         });
     }
 
@@ -1104,6 +1132,10 @@ public class ApiController : ControllerBase
                     : "OTP açılamadı: SMS/WhatsApp kanalı için en az bir admin kullanıcının telefon numarası olmalı.");
         }
 
+        // Lisans: SIEM/Syslog aktarımı Basic pakette kapalı
+        if (_lic.Current is { SiemAllowed: false } && model.SyslogEnabled)
+            return BadRequest("Lisans: SIEM/Syslog log aktarımı Standard ve Enterprise paketlerde kullanılabilir. Basic pakette bu ayar açılamaz.");
+
         // Sistem alanları formdan taşınmaz — mevcut değerler korunur
         model.LoginLogoFile = current.LoginLogoFile;
         model.TwilioChannelsMigrated = current.TwilioChannelsMigrated;
@@ -1214,6 +1246,9 @@ public class ApiController : ControllerBase
     {
         var s = await _settings.GetAsync(ct);
         if (!AdminAllowed(s)) return Forbid403();
+        // Lisans: Basic paket yalnız e-posta bildirimi destekler — SMS/WhatsApp/IVR kanalı eklenemez
+        if (_lic.Current is { EmailOnlyNotifications: true })
+            return BadRequest("Lisans: Basic paket yalnız e-posta bildirimi destekler. SMS/WhatsApp/IVR entegrasyonları için Standard veya Enterprise pakete geçin.");
         var err = await ValidateChannelAsync(0, m, ct);
         if (err != null) return BadRequest(err);
         var p = new SmsProvider { PasswordEncrypted = "", ApiKeyEncrypted = "" };
@@ -1501,6 +1536,10 @@ public class ApiController : ControllerBase
         var (error, members) = await Task.Run(() => ldap.ListGroupMembers(settings, syncCred), ct);
         if (error != null) return Ok(new { ok = false, message = "Senkronizasyon başarısız: " + error });
 
+        // Lisans limiti: Basic 1 / Standard 5 / Enterprise sınırsız kullanıcı
+        if (_lic.Current is { } lim && lim.MaxUsers != int.MaxValue && members.Count > lim.MaxUsers)
+            return Ok(new { ok = false, message = $"Lisans limiti: {lim.Edition} paket en fazla {lim.MaxUsers} kullanıcı destekler; LDAP grubunda {members.Count} üye var. Daha fazla kullanıcı için üst pakete geçin." });
+
         var existing = await _db.AppUsers.ToDictionaryAsync(u => u.Sam, StringComparer.OrdinalIgnoreCase, ct);
         var inGroup = members.Select(m => m.Sam).ToHashSet(StringComparer.OrdinalIgnoreCase);
         int added = 0, reactivated = 0;
@@ -1646,6 +1685,8 @@ public class ApiController : ControllerBase
     {
         var settings = await _settings.GetAsync(ct);
         if (!AdminAllowed(settings)) return StatusCode(403, "Yetki yok.");
+        if (_lic.Current is { EmailOnlyNotifications: true })
+            return BadRequest("Lisans: Basic paket yalnız e-posta bildirimi destekler.");
         var recipients = string.IsNullOrWhiteSpace(to)
             ? SmsService.ParseRecipients(settings.SmsRecipients)
             : new[] { to.Trim() };
@@ -1660,6 +1701,8 @@ public class ApiController : ControllerBase
     {
         var settings = await _settings.GetAsync(ct);
         if (!AdminAllowed(settings)) return StatusCode(403, "Yetki yok.");
+        if (_lic.Current is { EmailOnlyNotifications: true })
+            return BadRequest("Lisans: Basic paket yalnız e-posta bildirimi destekler.");
         var recipients = string.IsNullOrWhiteSpace(to)
             ? WhatsappService.ParseRecipients(settings.WhatsappRecipients)
             : new[] { to.Trim() };

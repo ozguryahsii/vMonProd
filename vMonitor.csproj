@@ -32,4 +32,13 @@
     <Content Update="Data\**\*.db" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
+  <!-- tools/ altındaki yardımcı projeler (vmon-lic lisans aracı) bu projeye DAHİL DEĞİLDİR:
+       kök csproj varsayılan glob'u alt dizinleri de topladığı için açıkça hariç tutulur. -->
+  <ItemGroup>
+    <Compile Remove="tools\**" />
+    <Content Remove="tools\**" />
+    <None Remove="tools\**" />
+    <EmbeddedResource Remove="tools\**" />
+  </ItemGroup>
+
 </Project>

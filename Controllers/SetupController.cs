@@ -37,6 +37,9 @@ public class SetupController : Controller
     // ---- Sihirbaz POST modeli ----
     public class SetupForm
     {
+        /// <summary>Lisans Fazı L1: kurulum key olmadan İLERLEYEMEZ (Basic/ücretsiz dahil).
+        /// DB adımından ÖNCE doğrulanır — Basic yalnız SQLite kurabilir.</summary>
+        public string LicenseKey { get; set; } = "";
         public string Provider { get; set; } = "Sqlite";
         public string Host { get; set; } = "";
         public int Port { get; set; } = 0;
@@ -112,6 +115,27 @@ public class SetupController : Controller
         var ob = new DbContextOptionsBuilder<AppDbContext>();
         DbProviderConfig.Apply(ob, c, connStr);
         return new AppDbContext(ob.Options);
+    }
+
+    /// <summary>Lisans key doğrulama (adım 0 — DB seçiminden önce zorunlu). Paket bilgisi ve
+    /// SQLite kısıtı (Basic) buradan döner; sihirbaz DB seçeneklerini buna göre daraltır.</summary>
+    [HttpPost]
+    public IActionResult ValidateLicense(SetupForm f)
+    {
+        if (!LicenseService.TryParse(f.LicenseKey, out var info, out var err))
+            return Json(new { ok = false, message = err });
+        if (info!.IsExpired)
+            return Json(new { ok = false, message = $"Bu lisansın süresi dolmuş (bitiş: {info.ExpiresAt:dd.MM.yyyy})." });
+        return Json(new
+        {
+            ok = true,
+            edition = info.Edition.ToString(),
+            company = info.Company,
+            expires = info.ExpiresAt.ToString("dd.MM.yyyy"),
+            daysLeft = info.DaysLeft,
+            sqliteOnly = info.SqliteOnly,
+            message = $"{info.Edition} lisansı doğrulandı ✅ ({info.Company} — bitiş {info.ExpiresAt:dd.MM.yyyy})"
+        });
     }
 
     /// <summary>Veritabanı bağlantı testi (adım 1 ilerlemeden önce zorunlu).</summary>
@@ -199,6 +223,15 @@ public class SetupController : Controller
     {
         try
         {
+            // Lisans Fazı L1: key olmadan kurulum TAMAMLANAMAZ; Basic paket yalnız SQLite kurabilir.
+            if (!LicenseService.TryParse(f.LicenseKey, out var lic, out var licErr))
+                return Json(new { ok = false, message = "Lisans: " + licErr });
+            if (lic!.IsExpired)
+                return Json(new { ok = false, message = $"Lisansın süresi dolmuş (bitiş: {lic.ExpiresAt:dd.MM.yyyy})." });
+            Enum.TryParse<DbProviderKind>(f.Provider, true, out var provKind);
+            if (lic.SqliteOnly && provKind != DbProviderKind.Sqlite)
+                return Json(new { ok = false, message = "Basic (ücretsiz) lisans yalnız SQLite veritabanını destekler. Diğer veritabanları için Standard/Enterprise lisans gerekir." });
+
             if (string.IsNullOrWhiteSpace(f.CompanyName)) return Json(new { ok = false, message = "Şirket adı zorunlu." });
             if (string.IsNullOrWhiteSpace(f.AdminUsers)) return Json(new { ok = false, message = "Yönetici kullanıcı adı zorunlu." });
             // Parola politikası (kurulumda varsayılan: en az 12 karakter + karmaşıklık — PCI 8.3.6 / NIST 800-63B)
@@ -257,6 +290,7 @@ public class SetupController : Controller
 
             // 2) bootstrap.json yaz (artık yapılandırıldı). Şifre/Vault güvenli saklanır.
             c.Configured = true;
+            c.LicenseKey = f.LicenseKey.Trim();   // lisans DB'den önce gerektiği için bootstrap'ta durur
             if (c.Provider != DbProviderKind.Sqlite)
             {
                 if (!string.IsNullOrWhiteSpace(c.ConnectionStringRaw))

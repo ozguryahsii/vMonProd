@@ -28,6 +28,37 @@ public class AccountController : Controller
         _otp = otp;
     }
 
+    /// <summary>Lisans Fazı L1 — lisans durumu/yenileme ekranı. Lisans kapısı kilitliyken tek açık sayfadır;
+    /// oturum GEREKMEZ (geçerli key'in kendisi yetkidir — süresi dolan kurulum yeni key ile açılır).</summary>
+    [HttpGet]
+    public IActionResult License([FromServices] LicenseService lic)
+    {
+        ViewBag.Status = lic.Status;
+        ViewBag.Info = lic.Current;
+        return View();
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> License(string key, [FromServices] LicenseService lic)
+    {
+        var (ok, err) = lic.Apply(key);
+        if (!ok)
+        {
+            ViewBag.Error = err;
+            ViewBag.Status = lic.Status;
+            ViewBag.Info = lic.Current;
+            return View();
+        }
+        try
+        {
+            await _audit.LogAsync("license.apply", lic.Current!.Company,
+                $"Lisans uygulandı: {lic.Current.Edition}, bitiş {lic.Current.ExpiresAt:yyyy-MM-dd}", true,
+                user: User?.Identity?.Name ?? "lisans-ekranı");
+        }
+        catch { /* DB erişilemese bile lisans uygulanır */ }
+        return Redirect("/app/dashboard");
+    }
+
     [HttpGet]
     public async Task<IActionResult> Login(string? returnUrl = null)
     {

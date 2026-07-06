@@ -544,6 +544,9 @@
         "Yanıt Süresi (": "Response Time (",
         "son: ": "last: ",
         "Toplu Düzenle (": "Bulk Edit (",
+        // Lisans Fazı L1 — API hata mesajları (dinamik sayılı; öneki çevrilir)
+        "Lisans limiti: ": "License limit: ",
+        "Lisans: ": "License: ",
         // DB İzleme Fazı — drawer grafik başlıkları: "<metrik> (N kontrol)"
         // (önek çevrilir → ikinci geçişte " kontrol)" soneki çevrilir; "Offline Tablespace" TR=EN, girilmez)
         "Bağlantı & Saat (": "Connection & Clock (",
