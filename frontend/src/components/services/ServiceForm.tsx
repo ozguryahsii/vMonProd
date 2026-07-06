@@ -174,23 +174,23 @@ export function ServiceForm({
               otomatik yeniden başlatma denenir. Denemeler biter ve servis hâlâ down ise normal alarm akışı çalışır.
               Müdahaleler Denetim'e kaydedilir.
             </p>
-            <div className="flex flex-wrap items-end gap-6">
-              <Switch checked={form.selfHealEnabled} onChange={(v) => set("selfHealEnabled", v)} label="Down olunca otomatik yeniden başlat" />
-              {form.selfHealEnabled && (
-                <>
-                  <Field label="Kaç ardışık down sonrası" hint="1 = ilk down'da hemen dene">
-                    <Input type="number" min={1} max={10} className="w-24"
-                      value={form.selfHealAfterFailures ?? 1}
-                      onChange={(e) => set("selfHealAfterFailures", Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
-                  </Field>
-                  <Field label="Deneme sayısı" hint="1-10 (sorun döngüsü başına)">
-                    <Input type="number" min={1} max={10} className="w-24"
-                      value={form.selfHealMaxRetries ?? 1}
-                      onChange={(e) => set("selfHealMaxRetries", Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
-                  </Field>
-                </>
-              )}
-            </div>
+            {/* Düzen: üstte anahtar; altında yan yana Deneme sayısı + Kaç ardışık down sonrası.
+                Sayı kutuları yazarken serbesttir (silinebilir); sınırlar (1-10) kayıtta uygulanır. */}
+            <Switch checked={form.selfHealEnabled} onChange={(v) => set("selfHealEnabled", v)} label="Down olunca otomatik yeniden başlat" />
+            {form.selfHealEnabled && (
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                <Field label="Deneme sayısı" hint="1-10 (sorun döngüsü başına)">
+                  <Input type="number" min={1} max={10}
+                    value={form.selfHealMaxRetries ?? ""}
+                    onChange={(e) => set("selfHealMaxRetries", numOrNull(e.target.value))} />
+                </Field>
+                <Field label="Kaç ardışık down sonrası" hint="1 = ilk down'da hemen dene">
+                  <Input type="number" min={1} max={10}
+                    value={form.selfHealAfterFailures ?? ""}
+                    onChange={(e) => set("selfHealAfterFailures", numOrNull(e.target.value))} />
+                </Field>
+              </div>
+            )}
           </div>
         )}
 
