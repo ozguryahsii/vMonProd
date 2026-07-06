@@ -201,6 +201,31 @@ public class StatisticsController : Controller
             disk = Rising(daily.Where(x => x.Disk.HasValue).Select(x => (x.ServiceId, x.Day, x.Disk!.Value)))
         };
 
+        // YOL HARİTASI #2 — Disk dolum tahmini: son 30 günlük günlük disk ortalamalarından
+        // en-küçük-kareler eğilimi. Artan eğilimli ve ~90 gün içinde %100'e ulaşması beklenen
+        // diskler listelenir ("bu gidişle X günde dolar"). Düz aritmetik — ML yok, %100 açıklanabilir.
+        var forecastList = new List<(string name, double current, double perDay, int daysLeft, string date)>();
+        foreach (var g in daily.Where(x => x.Disk.HasValue).GroupBy(x => x.ServiceId))
+        {
+            var ordered = g.OrderBy(x => x.Day).ToList();
+            if (ordered.Count < 3) continue;                       // eğilim için en az 3 günlük veri
+            var day0 = ordered[0].Day;
+            var pts = ordered.Select(x => (X: (x.Day - day0).TotalDays, Y: x.Disk!.Value)).ToList();
+            double mx = pts.Average(p => p.X), my = pts.Average(p => p.Y);
+            double varx = pts.Sum(p => (p.X - mx) * (p.X - mx));
+            if (varx <= 0) continue;
+            double slope = pts.Sum(p => (p.X - mx) * (p.Y - my)) / varx;   // % / gün
+            double current = pts[^1].Y;
+            if (slope < 0.05 || current >= 100) continue;          // durağan/azalan disk → tahmin anlamsız
+            double days = (100.0 - current) / slope;
+            if (days > 90) continue;
+            forecastList.Add((idName.GetValueOrDefault(g.Key, "?"), Math.Round(current, 1),
+                Math.Round(slope, 2), (int)Math.Ceiling(days),
+                DateTime.Today.AddDays(days).ToString("dd.MM.yyyy")));
+        }
+        var diskForecast = forecastList.OrderBy(x => x.daysLeft).Take(20)
+            .Select(x => new { x.name, x.current, x.perDay, x.daysLeft, x.date }).ToList();
+
         // DB İzleme Fazı: veritabanı sağlık izlemeleri özeti (İstatistikler DB widget'ları)
         var dbSvcAll = await DbHealthServicesAsync();
         var dbItems = dbSvcAll.Select(s => new
@@ -265,7 +290,8 @@ public class StatisticsController : Controller
             capacity,
             rising,
             heatmap = new { rows = heatRows, data = heatData },
-            dbHealth
+            dbHealth,
+            diskForecast
         };
     }
 
@@ -538,5 +564,7 @@ public class StatisticsController : Controller
         new() { Type="db_health",Source="db_health",     X=0, Y=34, W=12, H=4, SortOrder=23 },
         new() { Type="db_usage", Source="db_usage",      X=0, Y=38, W=6, H=4, SortOrder=24 },
         new() { Type="db_alerts",Source="db_alerts",     X=6, Y=38, W=6, H=4, SortOrder=25 },
+        // Yol haritası #2 — disk dolum tahmini
+        new() { Type="disk_forecast", Source="disk_forecast", X=0, Y=42, W=6, H=4, SortOrder=26 },
     };
 }

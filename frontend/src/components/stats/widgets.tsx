@@ -45,6 +45,7 @@ export const WIDGET_CATALOG: CatalogItem[] = [
   { type: "outage", source: "outage", label: "Kesinti özeti (7 gün)", group: "İçgörü", w: 6, h: 4 },
   { type: "os_eol", source: "os_eol", label: "Destek sonu (EOL) OS", group: "İçgörü", w: 6, h: 4 },
   { type: "heatmap", source: "heatmap", label: "CPU ısı haritası (24s)", group: "İçgörü", w: 12, h: 5 },
+  { type: "disk_forecast", source: "disk_forecast", label: "Yaklaşan Disk Dolumları", group: "İçgörü", w: 6, h: 4 },
   // DB İzleme Fazı — veritabanı sağlık widget'ları
   { type: "db_health", source: "db_health", label: "Veritabanı Sağlığı", group: "Veritabanı", w: 12, h: 4 },
   { type: "db_usage", source: "db_usage", label: "DB Bağlantı Doluluğu", group: "Veritabanı", w: 6, h: 4 },
@@ -76,6 +77,7 @@ export function WidgetRenderer({ w, data, onDrill }: { w: StatWidgetDef; data: S
     case "outage": return <Outage d={data} onDrill={onDrill} />;
     case "os_eol": return <OsEol d={data} onDrill={onDrill} />;
     case "heatmap": return <Heatmap d={data} />;
+    case "disk_forecast": return <DiskForecastW d={data} onDrill={onDrill} />;
     case "db_health": return <DbHealthW d={data} onDrill={onDrill} />;
     case "db_usage": return <DbUsageW d={data} onDrill={onDrill} />;
     case "db_alerts": return <DbAlertsW d={data} onDrill={onDrill} />;
@@ -419,6 +421,39 @@ function Heatmap({ d }: { d: StatsData }) {
 
 function Empty() {
   return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Veri yok</div>;
+}
+
+/* ================= Yol haritası #2: Yaklaşan Disk Dolumları ================= */
+/** Son 30 günlük eğilimle ~90 gün içinde dolması beklenen diskler ("bu gidişle X günde dolar"). */
+function DiskForecastW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
+  const items = d.diskForecast ?? [];
+  if (items.length === 0)
+    return <div className="flex h-full items-center justify-center text-sm text-emerald-400">90 gün içinde dolması beklenen disk yok 🎉</div>;
+  return (
+    <div className="h-full space-y-1.5 overflow-y-auto px-4 py-2">
+      {items.map((i) => {
+        const cls = i.daysLeft <= 7 ? "bg-rose-500/15 text-rose-400"
+          : i.daysLeft <= 30 ? "bg-amber-500/15 text-amber-400" : "bg-muted text-muted-foreground";
+        const bar = i.current >= 85 ? "bg-rose-500" : i.current >= 65 ? "bg-amber-500" : "bg-emerald-500";
+        return (
+          <button key={i.name} type="button"
+            onClick={() => onDrill({ source: "disk", title: "Disk — sunucular ve trend" })}
+            className="block w-full rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate font-medium">{i.name}</span>
+              <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
+                <span className="text-muted-foreground">%{i.current} · +{i.perDay}%/gün</span>
+                <span className={cn("rounded px-1.5 py-0.5 font-semibold", cls)}>~{i.daysLeft} gün · {i.date}</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
+              <div className={cn("h-full rounded-full", bar)} style={{ width: `${Math.min(100, i.current)}%` }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /* ================= DB İzleme Fazı widget'ları ================= */

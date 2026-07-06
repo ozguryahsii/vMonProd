@@ -33,6 +33,7 @@ export interface StatsData {
     disk: { name: string; from: number; to: number; delta: number }[];
   };
   heatmap: { rows: string[]; data: [number, number, number][] };
+  diskForecast: { name: string; current: number; perDay: number; daysLeft: number; date: string }[];
   dbHealth: {
     counts: { total: number; ok: number; warn: number; err: number; down: number };
     items: {

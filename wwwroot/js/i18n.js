@@ -584,6 +584,9 @@
         "Self-Healing açık": "Self-Healing on",
         "ardışık down sonrası": "consecutive downs, then",
         "deneme otomatik yeniden başlatma": "automatic restart attempts",
+        // Yol haritası #2 — Yaklaşan Disk Dolumları
+        "Yaklaşan Disk Dolumları": "Approaching Disk Full",
+        "90 gün içinde dolması beklenen disk yok 🎉": "No disks expected to fill within 90 days 🎉",
         // DB İzleme detay çekmecesi (metrik kutusuna tıklayınca canlı liste)
         "Aktif Oturumlar": "Active Sessions",
         "Bloklu Oturumlar": "Blocked Sessions",
@@ -647,11 +650,12 @@
         " kayıt (en yeni 500)": " records (newest 500)",
         // DB İzleme Fazı — metrik değer birimleri ("34 adet" → "34", "12 sn" → "12 s")
         " adet": "",
-        " sn": " s"
+        " sn": " s",
+        "%/gün": "%/day"
     };
 
     // Alt-dize değişimleri (dinamik denetim açıklamaları — örn. "start → İşlem gönderildi (start).")
-    const REPLACE = { "İşlem gönderildi": "Action sent", "sapma:": "drift:" };
+    const REPLACE = { "İşlem gönderildi": "Action sent", "sapma:": "drift:", " gün · ": " days · " };
 
     function translateText(value) {
         const key = value.trim();

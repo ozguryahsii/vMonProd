@@ -179,15 +179,15 @@ export function ServiceForm({
             <Switch checked={form.selfHealEnabled} onChange={(v) => set("selfHealEnabled", v)} label="Down olunca otomatik yeniden başlat" />
             {form.selfHealEnabled && (
               <div className="mt-3 grid grid-cols-2 gap-4">
-                <Field label="Deneme sayısı" hint="1-10 (sorun döngüsü başına)">
-                  <Input type="number" min={1} max={10}
-                    value={form.selfHealMaxRetries ?? ""}
-                    onChange={(e) => set("selfHealMaxRetries", numOrNull(e.target.value))} />
-                </Field>
                 <Field label="Kaç ardışık down sonrası" hint="1 = ilk down'da hemen dene">
                   <Input type="number" min={1} max={10}
                     value={form.selfHealAfterFailures ?? ""}
                     onChange={(e) => set("selfHealAfterFailures", numOrNull(e.target.value))} />
+                </Field>
+                <Field label="Deneme sayısı" hint="1-10 (sorun döngüsü başına)">
+                  <Input type="number" min={1} max={10}
+                    value={form.selfHealMaxRetries ?? ""}
+                    onChange={(e) => set("selfHealMaxRetries", numOrNull(e.target.value))} />
                 </Field>
               </div>
             )}
