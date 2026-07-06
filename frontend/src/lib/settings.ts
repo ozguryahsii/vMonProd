@@ -53,3 +53,18 @@ export const testLdap = (username: string, password: string) =>
   apiForm<{ ok: boolean; message: string }>("/test-ldap-login", { username, password });
 export const testSyslog = () => apiSend<{ ok: boolean; message: string }>("POST", "/syslog-test");
 export const eolSyncNow = () => apiSend<{ ok: boolean; message: string }>("POST", "/eol-sync");
+
+// ---- Lisans (Ayarlar > Lisans kartı: paket yükseltme/düşürme) ----
+export interface LicenseState {
+  machineCode: string;
+  status: string;
+  license: {
+    edition: "Basic" | "Standard" | "Enterprise";
+    company: string; issued: string; expires: string; daysLeft: number;
+    maxMonitors: number | null; maxUsers: number | null; maxDashboards: number | null;
+    sqliteOnly: boolean; emailOnly: boolean; siem: boolean;
+  } | null;
+}
+export const getLicense = (signal?: AbortSignal) => apiGet<LicenseState>("/license", signal);
+export const applyLicense = (key: string) =>
+  apiSend<{ ok: boolean; edition: string; expires: string; message: string; warn: string | null }>("POST", "/license", { key });

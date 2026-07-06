@@ -12,10 +12,12 @@ import {
   type AppSettings,
 } from "@/lib/settings";
 import { getCredentials, type CredentialRow } from "@/lib/admin";
-import { ChannelsCard, BackupsCard, LogoCard } from "@/components/settings/ManagementSections";
+import { ChannelsCard, BackupsCard, LogoCard, LicenseCard } from "@/components/settings/ManagementSections";
+import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
 
 export function Settings() {
+  const { reloadMe } = useMe();
   const [s, setS] = useState<AppSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creds, setCreds] = useState<CredentialRow[]>([]);
@@ -238,9 +240,12 @@ export function Settings() {
         </Section>
       </div>
 
-      {/* Yönetim: bildirim kanalları, yedekler, logo (form dışı — anında uygulanır) */}
+      {/* Yönetim: lisans, bildirim kanalları, yedekler, logo (form dışı — anında uygulanır) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChannelsCard />
+        <div className="space-y-4">
+          <LicenseCard onChanged={reloadMe} />
+          <ChannelsCard />
+        </div>
         <div className="space-y-4">
           <BackupsCard />
           <LogoCard current={s.loginLogoFile} onChanged={() => getSettings().then(setS).catch(() => {})} />

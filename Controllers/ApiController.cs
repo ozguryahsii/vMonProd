@@ -1067,6 +1067,63 @@ public class ApiController : ControllerBase
     // ================= Faz G: Ayarlar (React) =================
 
     /// <summary>Tüm ayarlar (yalnız admin). Sırlar asla dönmez — yalnız has* bayrakları.</summary>
+    /// <summary>Mevcut lisans durumu + bu makinenin kodu (Ayarlar > Lisans kartı). Yalnız admin.</summary>
+    [HttpGet("license")]
+    public async Task<IActionResult> LicenseGet(CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        return Ok(new
+        {
+            machineCode = LicenseService.MachineCode,
+            status = _lic.Status.ToString(),
+            license = _lic.Current is { } l
+                ? new
+                {
+                    edition = l.Edition.ToString(), company = l.Company,
+                    issued = l.IssuedAt.ToString("yyyy-MM-dd"), expires = l.ExpiresAt.ToString("yyyy-MM-dd"),
+                    daysLeft = l.DaysLeft,
+                    maxMonitors = l.MaxMonitors == int.MaxValue ? (int?)null : l.MaxMonitors,
+                    maxUsers = l.MaxUsers == int.MaxValue ? (int?)null : l.MaxUsers,
+                    maxDashboards = l.MaxDashboards == int.MaxValue ? (int?)null : l.MaxDashboards,
+                    sqliteOnly = l.SqliteOnly, emailOnly = l.EmailOnlyNotifications, siem = l.SiemAllowed
+                }
+                : null
+        });
+    }
+
+    /// <summary>Çalışan uygulamadan lisans key değiştir — paket yükseltme/düşürme (Ayarlar > Lisans). Yalnız admin.
+    /// Basic'e DÜŞÜŞTE mevcut veri (Oracle vb.) SQLite'a taşınmaz; key kabul edilir ama uyarı döner.</summary>
+    public record LicenseApplyInput(string Key);
+
+    [HttpPost("license")]
+    public async Task<IActionResult> LicenseApply([FromBody] LicenseApplyInput input, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+
+        var prev = _lic.Current?.Edition;
+        var (ok, err) = _lic.Apply(input?.Key ?? "");
+        if (!ok) return BadRequest(err);
+
+        await _audit.LogAsync("license.change", _lic.Current!.Company,
+            $"Lisans değişti: {prev?.ToString() ?? "—"} → {_lic.Current.Edition}, bitiş {_lic.Current.ExpiresAt:yyyy-MM-dd}", ct: ct);
+
+        // Basic'e geçişte, mevcut kurulum SQLite değilse: key geçerli ama Basic yalnız SQLite destekler → bilgilendir.
+        string? warn = null;
+        if (_lic.Current.SqliteOnly && _lic.Current.Edition != prev)
+            warn = "Basic paket yalnız SQLite'ı destekler. Mevcut veritabanınız farklıysa çalışmaya devam eder ancak yeni Basic kurulumlar SQLite ile yapılmalıdır. Ayrıca Basic limitlerini (40 izleme, 1 kullanıcı, 5 dashboard, yalnız e-posta, SIEM kapalı) aşan yapılandırmalar için ilgili işlemler kısıtlanır.";
+
+        return Ok(new
+        {
+            ok = true,
+            edition = _lic.Current.Edition.ToString(),
+            expires = _lic.Current.ExpiresAt.ToString("dd.MM.yyyy"),
+            message = $"Lisans güncellendi: {_lic.Current.Edition} (bitiş {_lic.Current.ExpiresAt:dd.MM.yyyy}).",
+            warn
+        });
+    }
+
     [HttpGet("settings")]
     public async Task<IActionResult> SettingsGet(CancellationToken ct)
     {

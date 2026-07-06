@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   Plus, Pencil, Trash2, FlaskConical, Database, Download, RotateCcw, Image, Upload,
-  CheckCircle2, XCircle, Send,
+  CheckCircle2, XCircle, Send, KeyRound,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   uploadLogo, removeLogo, KIND_LABELS,
   type ChannelRow, type ChannelInput, type BackupsData,
 } from "@/lib/channels";
+import { getLicense, applyLicense, type LicenseState } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 type Flash = { ok: boolean; msg: string } | null;
@@ -321,6 +322,96 @@ export function LogoCard({ current, onChanged }: { current: string; onChanged: (
             {current && <Button variant="ghost" size="sm" disabled={busy} onClick={doRemove}><Trash2 className="h-4 w-4" /> Kaldır</Button>}
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ================= Lisans (paket yükseltme / düşürme) ================= */
+const EDITION_BADGE: Record<string, string> = {
+  Basic: "bg-primary/15 text-primary",
+  Standard: "bg-sky-500/15 text-sky-400",
+  Enterprise: "bg-amber-500/15 text-amber-400",
+};
+
+export function LicenseCard({ onChanged }: { onChanged?: () => void }) {
+  const [state, setState] = useState<LicenseState | null>(null);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<Flash>(null);
+  const [copied, setCopied] = useState(false);
+
+  const load = useCallback(() => { getLicense().then(setState).catch(() => {}); }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 6000); return () => clearTimeout(t); } }, [flash]);
+
+  async function doApply() {
+    if (!key.trim()) { setFlash({ ok: false, msg: "Lisans key girin." }); return; }
+    setBusy(true);
+    try {
+      const r = await applyLicense(key.trim());
+      setFlash({ ok: true, msg: r.warn ? `${r.message} ${r.warn}` : r.message });
+      setKey("");
+      load();
+      onChanged?.();  // sol üst rozet + Hakkında güncellensin (me yeniden yüklenir)
+    } catch (e) {
+      setFlash({ ok: false, msg: (e as Error).message });
+    } finally { setBusy(false); }
+  }
+
+  const lic = state?.license;
+  const limit = (n: number | null) => (n == null ? "sınırsız" : String(n));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Lisans</CardTitle>
+        <CardDescription>Paket yükseltme/düşürme — yeni lisans key'i buradan uygulanır (Basic / Standard / Enterprise)</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {flash && <FlashLine f={flash} />}
+
+        {lic ? (
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold uppercase", EDITION_BADGE[lic.edition] ?? "")}>{lic.edition}</span>
+              <span className="font-medium">{lic.company}</span>
+              <span className={cn("ml-auto text-xs font-semibold", lic.daysLeft <= 30 ? "text-rose-400" : "text-muted-foreground")}>
+                bitiş {lic.expires} · {lic.daysLeft} gün kaldı
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-3">
+              <span>İzleme: <b className="text-foreground">{limit(lic.maxMonitors)}</b></span>
+              <span>Kullanıcı: <b className="text-foreground">{limit(lic.maxUsers)}</b></span>
+              <span>Dashboard: <b className="text-foreground">{limit(lic.maxDashboards)}</b></span>
+              <span>Veritabanı: <b className="text-foreground">{lic.sqliteOnly ? "yalnız SQLite" : "tümü"}</b></span>
+              <span>Bildirim: <b className="text-foreground">{lic.emailOnly ? "yalnız e-posta" : "tüm kanallar"}</b></span>
+              <span>SIEM: <b className="text-foreground">{lic.siem ? "açık" : "kapalı"}</b></span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Lisans bilgisi yükleniyor…</p>
+        )}
+
+        {state && (
+          <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Makine Kodu (yeni key isterken satıcıya iletin): </span>
+            <code className="font-semibold tracking-wider">{state.machineCode}</code>
+            <button type="button"
+              onClick={() => { navigator.clipboard.writeText(state.machineCode); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
+              className="ml-2 rounded border border-border px-1.5 py-0.5 text-muted-foreground hover:bg-accent/60">
+              {copied ? "kopyalandı" : "kopyala"}
+            </button>
+          </div>
+        )}
+
+        <Field label="Yeni Lisans Key" hint="Paket değiştirmek için yeni key'i yapıştırıp uygulayın. Satır kırılması sorun değil.">
+          <Textarea rows={3} value={key} onChange={(e) => setKey(e.target.value)} spellCheck={false}
+            placeholder="VMON1.xxxxx.xxxxx" className="font-mono text-xs" />
+        </Field>
+        <Button size="sm" disabled={busy} onClick={doApply}>
+          <KeyRound className="h-4 w-4" /> {busy ? "Uygulanıyor…" : "Lisansı Uygula"}
+        </Button>
       </CardContent>
     </Card>
   );
