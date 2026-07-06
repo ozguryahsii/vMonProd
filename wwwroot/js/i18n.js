@@ -579,6 +579,8 @@
         "Offline Tablespace'ler": "Offline Tablespaces",
         "ONLINE Olmayan Veritabanları": "Databases Not Online",
         "Kilit Bekleyen İşlemler": "Lock-Waiting Transactions",
+        "En Çok Bağlantı Tutanlar": "Top Connection Holders",
+        "Bağlantı": "Connections",
         "Kayıt yok 🎉": "No records 🎉",
         "Detay": "Details",
         "Yenile": "Refresh",

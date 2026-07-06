@@ -89,13 +89,98 @@ public sealed class DbDetailService
                 "SELECT ID, USER, HOST, TIME, LEFT(INFO,200) " +
                 "FROM information_schema.PROCESSLIST WHERE COMMAND<>'Sleep' AND TIME>60 ORDER BY TIME DESC LIMIT 50"),
 
+            // ---- Bağlantı Doluluğu: en çok bağlantı tutanlar (gruplu) + limit kırılımı (not) ----
+            ServiceType.OracleConnectionUsage => await OracleUsageAsync(svc, cred, ct),
+            ServiceType.MsSqlConnectionUsage => await MsSqlUsageAsync(svc, cred, ct),
+            ServiceType.MySqlConnectionUsage => await MySqlUsageAsync(svc, cred, ct),
+
             _ => null
         };
+    }
+
+    // ---- Bağlantı doluluğu detayları (kim tutuyor + limit) ----
+
+    private async Task<Result> OracleUsageAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
+    {
+        await using var conn = await OpenOracleAsync(svc, cred, ct);
+        // Limit kırılımı: processes/sessions için şu an / en yüksek / limit
+        var note = await NoteAsync(conn, ct,
+            "SELECT RESOURCE_NAME, CURRENT_UTILIZATION, MAX_UTILIZATION, TRIM(LIMIT_VALUE) " +
+            "FROM V$RESOURCE_LIMIT WHERE RESOURCE_NAME IN ('processes','sessions')",
+            r => $"{r[0]}: {r[1]}/{r[3]} (en yüksek {r[2]})");
+        return await ReadAsync(conn, "En Çok Bağlantı Tutanlar", new[] { "Kullanıcı", "Makine", "Bağlantı" },
+            "SELECT * FROM (SELECT USERNAME, MACHINE, COUNT(*) CNT FROM GV$SESSION " +
+            "WHERE TYPE<>'BACKGROUND' AND USERNAME IS NOT NULL GROUP BY USERNAME, MACHINE " +
+            "ORDER BY COUNT(*) DESC) WHERE ROWNUM <= 50", ct, note);
+    }
+
+    private async Task<Result> MsSqlUsageAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
+    {
+        await using var conn = await OpenMsSqlAsync(svc, cred, ct);
+        var note = await NoteAsync(conn, ct,
+            "SELECT (SELECT COUNT_BIG(*) FROM sys.dm_exec_sessions WHERE is_user_process=1), " +
+            "(SELECT CASE WHEN CAST(value_in_use AS int)=0 THEN 32767 ELSE CAST(value_in_use AS int) END " +
+            " FROM sys.configurations WHERE name='user connections')",
+            r => $"Kullanıcı oturumu: {r[0]} / limit {r[1]}");
+        return await ReadAsync(conn, "En Çok Bağlantı Tutanlar", new[] { "Kullanıcı", "Makine", "Program", "Bağlantı" },
+            "SELECT TOP 50 login_name, host_name, program_name, COUNT_BIG(*) " +
+            "FROM sys.dm_exec_sessions WHERE is_user_process=1 " +
+            "GROUP BY login_name, host_name, program_name ORDER BY COUNT_BIG(*) DESC", ct, note);
+    }
+
+    private async Task<Result> MySqlUsageAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
+    {
+        await using var conn = await OpenMySqlAsync(svc, cred, ct);
+        var note = await NoteAsync(conn, ct,
+            "SELECT (SELECT COUNT(*) FROM information_schema.PROCESSLIST), @@max_connections",
+            r => $"Bağlantı: {r[0]} / max_connections {r[1]}");
+        return await ReadAsync(conn, "En Çok Bağlantı Tutanlar", new[] { "Kullanıcı", "Host", "Bağlantı" },
+            "SELECT USER, HOST, COUNT(*) FROM information_schema.PROCESSLIST " +
+            "GROUP BY USER, HOST ORDER BY COUNT(*) DESC LIMIT 50", ct, note);
+    }
+
+    /// <summary>Tek satırlık/az satırlı limit sorgusunu okuyup her satırı fmt ile birleştirip not string'i üretir.</summary>
+    private static async Task<string?> NoteAsync(DbConnection conn, CancellationToken ct, string sql, Func<string[], string> fmt)
+    {
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.CommandTimeout = CommandTimeoutSec;
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            var parts = new List<string>();
+            while (parts.Count < 8 && await rd.ReadAsync(ct))
+            {
+                var vals = new string[rd.FieldCount];
+                for (int i = 0; i < rd.FieldCount; i++) vals[i] = rd.IsDBNull(i) ? "" : (Convert.ToString(rd.GetValue(i)) ?? "").Trim();
+                parts.Add(fmt(vals));
+            }
+            return parts.Count > 0 ? string.Join(" · ", parts) : null;
+        }
+        catch { return null; }   // limit okunamazsa yalnız gruplu liste gösterilir
     }
 
     // ---- Sağlayıcıya özel bağlantı + ortak okuma ----
 
     private async Task<Result> OracleAsync(MonitoredService svc, Credential? cred, CancellationToken ct, string title, string[] cols, string sql, string? note = null)
+    {
+        await using var conn = await OpenOracleAsync(svc, cred, ct);
+        return await ReadAsync(conn, title, cols, sql, ct, note);
+    }
+
+    private async Task<Result> MsSqlAsync(MonitoredService svc, Credential? cred, CancellationToken ct, string title, string[] cols, string sql, string? note = null)
+    {
+        await using var conn = await OpenMsSqlAsync(svc, cred, ct);
+        return await ReadAsync(conn, title, cols, sql, ct, note);
+    }
+
+    private async Task<Result> MySqlAsync(MonitoredService svc, Credential? cred, CancellationToken ct, string title, string[] cols, string sql, string? note = null)
+    {
+        await using var conn = await OpenMySqlAsync(svc, cred, ct);
+        return await ReadAsync(conn, title, cols, sql, ct, note);
+    }
+
+    private static async Task<OracleConnection> OpenOracleAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
     {
         if (cred == null) throw new InvalidOperationException("Kimlik bilgisi tanımlı değil");
         if (string.IsNullOrWhiteSpace(svc.Extra)) throw new InvalidOperationException("Service name (Ekstra) tanımlı değil");
@@ -110,12 +195,12 @@ public sealed class DbDetailService
             Password = VaultClient.GetPassword(cred),
             ConnectionTimeout = svc.TimeoutSeconds
         };
-        await using var conn = new OracleConnection(csb.ConnectionString);
+        var conn = new OracleConnection(csb.ConnectionString);
         await conn.OpenAsync(ct);
-        return await ReadAsync(conn, title, cols, sql, ct, note);
+        return conn;
     }
 
-    private async Task<Result> MsSqlAsync(MonitoredService svc, Credential? cred, CancellationToken ct, string title, string[] cols, string sql, string? note = null)
+    private static async Task<SqlConnection> OpenMsSqlAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
     {
         var csb = new SqlConnectionStringBuilder
         {
@@ -127,12 +212,12 @@ public sealed class DbDetailService
         if (!string.IsNullOrWhiteSpace(svc.Extra)) csb.InitialCatalog = svc.Extra;
         if (cred != null) { csb.UserID = VaultClient.GetUsername(cred); csb.Password = VaultClient.GetPassword(cred); }
         else csb.IntegratedSecurity = true;
-        await using var conn = new SqlConnection(csb.ConnectionString);
+        var conn = new SqlConnection(csb.ConnectionString);
         await conn.OpenAsync(ct);
-        return await ReadAsync(conn, title, cols, sql, ct, note);
+        return conn;
     }
 
-    private async Task<Result> MySqlAsync(MonitoredService svc, Credential? cred, CancellationToken ct, string title, string[] cols, string sql, string? note = null)
+    private static async Task<MySqlConnection> OpenMySqlAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
     {
         if (cred == null) throw new InvalidOperationException("Kimlik bilgisi tanımlı değil");
         var csb = new MySqlConnectionStringBuilder
@@ -145,9 +230,9 @@ public sealed class DbDetailService
             SslMode = svc.UseSsl ? MySqlSslMode.Required : MySqlSslMode.Preferred
         };
         if (!string.IsNullOrWhiteSpace(svc.Extra)) csb.Database = svc.Extra;
-        await using var conn = new MySqlConnection(csb.ConnectionString);
+        var conn = new MySqlConnection(csb.ConnectionString);
         await conn.OpenAsync(ct);
-        return await ReadAsync(conn, title, cols, sql, ct, note);
+        return conn;
     }
 
     /// <summary>SQL'i çalıştırıp satırları string tablosu olarak döner (en fazla 50 satır). Kolon başlıkları
