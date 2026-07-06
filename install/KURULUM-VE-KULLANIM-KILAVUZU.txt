@@ -1,0 +1,314 @@
+================================================================================
+  vMon — SERVİS İZLEME VE ALARM PLATFORMU
+  KURULUM VE KULLANIM KILAVUZU
+  Sürüm: 2.23.1
+================================================================================
+
+Bu belge vMon'un nasıl kurulacağını, nasıl lisanslanacağını ve başlıca
+özelliklerinin nasıl kullanılacağını anlatır. Kurulum için yönetici
+(Administrator) yetkisi gerekir.
+
+
+--------------------------------------------------------------------------------
+1) vMon NEDİR?
+--------------------------------------------------------------------------------
+vMon; sunucularınızı, veritabanlarınızı, ağ servislerinizi ve uygulamalarınızı
+tek bir merkezden gerçek zamanlı izleyen, sorun anında alarm üreten bir
+platformdur. Öne çıkan yetenekleri:
+
+  - Uçtan uca izleme: HTTP/HTTPS, TCP port, Ping (ICMP), DNS, LDAP/Active
+    Directory, SFTP, SMTP/IMAP (Exchange & Exchange Online), DHCP servisi.
+  - Sunucu sağlığı: Windows (WMI) ve Linux (SSH) sunucularda CPU / RAM / Disk
+    doluluğu, eşik aşımında alarm.
+  - Veritabanı sağlığı: Oracle, MSSQL, MySQL için bağlantı+saat sapması,
+    aktif oturum, bloklu oturum, uzun süren sorgu, tablo alanı/veritabanı
+    durumu ve bağlantı doluluğu (%) izlemeleri.
+  - Uzaktan servis kontrolü: Windows servisi ve Linux systemd birimlerini
+    panodan başlat / durdur / yeniden başlat.
+  - Canlı grafikli ana ekran, özelleştirilebilir çoklu dashboard'lar,
+    düzenlenebilir istatistik panosu ve yazdırılabilir yönetim raporları.
+  - Bildirimler: E-posta (SMTP) ve — lisansa göre — SMS, WhatsApp, sesli
+    arama / IVR entegrasyonları.
+  - Güvenlik ve uyumluluk: LDAP ile oturum açma, iki adımlı doğrulama (OTP),
+    izinsiz değişiklik-belirten denetim kaydı, şifreli yedekler, SIEM/syslog
+    aktarımı, kaynak-bağımsız çoklu veritabanı desteği.
+
+vMon "kendi içinde çalışır" (self-contained): hedef sunucuda .NET kurulu
+olmasına GEREK YOKTUR.
+
+
+--------------------------------------------------------------------------------
+2) SİSTEM GEREKSİNİMLERİ
+--------------------------------------------------------------------------------
+  - İşletim sistemi : Windows Server 2016+ veya Windows 10/11 (64-bit).
+  - Yetki           : Kurulum için yerel Administrator.
+  - .NET            : Gerekmez (Windows Service kurulumunda). IIS kurulumunda
+                      ASP.NET Core 8 Hosting Bundle gerekir (bkz. Bölüm 3-B).
+  - Ağ              : İzlenecek hedeflere erişim (ilgili portlar açık olmalı).
+  - Veritabanı      : Basic pakette gömülü SQLite (ek kurulum yok). Standard ve
+                      Enterprise'da SQLite / SQL Server / PostgreSQL / MySQL /
+                      Oracle seçilebilir (mevcut bir sunucuya bağlanır).
+
+
+--------------------------------------------------------------------------------
+3) KURULUM
+--------------------------------------------------------------------------------
+Release paketini (vMon-vX.Y.Z-win-x64.zip) sunucuya kopyalayıp açın. Klasör
+içinde şunlar bulunur:
+
+  app\                         Uygulama dosyaları
+  install.ps1                  Kurulum
+  upgrade.ps1                  Güncelleme (mevcut kurulumun üstüne)
+  uninstall.ps1                Kaldırma
+  update-vmon.ps1              Tek komutla indir+güncelle (opsiyonel)
+  INSTALL.md                   Kısa kurulum notları
+  KURULUM-VE-KULLANIM-KILAVUZU.txt   (bu belge)
+
+PowerShell'i "Yönetici olarak çalıştır" ile açın ve paketi açtığınız klasöre
+gidin.
+
+  >> ÖNEMLİ: Scriptler engellenmiş görünürse:
+     Get-ChildItem *.ps1 | Unblock-File
+
+A) SEÇENEK 1 — WINDOWS SERVICE (en kolay, IIS gerekmez)
+-------------------------------------------------------
+Bağımlılık yoktur. Düz HTTP bir port açar (TLS için önüne bir ters proxy —
+nginx/IIS — koyabilirsiniz).
+
+    .\install.ps1 -Mode Service -Port 8080
+
+  - Servis adı           : vMon   (görünen ad: "vMon Monitoring")
+  - Kurulum yolu         : C:\Program Files\vMon
+  - Veri dizini          : C:\Program Files\vMon\Data  (güncellemelerde korunur)
+  - Başlangıç            : Otomatik. Servis çökerse otomatik yeniden başlar.
+
+Farklı yol/port/servis adı isterseniz:
+
+    .\install.ps1 -Mode Service -Port 80 -Path "D:\Apps\vMon" -ServiceName vMonProd
+
+Kurulumdan sonra tarayıcıdan açın:  http://<sunucu>:8080
+İlk açılışta KURULUM SİHİRBAZI gelir (bkz. Bölüm 4).
+
+B) SEÇENEK 2 — IIS
+------------------
+Önkoşul: "ASP.NET Core 8 Hosting Bundle"
+  https://dotnet.microsoft.com/download/dotnet/8.0  ->  Hosting Bundle
+Kurduktan sonra:  iisreset
+
+    .\install.ps1 -Mode IIS -SiteName vMon -HostName vmon.firma.local -Port 80 -Path "C:\inetpub\wwwroot\vMon"
+
+  - Uygulama havuzu "No Managed Code" olarak otomatik oluşturulur.
+  - HTTPS için IIS Yöneticisi'nde bu siteye bir HTTPS binding + sertifika ekleyin.
+
+Sonra site adresini tarayıcıda açın -> kurulum sihirbazı.
+
+
+--------------------------------------------------------------------------------
+4) İLK KURULUM SİHİRBAZI
+--------------------------------------------------------------------------------
+İlk açılışta uygulama sizi kurulum sihirbazına yönlendirir. Adımlar:
+
+  ADIM 1 — LİSANS (ZORUNLU)
+    Lisans key'inizi yapıştırıp "Lisansı Doğrula"ya basın. vMon'u kullanmak
+    için — ücretsiz Basic paket dahil — geçerli bir lisans key gereklidir.
+    Bu ekranda "Makine Kodu" gösterilir; key almak için satıcınıza bu kodu
+    iletmeniz gerekir (bkz. Bölüm 5). Basic lisans seçildiyse veritabanı
+    olarak yalnızca SQLite seçilebilir.
+
+  ADIM 2 — VERİTABANI
+    Verilerin saklanacağı veritabanını seçin.
+      - Basic  : SQLite (sunucuda yerel dosya — ek bilgi gerekmez).
+      - Standard / Enterprise : SQLite / SQL Server / PostgreSQL / MySQL /
+        Oracle. Ağ üstü bir DB seçtiyseniz host, port, veritabanı adı ve
+        kimlik bilgisini girip "Bağlantıyı Test Et" ile doğrulayın.
+        ("Şema SQL'ini Göster" ile DBA'ya verilecek CREATE betiği üretilebilir;
+        bu adım DB'ye dokunmaz, yalnız gösterim amaçlıdır.)
+
+  ADIM 3 — ŞİRKET
+    Şirket/müşteri adı (arayüzde markalama ve raporlarda kullanılır).
+
+  ADIM 4 — YÖNETİCİ HESABI
+    Şifreli giriş yapacağınız YEREL yönetici hesabını oluşturun.
+    (Parola en az 12 karakter + büyük/küçük harf + rakam içermelidir.)
+    LDAP'ı sonra Ayarlar'dan bağlayabilir, senkron sonrası bu yerel hesabı
+    silebilirsiniz.
+
+  ADIM 5 — E-POSTA (SMTP) — OPSİYONEL
+    Alarm e-postaları için SMTP relay bilgisi. Doldurursanız ilerlemeden
+    önce test e-postası gönderilmesi zorunludur. "Atla" ile geçebilirsiniz.
+
+"Kurulumu Tamamla"dan sonra uygulama yeniden başlar ve giriş ekranı gelir.
+Giriş yaptığınızda doğrudan ana ekrana (Dashboard'lar) düşersiniz.
+
+
+--------------------------------------------------------------------------------
+5) LİSANSLAMA
+--------------------------------------------------------------------------------
+vMon üç pakette sunulur. TÜM lisanslar YILLIK yenilenir; süresiz/tek seferlik
+lisans yoktur. Süre dolduğunda (ücretsiz Basic dahil) uygulama yeni bir key
+girilene kadar kilitlenir.
+
+  PAKET       İZLEME     KULLANICI  VERİTABANI      BİLDİRİM        DASHBOARD  SIEM
+  ---------   --------   ---------  --------------  --------------  ---------  ----
+  Basic       40         1          Yalnız SQLite   Yalnız E-posta  5          Yok
+  (ücretsiz)
+  Standard    200        5          Tümü            Tüm kanallar    Sınırsız   Var
+  Enterprise  Sınırsız   Sınırsız   Tümü            Tüm kanallar    Sınırsız   Var
+
+  Not: "Tüm kanallar" = E-posta + SMS + WhatsApp + sesli arama/IVR.
+
+5.1) LİSANS KEY NASIL ALINIR?
+  Her kurulum, o makineye özel bir "Makine Kodu" üretir (örn. F7F1-3372-A392).
+  Bu kod; kurulum sihirbazının 1. adımında, lisans yenileme ekranında ve
+  Ayarlar > Lisans kartında görünür. Key almak için bu kodu satıcınıza
+  iletin. Satıcı, key'i yalnızca o makinede geçerli olacak şekilde üretir;
+  key başka bir sunucuya kopyalanırsa çalışmaz.
+
+5.2) LİSANS KEY NASIL UYGULANIR?
+  - İlk kurulumda: sihirbazın 1. adımında.
+  - Süre dolduğunda / lisans yokken: açılan lisans ekranında.
+  - Paket değiştirmek (yükseltme/düşürme) için: Ayarlar > Lisans kartında
+    yeni key'i yapıştırıp "Lisansı Uygula"ya basın. Paket ve limitler anında
+    güncellenir; sol üstteki paket rozeti ve Hakkında sayfası hemen değişir.
+    (Yeniden kurulum/başlatma gerekmez.)
+
+  Key'i kopyalarken araya satır kırılması girmesi sorun değildir; uygulama
+  bunu otomatik temizler.
+
+5.3) PAKET YÜKSELTME / DÜŞÜRME
+  Standart/Enterprise'a yükseltince limitler hemen açılır. Basic'e düşünce
+  Basic limitleri geçerli olur; limit üstü mevcut kayıtlar silinmez ancak
+  yeni ekleme/işlemler kısıtlanır.
+
+5.4) KALAN SÜRE
+  Lisansın bitiş tarihi ve kalan gün sayısı hem sol üst rozetin ipucunda hem
+  de Hakkında sayfasında görünür. Son 30 güne girildiğinde uyarı rengiyle
+  gösterilir; yenilemek için satıcınızdan yeni bir key isteyin.
+
+
+--------------------------------------------------------------------------------
+6) ÖZELLİKLER VE KULLANIM
+--------------------------------------------------------------------------------
+
+6.1) İZLEMELER
+  Sol menü > İzlemeler. "Yeni İzleme" ile izleme ekleyin. Tür seçtiğinizde
+  form o türe göre değişir (örn. Oracle için Service Name, Windows sağlık için
+  kimlik). Toplu seçim, toplu düzenleme, toplu silme, CSV içe/dışa aktarım ve
+  örnek CSV indirme desteklenir. Bir satıra tıklayarak seçebilir, seçilenleri
+  dışa aktarabilirsiniz. Üstteki arama ve tür/durum/etiket filtreleri liste
+  akarken sabit kalır.
+
+6.2) DASHBOARD'LAR (ANA EKRAN)
+  Sol menü > Dashboard'lar. "Hepsi" sekmesi tüm izlemeleri gösterir; kendi
+  panolarınızı oluşturup (Yeni Dashboard) belirli izlemeleri gruplayabilirsiniz.
+  Üstteki sayaçlar (Toplam / Çalışan / Yavaş / Kapalı / Hata) tıklanabilir ve
+  grafikleri süzer. Veritabanı izlemeleri, sunucu (Service Name) bazında ayrı
+  kartlarda toplanır. Bir karta tıklayınca canlı detay paneli açılır; buradan
+  yanıt süresi/metrik grafiğini görebilir, uzaktan kontrol edilebilen
+  servisleri başlatıp durdurabilirsiniz. (Basic: en fazla 5 dashboard.)
+
+6.3) İSTATİSTİKLER
+  Sol menü > İstatistikler. Düzenlenebilir widget panosu: sayaçlar, CPU/RAM/
+  Disk dağılımı, OS dağılımı, kapasite, kesinti özeti, ısı haritası, EOL
+  (destek sonu) işletim sistemleri ve veritabanı sağlığı widget'ları. Her kutu
+  tıklanabilir ve ilgili sunucu listesine + trendine iner. "Widget Ekle" ile
+  yeni kutu ekleyebilir, "Varsayılana Dön" ile önerilen düzeni geri
+  getirebilirsiniz.
+
+6.4) RAPORLAR
+  Sol menü > Raporlar. Günlük erişilebilirlik (uptime) şeridi, kesinti/hata
+  filtreleri, etiket/tür filtreleri ve CSV dışa aktarım. İstatistikler
+  ekranından "PDF Raporu" ile yazdırılabilir yönetim raporu alınabilir.
+
+6.5) BİLDİRİMLER / ALARMLAR
+  Ayarlar > E-posta ile SMTP relay'i yapılandırın. Standard/Enterprise'da
+  Ayarlar > Bildirim Kanalları'ndan SMS, WhatsApp ve sesli arama/IVR
+  entegrasyonları eklenebilir. İzleme bazında hangi kanaldan alarm gideceği
+  seçilebilir. (Basic pakette yalnız e-posta bildirimi çalışır.)
+
+6.6) KULLANICILAR VE LDAP
+  Sol menü > Kullanıcılar. Yetki bazlı erişim (her ekran/işlem için ayrı izin).
+  Ayarlar > Oturum Açma'dan LDAP/Active Directory bağlanır; "LDAP'tan
+  Senkronize Et" ile grup üyeleri toplu çekilir. İki adımlı doğrulama (OTP)
+  e-posta/SMS/WhatsApp ile açılabilir. (Basic: 1 kullanıcı, Standard: 5,
+  Enterprise: sınırsız.)
+
+6.7) KİMLİK BİLGİLERİ
+  Sol menü > Kimlik Bilgileri. İzlemelerin kullandığı hesaplar burada
+  saklanır. Şifreler asla düz metin tutulmaz; Windows DPAPI ile şifrelenir
+  veya HashiCorp Vault'tan çözülür. Vault bağlantısı test edilebilir.
+
+6.8) DENETİM (AUDIT)
+  Sol menü > Denetim. Tüm yönetimsel işlemler kaydedilir. Kayıtlar
+  hash-zincirlidir; "Bütünlüğü Doğrula" ile değiştirilen/silinen kayıt tespit
+  edilir. Tarih aralığı filtresi, Excel (CSV) ve PDF dışa aktarım vardır.
+
+6.9) GÜVENLİK VE UYUMLULUK
+  Ayarlar > Güvenlik: parola politikası, hesap kilitleme, denetim saklama
+  süresi, iç sertifikalara güven. SIEM/Syslog aktarımı (Standard/Enterprise)
+  denetim olaylarını merkezi log sistemine iletir. Oturum boşta kalma
+  zaman aşımı 15 dakikadır.
+
+
+--------------------------------------------------------------------------------
+7) GÜNCELLEME
+--------------------------------------------------------------------------------
+Yeni release zip'ini açıp, aynı klasörden:
+
+    .\upgrade.ps1 -Mode Service -ServiceName vMon -Path "C:\Program Files\vMon"
+    # veya IIS:
+    .\upgrade.ps1 -Mode IIS -SiteName vMon -Path "C:\inetpub\wwwroot\vMon"
+
+Veritabanı (Data) ve appsettings.json KORUNUR. Şema, yeni sürümde eklenen
+kolonları otomatik ve veri kaybı olmadan tamamlar.
+
+Tek komutla indir+güncelle (repo erişiminiz varsa):
+
+    .\update-vmon.ps1 -Token "<erisim-anahtari>" -Repo "<hesap/repo>" -Tag v2.23.1
+
+
+--------------------------------------------------------------------------------
+8) YEDEKLEME
+--------------------------------------------------------------------------------
+(SQLite kurulumlarında) Ayarlar > Yedekleme: sunucu-taraflı bir klasör seçip
+elle veya zamanlanmış (günlük + saklama sayısı) yedek alın. Yedekler AES-256
+ile şifrelenebilir. Listeden geri yükleyebilir veya başka bir makineden .db
+dosyası yükleyebilirsiniz.
+
+Ağ üstü veritabanlarında (SQL Server/PostgreSQL/MySQL/Oracle) yedekleme
+kurumsal DB yedekleme süreçlerinizle yapılmalıdır.
+
+
+--------------------------------------------------------------------------------
+9) KALDIRMA
+--------------------------------------------------------------------------------
+    .\uninstall.ps1 -Mode Service -ServiceName vMon                    # veriyi korur
+    .\uninstall.ps1 -Mode IIS -SiteName vMon -Path "..." -RemoveData   # her şeyi siler
+
+
+--------------------------------------------------------------------------------
+10) SORUN GİDERME (SIK KARŞILAŞILANLAR)
+--------------------------------------------------------------------------------
+  * "Lisans key çözülemedi" : Key kopyalanırken bozulmuş olabilir. Tek satır
+    halinde tekrar yapıştırın (uygulama satır kırılmalarını temizler).
+  * "Bu lisans başka bir makine için üretilmiş" : Key başka bir makine koduna
+    bağlı. Ekranda görünen bu makinenin kodunu satıcınıza iletip yeni key alın.
+    (Sunucunun bilgisayar adı değişirse makine kodu da değişir.)
+  * "Kullanıcı adı veya şifre hatalı" : Lisanstan bağımsızdır; doğru yerel
+    yönetici hesabı/şifresi ile deneyin. LDAP kullanıyorsanız bir LDAP hesabı
+    ile girin.
+  * Ağ üstü DB bağlantı testi başarısız : Host/port, güvenlik duvarı ve DB
+    kullanıcı yetkilerini kontrol edin. Named SQL instance için HOST\INSTANCE
+    yazıp port alanını boş bırakın.
+  * HTTP üzerinden giriş açılmıyor : Windows Service kurulumunda düz HTTP
+    içindir; TLS için önüne ters proxy koyun ya da IIS kurulumunu kullanın.
+
+
+--------------------------------------------------------------------------------
+İLETİŞİM
+--------------------------------------------------------------------------------
+Lisans, teknik destek ve fiyatlandırma için satıcınızla iletişime geçin.
+
+================================================================================
+  © vMon — Servis İzleme ve Alarm Platformu
+================================================================================
