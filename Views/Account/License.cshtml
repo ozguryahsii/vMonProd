@@ -68,6 +68,21 @@
                 </div>
             }
 
+            <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4">
+                <div class="text-xs font-medium text-slate-500 mb-1">
+                    <i class="bi bi-pc-display"></i>
+                    @T("Makine Kodu — lisans key isterken satıcınıza bu kodu iletin (key bu makineye bağlı üretilir):",
+                       "Machine Code — send this code to your vendor when requesting a key (the key is bound to this machine):")
+                </div>
+                <div class="flex items-center gap-2">
+                    <code id="machineCode" class="text-base font-bold tracking-wider text-slate-800">@LicenseService.MachineCode</code>
+                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('machineCode').textContent).then(()=>{this.innerHTML='<i class=\'bi bi-check\'></i>';setTimeout(()=>this.innerHTML='<i class=\'bi bi-clipboard\'></i>',1200)})"
+                            class="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" title="@T("Kopyala", "Copy")">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+            </div>
+
             <form method="post" asp-action="License" class="space-y-4">
                 @Html.AntiForgeryToken()
                 <div>

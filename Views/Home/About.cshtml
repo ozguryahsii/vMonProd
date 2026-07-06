@@ -46,6 +46,7 @@
                         <span class="ml-1">@lic.Company</span>
                         <span class="ml-1 text-slate-500">— @T("bitiş", "expires"): @lic.ExpiresAt.ToString("dd.MM.yyyy")</span>
                         <span class="ml-1 font-semibold @(warn ? "text-rose-600" : "text-emerald-600")">@lic.DaysLeft @T("gün kaldı", "days left")</span>
+                        <div class="mt-1 text-xs text-slate-500">@T("Makine Kodu", "Machine Code"): <code class="font-semibold">@vMonitor.Services.LicenseService.MachineCode</code> — @T("yenileme key'i isterken bu kodu iletin.", "send this code when requesting a renewal key.")</div>
                         @if (warn)
                         {
                             <div class="mt-1 text-xs text-rose-600">@T("Lisanslar yıllık yenilenir — süre dolunca uygulama yeni key girilene kadar kilitlenir.", "Licenses renew yearly — when it expires the application locks until a new key is entered.")</div>
@@ -61,7 +62,7 @@
                 <div class="w-44 shrink-0 font-medium text-slate-600"><i class="bi bi-tag text-brand-500"></i> @T("Versiyon", "Version")</div>
                 <div class="text-slate-700 flex-1">
                     <button type="button" @@click="open=!open" class="inline-flex items-center gap-2 group">
-                        <span class="badge pill-info">v2.23.1-pre.2</span>
+                        <span class="badge pill-info">v2.23.1-pre.3</span>
                         <span class="text-xs text-brand-600 group-hover:underline">@T("Sürüm notları", "Release notes") <i class="bi" :class="open ? 'bi-chevron-up' : 'bi-chevron-down'"></i></span>
                     </button>
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">

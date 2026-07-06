@@ -34,6 +34,7 @@ static int Usage()
           new   --out <klasor> --pass <parola>
           issue --key <private.vmonkey> --pass <parola>
                 --edition basic|standard|enterprise --company "Firma" [--days 365]
+                [--machine XXXX-XXXX-XXXX]   (musterinin lisans ekranindaki Makine Kodu — ONERILIR)
         """);
     return 1;
 }
@@ -123,13 +124,13 @@ static int CmdIssue(string[] args)
     }
 
     var ed = char.ToUpperInvariant(edition[0]) + edition[1..];   // Basic / Standard / Enterprise
-    var payload = JsonSerializer.SerializeToUtf8Bytes(new
-    {
-        ed,
-        co = company,
-        iat = DateTime.Today.ToString("yyyy-MM-dd"),
-        exp = DateTime.Today.AddDays(days).ToString("yyyy-MM-dd")
-    });
+    var machine = Arg(args, "machine")?.Trim().ToUpperInvariant();
+    var iat = DateTime.Today.ToString("yyyy-MM-dd");
+    var exp = DateTime.Today.AddDays(days).ToString("yyyy-MM-dd");
+    // Makine kodu verilirse key O MAKINEYE baglanir (kopyalanamaz); verilmezse her makinede calisir.
+    var payload = machine is { Length: > 0 }
+        ? JsonSerializer.SerializeToUtf8Bytes(new { ed, co = company, iat, exp, mac = machine })
+        : JsonSerializer.SerializeToUtf8Bytes(new { ed, co = company, iat, exp });
 
     using var ecdsa = LoadPrivate(keyFile, pass);
     var sig = ecdsa.SignData(payload, HashAlgorithmName.SHA256);
@@ -139,6 +140,9 @@ static int CmdIssue(string[] args)
     Console.WriteLine($"Paket    : {ed}");
     Console.WriteLine($"Firma    : {company}");
     Console.WriteLine($"Bitis    : {DateTime.Today.AddDays(days):yyyy-MM-dd}  ({days} gun)");
+    Console.WriteLine(machine is { Length: > 0 }
+        ? $"Makine   : {machine}  (yalniz bu makinede gecerli)"
+        : "Makine   : BAGLI DEGIL — key her makinede calisir! (--machine onerilir)");
     Console.WriteLine();
     Console.WriteLine(key);
     return 0;

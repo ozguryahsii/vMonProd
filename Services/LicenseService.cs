@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace vMonitor.Services;
@@ -85,6 +86,25 @@ public sealed class LicenseService
         return (true, "");
     }
 
+    /// <summary>Bu makinenin lisans bağlama kodu (hostname + Windows MachineGuid özeti).
+    /// Müşteri bu kodu satıcıya iletir; satıcı key'i bu koda bağlı üretir (vmon-lic --machine).
+    /// Koda bağlı key başka makinede GEÇERSİZDİR. Donanım/hostname değişirse yeni key gerekir.</summary>
+    public static string MachineCode
+    {
+        get
+        {
+            string guid = "";
+            try
+            {
+                guid = Microsoft.Win32.Registry.LocalMachine
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Cryptography")?.GetValue("MachineGuid")?.ToString() ?? "";
+            }
+            catch { /* okunamazsa yalnız hostname kullanılır */ }
+            var h = SHA256.HashData(Encoding.UTF8.GetBytes($"{Environment.MachineName}|{guid}".ToUpperInvariant()));
+            return $"{Convert.ToHexString(h, 0, 2)}-{Convert.ToHexString(h, 2, 2)}-{Convert.ToHexString(h, 4, 2)}";
+        }
+    }
+
     /// <summary>Key'i çözüp imzasını doğrular; kaydetmez. Setup sihirbazı ve Apply kullanır.</summary>
     public static bool TryParse(string? key, out LicenseInfo? info, out string error)
     {
@@ -117,6 +137,14 @@ public sealed class LicenseService
             // YILLIK kural savunması: 370 günden uzun ömürlü key kabul edilmez (CLI da 365 ile sınırlar).
             if ((exp - iat).TotalDays > 370) { error = "Lisans süresi izin verilen üst sınırı aşıyor."; return false; }
             if (iat > DateTime.Today.AddDays(2)) { error = "Lisans başlangıç tarihi gelecekte görünüyor (sunucu saati?)."; return false; }
+
+            // Makine bağlama: key'de makine kodu varsa bu makineninkiyle eşleşmeli (kopyalama engeli)
+            if (j.TryGetProperty("mac", out var mc))
+            {
+                var want = mc.GetString() ?? "";
+                if (!string.IsNullOrWhiteSpace(want) && !string.Equals(want, MachineCode, StringComparison.OrdinalIgnoreCase))
+                { error = $"Bu lisans başka bir makine için üretilmiş. Bu makinenin kodu: {MachineCode} — yeni key isterken bu kodu iletin."; return false; }
+            }
 
             info = new LicenseInfo
             {
