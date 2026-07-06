@@ -15,7 +15,7 @@ const empty: ServiceInput = {
   cpuThresholdPercent: null, ramThresholdPercent: null, diskThresholdPercent: null,
   keyword: null, description: null,
   alertMail: true, alertSms: false, alertWhatsapp: false, alertCall: false,
-  selfHealEnabled: false, selfHealMaxRetries: 1,
+  selfHealEnabled: false, selfHealMaxRetries: 1, selfHealAfterFailures: 1,
 };
 
 function toInput(s: ServiceItem): ServiceInput {
@@ -170,17 +170,25 @@ export function ServiceForm({
           <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
             <p className="mb-1 text-sm font-medium text-muted-foreground">Self-Healing (otomatik iyileştirme)</p>
             <p className="mb-3 text-xs text-muted-foreground">
-              Servis DOWN görülünce alarm üretmeden ÖNCE otomatik yeniden başlatma denenir.
-              Denemeler biter ve servis hâlâ down ise normal alarm akışı çalışır. Müdahaleler Denetim'e kaydedilir.
+              Belirlenen sayıda ARDIŞIK kontrol DOWN görülürse (false-positive koruması) alarm üretmeden ÖNCE
+              otomatik yeniden başlatma denenir. Denemeler biter ve servis hâlâ down ise normal alarm akışı çalışır.
+              Müdahaleler Denetim'e kaydedilir.
             </p>
             <div className="flex flex-wrap items-end gap-6">
               <Switch checked={form.selfHealEnabled} onChange={(v) => set("selfHealEnabled", v)} label="Down olunca otomatik yeniden başlat" />
               {form.selfHealEnabled && (
-                <Field label="Deneme sayısı" hint="1-10 (sorun döngüsü başına)">
-                  <Input type="number" min={1} max={10} className="w-24"
-                    value={form.selfHealMaxRetries ?? 1}
-                    onChange={(e) => set("selfHealMaxRetries", Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
-                </Field>
+                <>
+                  <Field label="Kaç ardışık down sonrası" hint="1 = ilk down'da hemen dene">
+                    <Input type="number" min={1} max={10} className="w-24"
+                      value={form.selfHealAfterFailures ?? 1}
+                      onChange={(e) => set("selfHealAfterFailures", Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
+                  </Field>
+                  <Field label="Deneme sayısı" hint="1-10 (sorun döngüsü başına)">
+                    <Input type="number" min={1} max={10} className="w-24"
+                      value={form.selfHealMaxRetries ?? 1}
+                      onChange={(e) => set("selfHealMaxRetries", Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
+                  </Field>
+                </>
               )}
             </div>
           </div>

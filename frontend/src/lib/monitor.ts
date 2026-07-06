@@ -22,6 +22,7 @@ export interface StatusService {
   description: string | null;
   selfHealEnabled: boolean;
   selfHealMaxRetries: number;
+  selfHealAfterFailures: number;
   lastSelfHealAt: string | null;
   isError: boolean;
   slow: boolean;

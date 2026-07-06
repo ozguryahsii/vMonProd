@@ -575,12 +575,14 @@
         "kapalı": "off",
         // Self-Healing (yol haritası #1)
         "Self-Healing (otomatik iyileştirme)": "Self-Healing (automatic recovery)",
-        "Servis DOWN görülünce alarm üretmeden ÖNCE otomatik yeniden başlatma denenir. Denemeler biter ve servis hâlâ down ise normal alarm akışı çalışır. Müdahaleler Denetim'e kaydedilir.": "When the service is seen DOWN, an automatic restart is attempted BEFORE raising an alarm. If retries are exhausted and it is still down, the normal alarm flow runs. Interventions are recorded in Audit.",
+        "Belirlenen sayıda ARDIŞIK kontrol DOWN görülürse (false-positive koruması) alarm üretmeden ÖNCE otomatik yeniden başlatma denenir. Denemeler biter ve servis hâlâ down ise normal alarm akışı çalışır. Müdahaleler Denetim'e kaydedilir.": "If the configured number of CONSECUTIVE checks are DOWN (false-positive protection), an automatic restart is attempted BEFORE raising an alarm. If retries are exhausted and it is still down, the normal alarm flow runs. Interventions are recorded in Audit.",
         "Down olunca otomatik yeniden başlat": "Automatically restart when down",
+        "Kaç ardışık down sonrası": "After how many consecutive downs",
+        "1 = ilk down'da hemen dene": "1 = try immediately on first down",
         "Deneme sayısı": "Retry count",
         "1-10 (sorun döngüsü başına)": "1-10 (per incident cycle)",
         "Self-Healing açık": "Self-Healing on",
-        "— down olunca": "— when down,",
+        "ardışık down sonrası": "consecutive downs, then",
         "deneme otomatik yeniden başlatma": "automatic restart attempts",
         // DB İzleme detay çekmecesi (metrik kutusuna tıklayınca canlı liste)
         "Aktif Oturumlar": "Active Sessions",

@@ -57,6 +57,7 @@ public class ApiController : ControllerBase
                 s.Description,
                 s.SelfHealEnabled,
                 s.SelfHealMaxRetries,
+                s.SelfHealAfterFailures,
                 s.LastSelfHealAt
             })
             .ToListAsync(ct);
@@ -76,7 +77,7 @@ public class ApiController : ControllerBase
                 s.ConsecutiveFailures, s.ResponseTimeThresholdMs,
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
-                s.SelfHealEnabled, s.SelfHealMaxRetries, s.LastSelfHealAt,
+                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue
                        && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,
@@ -194,7 +195,7 @@ public class ApiController : ControllerBase
                 s.Enabled, s.IntervalMinutesOverride, s.ResponseTimeThresholdMs, s.TimeoutSeconds,
                 s.CpuThresholdPercent, s.RamThresholdPercent, s.DiskThresholdPercent,
                 s.Keyword, s.Description, s.AlertMail, s.AlertSms, s.AlertWhatsapp, s.AlertCall,
-                s.SelfHealEnabled, s.SelfHealMaxRetries,
+                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures,
                 s.LastCheckedAt, s.LastIsUp, s.LastStatus, s.LastResponseTimeMs, s.LastError,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue && s.LastResponseTimeMs > s.ResponseTimeThresholdMs
             })
@@ -219,7 +220,7 @@ public class ApiController : ControllerBase
         int? CpuThresholdPercent, int? RamThresholdPercent, int? DiskThresholdPercent,
         string? Keyword, string? Description,
         bool AlertMail, bool AlertSms, bool AlertWhatsapp, bool AlertCall,
-        bool SelfHealEnabled = false, int? SelfHealMaxRetries = null);
+        bool SelfHealEnabled = false, int? SelfHealMaxRetries = null, int? SelfHealAfterFailures = null);
 
     private static string? ValidateInput(ServiceInput m, out ServiceType type)
     {
@@ -248,6 +249,7 @@ public class ApiController : ControllerBase
         var canHeal = type is ServiceType.WindowsServiceControl or ServiceType.LinuxServiceControl;
         s.SelfHealEnabled = canHeal && m.SelfHealEnabled;
         s.SelfHealMaxRetries = Math.Clamp(m.SelfHealMaxRetries ?? s.SelfHealMaxRetries, 1, 10);
+        s.SelfHealAfterFailures = Math.Clamp(m.SelfHealAfterFailures ?? s.SelfHealAfterFailures, 1, 10);
         if (!s.SelfHealEnabled) s.SelfHealAttemptsUsed = 0;
     }
 

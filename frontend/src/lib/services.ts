@@ -26,6 +26,7 @@ export interface ServiceItem {
   alertCall: boolean;
   selfHealEnabled: boolean;
   selfHealMaxRetries: number;
+  selfHealAfterFailures: number;
   lastCheckedAt: string | null;
   lastIsUp: boolean | null;
   lastStatus: number;
@@ -67,6 +68,7 @@ export interface ServiceInput {
   alertCall: boolean;
   selfHealEnabled: boolean;
   selfHealMaxRetries: number | null;
+  selfHealAfterFailures: number | null;
 }
 
 export interface ServicesMeta {

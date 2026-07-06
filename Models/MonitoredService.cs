@@ -106,6 +106,9 @@ public class MonitoredService
     // ---- SELF-HEALING (yalnız WindowsServiceControl/LinuxServiceControl) ----
     /// <summary>Down görülünce alarmdan ÖNCE otomatik yeniden başlatma dene.</summary>
     public bool SelfHealEnabled { get; set; } = false;
+    /// <summary>Kaç ARDIŞIK down kontrolünden sonra iyileştirme başlasın (1-10).
+    /// 1 = ilk down'da hemen dene; 2+ = false-positive koruması (tek seferlik dalgalanmada restart atılmaz).</summary>
+    public int SelfHealAfterFailures { get; set; } = 1;
     /// <summary>Sorun döngüsü başına en fazla kaç yeniden başlatma denemesi yapılır (1-10).</summary>
     public int SelfHealMaxRetries { get; set; } = 1;
     /// <summary>Süregelen sorun döngüsünde harcanan deneme sayısı (UP olunca sıfırlanır).</summary>

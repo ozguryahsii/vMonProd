@@ -45,14 +45,25 @@ public class CheckRunner
         var outcome = await checker.CheckAsync(svc, svc.Credential, ct);
 
         // ---- SELF-HEALING (yol haritası #1): yalnız Windows/Linux servis kontrol tiplerinde ----
-        // Down görülünce alarmdan ÖNCE otomatik yeniden başlatma denenir; başarılıysa kontrol tekrarlanır
-        // ve döngü kayda "kendini iyileştirdi" olarak geçer. Deneme hakkı bitince normal alarm akışı çalışır.
+        // Kural: X ARDIŞIK kontrol down görülürse (false-positive koruması) → Y kez yeniden başlatma
+        // dene → hâlâ down ise normal alarm akışı. Başarılıysa döngü "kendini iyileştirdi" olarak kayda geçer.
         bool healRetryPending = false;
         if (outcome.Status == CheckStatus.Down && svc.SelfHealEnabled
             && svc.Type is ServiceType.WindowsServiceControl or ServiceType.LinuxServiceControl)
         {
             var maxRetries = Math.Clamp(svc.SelfHealMaxRetries, 1, 10);
-            if (svc.SelfHealAttemptsUsed < maxRetries)
+            var startAfter = Math.Clamp(svc.SelfHealAfterFailures, 1, 10);
+            var consecutiveNow = svc.ConsecutiveFailures + 1;   // bu kontrol dahil ardışık down sayısı
+
+            if (consecutiveNow < startAfter)
+            {
+                // Henüz iyileştirme eşiğine gelinmedi: restart atılmaz, alarm da bekletilir
+                // (kullanıcı kuralı: önce dene, alarm en son). Sonraki down kontrolünde tekrar bakılır.
+                healRetryPending = true;
+                _logger.LogInformation("Self-healing bekliyor: {Svc} down {N}/{X} (eşik dolunca restart denenecek)",
+                    svc.Name, consecutiveNow, startAfter);
+            }
+            else if (svc.SelfHealAttemptsUsed < maxRetries)
             {
                 svc.SelfHealAttemptsUsed++;
                 var attemptNo = svc.SelfHealAttemptsUsed;
