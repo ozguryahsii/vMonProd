@@ -103,6 +103,16 @@ public class MonitoredService
     /// <summary>Sesli arama alarmı (ileride; şimdilik yalnızca işaret).</summary>
     public bool AlertCall { get; set; } = false;
 
+    // ---- SELF-HEALING (yalnız WindowsServiceControl/LinuxServiceControl) ----
+    /// <summary>Down görülünce alarmdan ÖNCE otomatik yeniden başlatma dene.</summary>
+    public bool SelfHealEnabled { get; set; } = false;
+    /// <summary>Sorun döngüsü başına en fazla kaç yeniden başlatma denemesi yapılır (1-10).</summary>
+    public int SelfHealMaxRetries { get; set; } = 1;
+    /// <summary>Süregelen sorun döngüsünde harcanan deneme sayısı (UP olunca sıfırlanır).</summary>
+    public int SelfHealAttemptsUsed { get; set; } = 0;
+    /// <summary>Son otomatik iyileştirme müdahalesinin zamanı (UTC).</summary>
+    public DateTime? LastSelfHealAt { get; set; }
+
     /// <summary>Keyword alanını ayrı ayrı etiketlere böler (virgül ayraçlı, tekrarsız).</summary>
     public static List<string> SplitKeywords(string? keyword) =>
         string.IsNullOrWhiteSpace(keyword)

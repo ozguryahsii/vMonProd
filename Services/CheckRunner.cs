@@ -16,7 +16,7 @@ public class CheckRunner
     private readonly ILogger<CheckRunner> _logger;
     private readonly Dictionary<ServiceType, IServiceChecker> _checkers;
 
-    public CheckRunner(AppDbContext db, EmailService email, SmsService sms, WhatsappService whatsapp, IEnumerable<IServiceChecker> checkers, ILogger<CheckRunner> logger, LicenseService license)
+    public CheckRunner(AppDbContext db, EmailService email, SmsService sms, WhatsappService whatsapp, IEnumerable<IServiceChecker> checkers, ILogger<CheckRunner> logger, LicenseService license, AuditService audit)
     {
         _db = db;
         _email = email;
@@ -24,10 +24,12 @@ public class CheckRunner
         _whatsapp = whatsapp;
         _logger = logger;
         _license = license;
+        _audit = audit;
         _checkers = checkers.ToDictionary(c => c.Type);
     }
 
     private readonly LicenseService _license;
+    private readonly AuditService _audit;
 
     /// <summary>Lisans: Basic paket yalnız e-posta bildirimi destekler — SMS/WhatsApp gönderimi atlanır.</summary>
     private bool EmailOnly => _license.Current?.EmailOnlyNotifications == true;
@@ -41,6 +43,51 @@ public class CheckRunner
             throw new InvalidOperationException($"Checker yok: {svc.Type}");
 
         var outcome = await checker.CheckAsync(svc, svc.Credential, ct);
+
+        // ---- SELF-HEALING (yol haritası #1): yalnız Windows/Linux servis kontrol tiplerinde ----
+        // Down görülünce alarmdan ÖNCE otomatik yeniden başlatma denenir; başarılıysa kontrol tekrarlanır
+        // ve döngü kayda "kendini iyileştirdi" olarak geçer. Deneme hakkı bitince normal alarm akışı çalışır.
+        bool healRetryPending = false;
+        if (outcome.Status == CheckStatus.Down && svc.SelfHealEnabled
+            && svc.Type is ServiceType.WindowsServiceControl or ServiceType.LinuxServiceControl)
+        {
+            var maxRetries = Math.Clamp(svc.SelfHealMaxRetries, 1, 10);
+            if (svc.SelfHealAttemptsUsed < maxRetries)
+            {
+                svc.SelfHealAttemptsUsed++;
+                var attemptNo = svc.SelfHealAttemptsUsed;
+                svc.LastSelfHealAt = DateTime.UtcNow;
+                _logger.LogWarning("Self-healing: {Svc} down — otomatik yeniden başlatma {N}/{Max}", svc.Name, attemptNo, maxRetries);
+
+                var act = svc.Type == ServiceType.WindowsServiceControl
+                    ? await Task.Run(() => ServiceControl.WindowsAction(svc, svc.Credential, "restart"), ct)
+                    : svc.Credential == null
+                        ? new ServiceControl.ActionResult(false, "Kimlik bilgisi tanımlı değil")
+                        : await Task.Run(() => ServiceControl.LinuxAction(svc, svc.Credential, "restart"), ct);
+
+                if (act.Ok)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), ct);   // servisin ayağa kalkması için kısa bekleme
+                    outcome = await checker.CheckAsync(svc, svc.Credential, ct);
+                }
+
+                if (outcome.IsUp)
+                {
+                    await _audit.LogAsync("selfheal.success", svc.Name,
+                        $"Servis down görüldü; otomatik yeniden başlatma ile düzeldi (deneme {attemptNo}/{maxRetries}).",
+                        true, user: "self-healing");
+                }
+                else
+                {
+                    // Deneme hakkı kaldıysa bu döngüde alarm bastırılır (sonraki kontrolde tekrar denenir)
+                    healRetryPending = svc.SelfHealAttemptsUsed < maxRetries;
+                    await _audit.LogAsync("selfheal.fail", svc.Name,
+                        $"Otomatik yeniden başlatma {attemptNo}/{maxRetries} başarısız" +
+                        (act.Ok ? " (servis hâlâ down)." : $": {act.Message}"),
+                        false, user: "self-healing");
+                }
+            }
+        }
 
         // Yanıt süresi eşiği aşıldıysa UP olsa bile uyarı say (DOWN yapmaz, sadece işaretler)
         var slow = outcome.IsUp && svc.ResponseTimeThresholdMs.HasValue
@@ -119,6 +166,7 @@ public class CheckRunner
         if (outcome.IsUp)
         {
             svc.ConsecutiveFailures = 0;
+            svc.SelfHealAttemptsUsed = 0;   // self-healing deneme hakkı yeni sorun döngüsü için tazelenir
             if (svc.DownAlertSent)
             {
                 svc.DownAlertSent = false;
@@ -146,7 +194,8 @@ public class CheckRunner
             svc.ConsecutiveFailures++;
 
             // Eşik dolduktan sonra HER sorunlu kontrolde uyarı gider (servis düzelene kadar).
-            if (svc.ConsecutiveFailures >= settings.FailureThreshold)
+            // Self-healing deneme hakkı sürüyorsa alarm BASTIRILIR (kullanıcı kuralı: önce dene, sonra alarm).
+            if (!healRetryPending && svc.ConsecutiveFailures >= settings.FailureThreshold)
             {
                 svc.DownAlertSent = true;
                 if (settings.EmailEnabled && svc.AlertMail)

@@ -54,7 +54,10 @@ public class ApiController : ControllerBase
                 s.LastMaxDiskPercent,
                 s.CapacityInfo,
                 s.LastStatus,
-                s.Description
+                s.Description,
+                s.SelfHealEnabled,
+                s.SelfHealMaxRetries,
+                s.LastSelfHealAt
             })
             .ToListAsync(ct);
 
@@ -73,6 +76,7 @@ public class ApiController : ControllerBase
                 s.ConsecutiveFailures, s.ResponseTimeThresholdMs,
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
+                s.SelfHealEnabled, s.SelfHealMaxRetries, s.LastSelfHealAt,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue
                        && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,
@@ -190,6 +194,7 @@ public class ApiController : ControllerBase
                 s.Enabled, s.IntervalMinutesOverride, s.ResponseTimeThresholdMs, s.TimeoutSeconds,
                 s.CpuThresholdPercent, s.RamThresholdPercent, s.DiskThresholdPercent,
                 s.Keyword, s.Description, s.AlertMail, s.AlertSms, s.AlertWhatsapp, s.AlertCall,
+                s.SelfHealEnabled, s.SelfHealMaxRetries,
                 s.LastCheckedAt, s.LastIsUp, s.LastStatus, s.LastResponseTimeMs, s.LastError,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue && s.LastResponseTimeMs > s.ResponseTimeThresholdMs
             })
@@ -213,7 +218,8 @@ public class ApiController : ControllerBase
         int? IntervalMinutesOverride, int? ResponseTimeThresholdMs, int TimeoutSeconds,
         int? CpuThresholdPercent, int? RamThresholdPercent, int? DiskThresholdPercent,
         string? Keyword, string? Description,
-        bool AlertMail, bool AlertSms, bool AlertWhatsapp, bool AlertCall);
+        bool AlertMail, bool AlertSms, bool AlertWhatsapp, bool AlertCall,
+        bool SelfHealEnabled = false, int? SelfHealMaxRetries = null);
 
     private static string? ValidateInput(ServiceInput m, out ServiceType type)
     {
@@ -238,6 +244,11 @@ public class ApiController : ControllerBase
         s.Keyword = string.IsNullOrWhiteSpace(m.Keyword) ? null : m.Keyword.Trim();
         s.Description = string.IsNullOrWhiteSpace(m.Description) ? null : m.Description.Trim();
         s.AlertMail = m.AlertMail; s.AlertSms = m.AlertSms; s.AlertWhatsapp = m.AlertWhatsapp; s.AlertCall = m.AlertCall;
+        // Self-healing yalnız Windows/Linux servis kontrol tiplerinde etkinleşebilir
+        var canHeal = type is ServiceType.WindowsServiceControl or ServiceType.LinuxServiceControl;
+        s.SelfHealEnabled = canHeal && m.SelfHealEnabled;
+        s.SelfHealMaxRetries = Math.Clamp(m.SelfHealMaxRetries ?? s.SelfHealMaxRetries, 1, 10);
+        if (!s.SelfHealEnabled) s.SelfHealAttemptsUsed = 0;
     }
 
     [HttpPost("services")]

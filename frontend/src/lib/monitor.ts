@@ -20,6 +20,9 @@ export interface StatusService {
   capacityInfo: string | null;
   lastStatus: number;
   description: string | null;
+  selfHealEnabled: boolean;
+  selfHealMaxRetries: number;
+  lastSelfHealAt: string | null;
   isError: boolean;
   slow: boolean;
   downSince: string | null;

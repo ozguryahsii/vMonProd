@@ -144,6 +144,14 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
             </div>
           </div>
 
+          {service.selfHealEnabled && (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-emerald-400">Self-Healing açık</span>
+              {" — down olunca "}{service.selfHealMaxRetries}{" deneme otomatik yeniden başlatma"}
+              {service.lastSelfHealAt && <span> · son müdahale: {dt(service.lastSelfHealAt)}</span>}
+            </div>
+          )}
+
           {service.capacityInfo && (
             <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">Atanan kaynaklar: </span>{service.capacityInfo}
