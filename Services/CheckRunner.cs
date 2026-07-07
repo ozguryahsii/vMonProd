@@ -47,8 +47,10 @@ public class CheckRunner
         // ---- SELF-HEALING (yol haritası #1): yalnız Windows/Linux servis kontrol tiplerinde ----
         // Kural: X ARDIŞIK kontrol down görülürse (false-positive koruması) → Y kez yeniden başlatma
         // dene → hâlâ down ise normal alarm akışı. Başarılıysa döngü "kendini iyileştirdi" olarak kayda geçer.
+        // Lisans: Self-Healing yalnız Standard/Enterprise — Basic'e düşen kurulumda açık bayraklar da işlemez.
         bool healRetryPending = false;
         if (outcome.Status == CheckStatus.Down && svc.SelfHealEnabled
+            && _license.Current is { SelfHealAllowed: true }
             && svc.Type is ServiceType.WindowsServiceControl or ServiceType.LinuxServiceControl)
         {
             var maxRetries = Math.Clamp(svc.SelfHealMaxRetries, 1, 10);

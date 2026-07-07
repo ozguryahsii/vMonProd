@@ -33,6 +33,8 @@ public sealed class LicenseInfo
     public bool SqliteOnly => Edition == LicenseEdition.Basic;
     public bool EmailOnlyNotifications => Edition == LicenseEdition.Basic;
     public bool SiemAllowed => Edition != LicenseEdition.Basic;
+    /// <summary>Self-Healing (otomatik yeniden başlatma) yalnız Standard/Enterprise'da (2026-07-07 kararı).</summary>
+    public bool SelfHealAllowed => Edition != LicenseEdition.Basic;
 }
 
 public sealed class LicenseService

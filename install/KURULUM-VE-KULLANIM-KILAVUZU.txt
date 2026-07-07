@@ -148,14 +148,16 @@ vMon üç pakette sunulur. TÜM lisanslar YILLIK yenilenir; süresiz/tek seferli
 lisans yoktur. Süre dolduğunda (ücretsiz Basic dahil) uygulama yeni bir key
 girilene kadar kilitlenir.
 
-  PAKET       İZLEME     KULLANICI  VERİTABANI      BİLDİRİM        DASHBOARD  SIEM
-  ---------   --------   ---------  --------------  --------------  ---------  ----
-  Basic       40         1          Yalnız SQLite   Yalnız E-posta  5          Yok
+  PAKET       İZLEME     KULLANICI  VERİTABANI      BİLDİRİM        DASHBOARD  SIEM  SELF-HEALING
+  ---------   --------   ---------  --------------  --------------  ---------  ----  ------------
+  Basic       40         1          Yalnız SQLite   Yalnız E-posta  5          Yok   Yok
   (ücretsiz)
-  Standard    200        5          Tümü            Tüm kanallar    Sınırsız   Var
-  Enterprise  Sınırsız   Sınırsız   Tümü            Tüm kanallar    Sınırsız   Var
+  Standard    200        5          Tümü            Tüm kanallar    Sınırsız   Var   Var
+  Enterprise  Sınırsız   Sınırsız   Tümü            Tüm kanallar    Sınırsız   Var   Var
 
   Not: "Tüm kanallar" = E-posta + SMS + WhatsApp + sesli arama/IVR.
+  Self-Healing: Windows/Linux servis izlemelerinde down görülünce alarmdan önce
+  otomatik yeniden başlatma (ayarlanabilir ardışık-down eşiği ve deneme sayısı).
 
 5.1) LİSANS KEY NASIL ALINIR?
   Her kurulum, o makineye özel bir "Makine Kodu" üretir (örn. F7F1-3372-A392).

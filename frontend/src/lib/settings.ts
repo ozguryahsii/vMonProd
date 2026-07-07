@@ -62,7 +62,7 @@ export interface LicenseState {
     edition: "Basic" | "Standard" | "Enterprise";
     company: string; issued: string; expires: string; daysLeft: number;
     maxMonitors: number | null; maxUsers: number | null; maxDashboards: number | null;
-    sqliteOnly: boolean; emailOnly: boolean; siem: boolean;
+    sqliteOnly: boolean; emailOnly: boolean; siem: boolean; selfHeal: boolean;
   } | null;
 }
 export const getLicense = (signal?: AbortSignal) => apiGet<LicenseState>("/license", signal);

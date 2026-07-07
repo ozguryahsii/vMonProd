@@ -7,6 +7,7 @@ import {
   TYPE_META, TYPE_GROUP_ORDER, CONTROL_TYPES,
   createService, updateService,
 } from "@/lib/services";
+import { useMe } from "@/hooks/useMe";
 
 const empty: ServiceInput = {
   name: "", type: "Http", target: "", port: null, extra: null,
@@ -38,6 +39,9 @@ export function ServiceForm({
   const [form, setForm] = useState<ServiceInput>(empty);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Self-Healing yalnız Standard/Enterprise lisansta (Basic'te kilit + yükseltme notu)
+  const { me } = useMe();
+  const selfHealLicensed = me?.license?.edition !== "Basic";
 
   useEffect(() => {
     if (open) { setForm(service ? toInput(service) : empty); setErr(null); }
@@ -174,10 +178,17 @@ export function ServiceForm({
               otomatik yeniden başlatma denenir. Denemeler biter ve servis hâlâ down ise normal alarm akışı çalışır.
               Müdahaleler Denetim'e kaydedilir.
             </p>
-            {/* Düzen: üstte anahtar; altında yan yana Deneme sayısı + Kaç ardışık down sonrası.
+            {!selfHealLicensed && (
+              <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                Self-Healing özelliği Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.
+              </div>
+            )}
+            {/* Düzen: üstte anahtar; altında yan yana Kaç ardışık down sonrası + Deneme sayısı.
                 Sayı kutuları yazarken serbesttir (silinebilir); sınırlar (1-10) kayıtta uygulanır. */}
-            <Switch checked={form.selfHealEnabled} onChange={(v) => set("selfHealEnabled", v)} label="Down olunca otomatik yeniden başlat" />
-            {form.selfHealEnabled && (
+            <Switch checked={form.selfHealEnabled && selfHealLicensed}
+              onChange={(v) => { if (selfHealLicensed) set("selfHealEnabled", v); }}
+              label="Down olunca otomatik yeniden başlat" />
+            {form.selfHealEnabled && selfHealLicensed && (
               <div className="mt-3 grid grid-cols-2 gap-4">
                 <Field label="Kaç ardışık down sonrası" hint="1 = ilk down'da hemen dene">
                   <Input type="number" min={1} max={10}

@@ -387,6 +387,7 @@ export function LicenseCard({ onChanged }: { onChanged?: () => void }) {
               <span>Veritabanı: <b className="text-foreground">{lic.sqliteOnly ? "yalnız SQLite" : "tümü"}</b></span>
               <span>Bildirim: <b className="text-foreground">{lic.emailOnly ? "yalnız e-posta" : "tüm kanallar"}</b></span>
               <span>SIEM: <b className="text-foreground">{lic.siem ? "açık" : "kapalı"}</b></span>
+              <span>Self-Healing: <b className="text-foreground">{lic.selfHeal ? "açık" : "kapalı"}</b></span>
             </div>
           </div>
         ) : (

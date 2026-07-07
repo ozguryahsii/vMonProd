@@ -266,6 +266,8 @@ public class ApiController : ControllerBase
         }
         var err = ValidateInput(m, out var type);
         if (err != null) return BadRequest(err);
+        if (m.SelfHealEnabled && _lic.Current is { SelfHealAllowed: false })
+            return BadRequest("Lisans: Self-Healing özelliği Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.");
         var s = new MonitoredService();
         Apply(s, m, type);
         _db.Services.Add(s);
@@ -280,6 +282,8 @@ public class ApiController : ControllerBase
         if (!Can(Perms.ServicesManage)) return Forbid403();
         var err = ValidateInput(m, out var type);
         if (err != null) return BadRequest(err);
+        if (m.SelfHealEnabled && _lic.Current is { SelfHealAllowed: false })
+            return BadRequest("Lisans: Self-Healing özelliği Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.");
         var s = await _db.Services.FindAsync(new object[] { id }, ct);
         if (s == null) return NotFound("Servis bulunamadı");
         Apply(s, m, type);
@@ -1119,7 +1123,8 @@ public class ApiController : ControllerBase
                     maxMonitors = l.MaxMonitors == int.MaxValue ? (int?)null : l.MaxMonitors,
                     maxUsers = l.MaxUsers == int.MaxValue ? (int?)null : l.MaxUsers,
                     maxDashboards = l.MaxDashboards == int.MaxValue ? (int?)null : l.MaxDashboards,
-                    sqliteOnly = l.SqliteOnly, emailOnly = l.EmailOnlyNotifications, siem = l.SiemAllowed
+                    sqliteOnly = l.SqliteOnly, emailOnly = l.EmailOnlyNotifications, siem = l.SiemAllowed,
+                    selfHeal = l.SelfHealAllowed
                 }
                 : null
         });

@@ -582,6 +582,7 @@
         "Deneme sayısı": "Retry count",
         "1-10 (sorun döngüsü başına)": "1-10 (per incident cycle)",
         "Self-Healing açık": "Self-Healing on",
+        "Self-Healing özelliği Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.": "Self-Healing is available in the Standard and Enterprise editions. It cannot be enabled in Basic.",
         "ardışık down sonrası": "consecutive downs, then",
         "deneme otomatik yeniden başlatma": "automatic restart attempts",
         // Yol haritası #2 — Yaklaşan Disk Dolumları
