@@ -250,7 +250,6 @@ export function Settings() {
       {/* Yönetim: lisans, bildirim kanalları, yedekler, logo (form dışı — anında uygulanır) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <UpdateCard />
           <LicenseCard onChanged={reloadMe} />
           <ChannelsCard />
         </div>
@@ -259,6 +258,9 @@ export function Settings() {
           <LogoCard current={s.loginLogoFile} onChanged={() => getSettings().then(setS).catch(() => {})} />
         </div>
       </div>
+
+      {/* Güncelleme: en altta TAM GENİŞLİK (sürüm notları geniş görünsün) */}
+      <UpdateCard />
 
       {/* Kaydet çubuğu */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/80 px-5 py-3 backdrop-blur lg:left-44">

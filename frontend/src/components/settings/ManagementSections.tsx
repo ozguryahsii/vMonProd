@@ -335,6 +335,33 @@ export function LogoCard({ current, onChanged }: { current: string; onChanged: (
   );
 }
 
+/** GitHub release notlarını (markdown) okunur satırlara çevirir: linkler tıklanabilir,
+ *  **kalın** temizlenir, madde işaretleri korunur. Ağır bir markdown motoru gerektirmez. */
+function renderNotes(md: string) {
+  const linkRe = /(https?:\/\/[^\s)]+)/g;
+  return md.split(/\r?\n/).map((raw, i) => {
+    const line = raw.replace(/\*\*/g, "").trimEnd();
+    if (line.trim() === "") return <div key={i} className="h-2" />;
+    const bullet = /^\s*[-*]\s+/.test(line);
+    const text = bullet ? line.replace(/^\s*[-*]\s+/, "") : line;
+    const parts = text.split(linkRe);
+    return (
+      <div key={i} className={cn("break-words", bullet && "flex gap-1.5")}>
+        {bullet && <span className="mt-1 text-muted-foreground">•</span>}
+        <span>
+          {parts.map((p, j) =>
+            /^https?:\/\//.test(p) ? (
+              <a key={j} href={p} target="_blank" rel="noreferrer" className="text-sky-400 underline underline-offset-2 hover:text-sky-300">{p}</a>
+            ) : (
+              <span key={j}>{p}</span>
+            )
+          )}
+        </span>
+      </div>
+    );
+  });
+}
+
 /* ================= Self-Update (yol haritası #2.5) ================= */
 /** Ayarlar > Güncelleme: en son release'i denetle → sürüm notlarını göster → onayla → uygulama
  *  kendini günceller (ayrık güncelleyici servisi durdurup dosyaları değiştirir ve yeniden başlatır). */
@@ -405,9 +432,9 @@ export function UpdateCard() {
         )}
 
         {res && res.ok && res.isNewer && !updating && (
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="rounded-md bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-400">{res.latest}</span>
+              <span className="rounded-md bg-sky-500/15 px-2 py-0.5 text-sm font-semibold text-sky-400">{res.latest}</span>
               <span className="text-xs text-muted-foreground">
                 {res.sizeMb ? `${res.sizeMb} MB` : ""}{res.publishedAt ? ` · ${new Date(res.publishedAt).toLocaleDateString()}` : ""}
               </span>
@@ -416,9 +443,11 @@ export function UpdateCard() {
               </Button>
             </div>
             {res.notes && (
-              <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-border/40 bg-background/40 p-2">
-                <p className="mb-1 text-xs font-semibold text-muted-foreground">Sürüm notları</p>
-                <pre className="whitespace-pre-wrap font-sans text-xs text-muted-foreground">{res.notes}</pre>
+              <div className="mt-3 rounded-md border border-border/40 bg-background/40 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sürüm notları</p>
+                <div className="max-h-[420px] space-y-1 overflow-y-auto text-sm leading-relaxed text-foreground/90">
+                  {renderNotes(res.notes)}
+                </div>
               </div>
             )}
           </div>
@@ -434,6 +463,8 @@ export function UpdateCard() {
         open={confirmOpen}
         title="Uygulamayı güncelle"
         message={`${res?.current} → ${res?.latest} güncellemesi indirilecek ve uygulama yeniden başlatılacak. Devam edilsin mi?`}
+        confirmLabel="Güncelle"
+        danger={false}
         loading={false}
         onConfirm={doApply}
         onCancel={() => setConfirmOpen(false)}

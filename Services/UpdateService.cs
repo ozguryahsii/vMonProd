@@ -40,6 +40,34 @@ public sealed class UpdateService
         var notes = root.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "";
         var published = root.TryGetProperty("published_at", out var p) ? p.GetString() : null;
 
+        // GitHub'ın otomatik notu çoğu zaman yalnız "Full Changelog" linki olur. Kullanıcı TAM detay ister:
+        // mevcut sürümden bu sürüme kadarki commit başlıklarını compare API'siyle ekle (madde listesi).
+        try
+        {
+            var from = VersionInfo.AppVersion;
+            if (VersionInfo.IsNewer(tag, from) && from != tag)
+            {
+                var cmpJson = await http.GetStringAsync($"https://api.github.com/repos/{Repo}/compare/{from}...{tag}", ct);
+                using var cd = JsonDocument.Parse(cmpJson);
+                if (cd.RootElement.TryGetProperty("commits", out var commits) && commits.GetArrayLength() > 0)
+                {
+                    var lines = new List<string>();
+                    foreach (var c in commits.EnumerateArray())
+                    {
+                        var msg = c.GetProperty("commit").GetProperty("message").GetString() ?? "";
+                        var first = msg.Split('\n')[0].Trim();
+                        if (first.Length == 0 || first.StartsWith("Merge ", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (first.Length > 160) first = first[..160] + "…";
+                        lines.Add("- " + first);
+                    }
+                    if (lines.Count > 0)
+                        notes = $"Bu güncellemedeki değişiklikler ({from} → {tag}):\n" + string.Join("\n", lines)
+                              + (string.IsNullOrWhiteSpace(notes) ? "" : "\n\n" + notes);
+                }
+            }
+        }
+        catch { /* compare erişilemezse yalnız GitHub'ın body'si gösterilir */ }
+
         string? assetUrl = null, assetName = null, digest = null;
         double sizeMb = 0;
         if (root.TryGetProperty("assets", out var assets))
