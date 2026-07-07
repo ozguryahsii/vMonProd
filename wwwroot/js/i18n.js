@@ -538,16 +538,21 @@
         "örn. mail.firma.local veya outlook.office365.com": "e.g. mail.company.local or outlook.office365.com"
     };
 
-    const PREFIX = {
-        "Son yenileme: ": "Last refresh: ",
-        "Kesintiler (": "Outages (",
-        "Yanıt Süresi (": "Response Time (",
-        "son: ": "last: ",
-        "son müdahale: ": "last intervention: ",
-        "Toplu Düzenle (": "Bulk Edit (",
-        // Lisans Fazı L1 — API hata mesajları (dinamik sayılı; öneki çevrilir)
-        "Lisans limiti: ": "License limit: ",
-        "Lisans: ": "License: ",
+    // DÜZELTME: aşağıdaki DÜZ METİN girişleri yanlışlıkla PREFIX'e yazılmıştı — startsWith kısa
+    // anahtarları ("Kullanıcı", "Durum", "Lisans"...) EN modda daha uzun metinleri bozuyordu.
+    // TEXT'e taşındı (NORMMAP bu satırdan SONRA kurulduğu için çeviriler tam çalışır).
+    Object.assign(TEXT, {
+        // Ayarlar > Güncelleme kartı (self-update)
+        "Güncelleme": "Update",
+        "Mevcut sürüm:": "Current version:",
+        "— tek tıkla yeni sürüme geçin": "— upgrade with one click",
+        "Güncellemeleri Denetle": "Check for Updates",
+        "Paket indiriliyor ve doğrulanıyor…": "Downloading and verifying package…",
+        "Uygulama yeniden başlatılıyor — sayfa otomatik yenilenecek…": "Application is restarting — the page will refresh automatically…",
+        "Güncelle ve Yeniden Başlat": "Update and Restart",
+        "Sürüm notları": "Release notes",
+        "Uygulamayı güncelle": "Update application",
+        "Güncelleme sırasında veritabanı ve ayarlar korunur; servis birkaç saniyeliğine yeniden başlar. İşlem günlüğü: Data\\selfupdate.log": "The database and settings are preserved during the update; the service restarts for a few seconds. Log: Data\\selfupdate.log",
         // Ayarlar > Lisans kartı
         "Lisans": "License",
         "Paket yükseltme/düşürme — yeni lisans key'i buradan uygulanır (Basic / Standard / Enterprise)": "Upgrade/downgrade — apply a new license key here (Basic / Standard / Enterprise)",
@@ -565,7 +570,6 @@
         "Dashboard: ": "Dashboards: ",
         "Veritabanı: ": "Database: ",
         "Bildirim: ": "Notifications: ",
-        "SIEM: ": "SIEM: ",
         "sınırsız": "unlimited",
         "yalnız SQLite": "SQLite only",
         "tümü": "all",
@@ -606,24 +610,36 @@
         "Yenile": "Refresh",
         "Kullanıcı": "User",
         "Makine": "Machine",
-        "Program": "Program",
         "Süre (sn)": "Duration (s)",
         "Bloklayan SID": "Blocking SID",
         "Bekleme (sn)": "Waiting (s)",
         "Olay": "Event",
         "Sorgu": "Query",
-        "Tablespace": "Tablespace",
         "Durum": "Status",
         "İçerik": "Contents",
         "Oturum": "Session",
         "Bloklayan": "Blocker",
         "Bekleme Türü": "Wait Type",
         "Kurtarma Modeli": "Recovery Model",
-        "Host": "Host",
         "Komut": "Command",
-        "Thread": "Thread",
         "Başlangıç": "Started",
-        "Sorgu metni için GRANT SELECT ON gv_$sql gerekir.": "Query text requires GRANT SELECT ON gv_$sql.",
+        "Sorgu metni için GRANT SELECT ON gv_$sql gerekir.": "Query text requires GRANT SELECT ON gv_$sql."
+    });
+
+    const PREFIX = {
+        "Son yenileme: ": "Last refresh: ",
+        "Kesintiler (": "Outages (",
+        "Yanıt Süresi (": "Response Time (",
+        "son: ": "last: ",
+        "son müdahale: ": "last intervention: ",
+        "Toplu Düzenle (": "Bulk Edit (",
+        // Lisans + self-update — dinamik kuyruklu mesajlar (yalnız GERÇEK önekler!)
+        "Lisans limiti: ": "License limit: ",
+        "Lisans: ": "License: ",
+        "Uygulamanız güncel (": "You are up to date (",
+        "Zaten güncelsiniz (": "Already up to date (",
+        "Güncelleme başlatıldı: ": "Update started: ",
+        "Güncelleme sunucusuna erişilemedi: ": "Could not reach the update server: ",
         // DB İzleme Fazı — drawer grafik başlıkları: "<metrik> (N kontrol)"
         // (önek çevrilir → ikinci geçişte " kontrol)" soneki çevrilir; "Offline Tablespace" TR=EN, girilmez)
         "Bağlantı & Saat (": "Connection & Clock (",

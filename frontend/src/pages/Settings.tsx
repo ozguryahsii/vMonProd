@@ -12,7 +12,7 @@ import {
   type AppSettings,
 } from "@/lib/settings";
 import { getCredentials, type CredentialRow } from "@/lib/admin";
-import { ChannelsCard, BackupsCard, LogoCard, LicenseCard } from "@/components/settings/ManagementSections";
+import { ChannelsCard, BackupsCard, LogoCard, LicenseCard, UpdateCard } from "@/components/settings/ManagementSections";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
 
@@ -250,6 +250,7 @@ export function Settings() {
       {/* Yönetim: lisans, bildirim kanalları, yedekler, logo (form dışı — anında uygulanır) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
+          <UpdateCard />
           <LicenseCard onChanged={reloadMe} />
           <ChannelsCard />
         </div>

@@ -1036,6 +1036,7 @@ public class ApiController : ControllerBase
             theme,
             lang,
             companyName = settings.CompanyName,
+            version = VersionInfo.AppVersion,   // self-update sonrası UI yeni sürümü buradan fark eder
             // Lisans Fazı L1: sol üst rozet + Hakkında kalan gün + arayüz kilitleri buradan beslenir
             license = _lic.Current is { } lic
                 ? new
@@ -1112,6 +1113,44 @@ public class ApiController : ControllerBase
     // ================= Faz G: Ayarlar (React) =================
 
     /// <summary>Tüm ayarlar (yalnız admin). Sırlar asla dönmez — yalnız has* bayrakları.</summary>
+    /// <summary>Self-update: en son release'i denetle (Ayarlar > Güncelleme). Yalnız admin.</summary>
+    [HttpGet("update/check")]
+    public async Task<IActionResult> UpdateCheck([FromServices] UpdateService upd, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        try
+        {
+            var r = await upd.CheckAsync(ct);
+            await _audit.LogAsync("update.check", r.Latest, $"Mevcut {r.Current}, en son {r.Latest}, yeni mi: {r.IsNewer}", ct: ct);
+            return Ok(new { ok = true, r.Current, r.Latest, r.IsNewer, r.Notes, r.SizeMb, r.PublishedAt });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { ok = false, message = "Güncelleme sunucusuna erişilemedi: " + ex.GetBaseException().Message });
+        }
+    }
+
+    /// <summary>Self-update: onaylanan güncellemeyi uygula — indirir, doğrular, ayrık güncelleyiciyi başlatır.
+    /// Birkaç saniye içinde servis durdurulup yeni sürümle başlatılır. Yalnız admin.</summary>
+    [HttpPost("update/apply")]
+    public async Task<IActionResult> UpdateApply([FromServices] UpdateService upd, CancellationToken ct)
+    {
+        var s = await _settings.GetAsync(ct);
+        if (!AdminAllowed(s)) return Forbid403();
+        try
+        {
+            var (ok, message) = await upd.ApplyAsync(ct);
+            await _audit.LogAsync("update.apply", VersionInfo.AppVersion, message, ok,
+                user: User?.Identity?.Name ?? "admin", ct: ct);
+            return Ok(new { ok, message });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { ok = false, message = "Güncelleme başlatılamadı: " + ex.GetBaseException().Message });
+        }
+    }
+
     /// <summary>Mevcut lisans durumu + bu makinenin kodu (Ayarlar > Lisans kartı). Yalnız admin.</summary>
     [HttpGet("license")]
     public async Task<IActionResult> LicenseGet(CancellationToken ct)

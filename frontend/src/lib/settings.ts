@@ -68,3 +68,17 @@ export interface LicenseState {
 export const getLicense = (signal?: AbortSignal) => apiGet<LicenseState>("/license", signal);
 export const applyLicense = (key: string) =>
   apiSend<{ ok: boolean; edition: string; expires: string; message: string; warn: string | null }>("POST", "/license", { key });
+
+// ---- Self-update (Ayarlar > Güncelleme kartı) ----
+export interface UpdateCheck {
+  ok: boolean;
+  message?: string;          // ok=false ise hata
+  current?: string;
+  latest?: string;
+  isNewer?: boolean;
+  notes?: string;
+  sizeMb?: number;
+  publishedAt?: string | null;
+}
+export const checkUpdate = (signal?: AbortSignal) => apiGet<UpdateCheck>("/update/check", signal);
+export const applyUpdate = () => apiSend<{ ok: boolean; message: string }>("POST", "/update/apply");

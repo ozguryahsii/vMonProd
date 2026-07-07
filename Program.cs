@@ -116,6 +116,9 @@ builder.Services.AddSingleton<LicenseService>();
 // DB İzleme detay çekmecesi (metrik kutusuna tıklayınca canlı oturum/sorgu/tablespace listesi)
 builder.Services.AddScoped<DbDetailService>();
 
+// Self-update (yol haritası #2.5): public repodan release denetimi + ayrık güncelleyici
+builder.Services.AddScoped<UpdateService>();
+
 if (bcfg.Configured)
 {
     var dbPass = DbProviderConfig.ResolvePassword(bcfg, secrets);

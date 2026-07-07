@@ -16,7 +16,8 @@ import {
   uploadLogo, removeLogo, KIND_LABELS,
   type ChannelRow, type ChannelInput, type BackupsData,
 } from "@/lib/channels";
-import { getLicense, applyLicense, type LicenseState } from "@/lib/settings";
+import { getLicense, applyLicense, checkUpdate, applyUpdate, type LicenseState, type UpdateCheck } from "@/lib/settings";
+import { getMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 type Flash = { ok: boolean; msg: string } | null;
@@ -330,6 +331,113 @@ export function LogoCard({ current, onChanged }: { current: string; onChanged: (
           </div>
         </div>
       </CardContent>
+    </Card>
+  );
+}
+
+/* ================= Self-Update (yol haritası #2.5) ================= */
+/** Ayarlar > Güncelleme: en son release'i denetle → sürüm notlarını göster → onayla → uygulama
+ *  kendini günceller (ayrık güncelleyici servisi durdurup dosyaları değiştirir ve yeniden başlatır). */
+export function UpdateCard() {
+  const { me } = useMe();
+  const [res, setRes] = useState<UpdateCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);   // null=hayır; string=durum metni
+  const [flash, setFlash] = useState<Flash>(null);
+
+  async function doCheck() {
+    setChecking(true); setRes(null); setFlash(null);
+    try { setRes(await checkUpdate()); }
+    catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }
+    finally { setChecking(false); }
+  }
+
+  async function doApply() {
+    setConfirmOpen(false);
+    setUpdating("Paket indiriliyor ve doğrulanıyor…");
+    try {
+      const r = await applyUpdate();
+      if (!r.ok) { setUpdating(null); setFlash({ ok: false, msg: r.message }); return; }
+      setUpdating("Uygulama yeniden başlatılıyor — sayfa otomatik yenilenecek…");
+      // Yeni sürüm ayağa kalkana dek /api/me'yi yokla; sürüm değişince yenile
+      const startVer = me?.version;
+      const poll = setInterval(async () => {
+        try {
+          const m = await getMe();
+          if (m.version && m.version !== startVer) { clearInterval(poll); window.location.reload(); }
+        } catch { /* servis yeniden başlarken kısa süre erişilemez — normal */ }
+      }, 5000);
+    } catch (e) {
+      setUpdating(null);
+      setFlash({ ok: false, msg: (e as Error).message });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="text-base">Güncelleme</CardTitle>
+          <CardDescription>Mevcut sürüm: <b>{me?.version ?? "…"}</b> — tek tıkla yeni sürüme geçin</CardDescription>
+        </div>
+        <Button variant="outline" size="sm" disabled={checking || !!updating} onClick={doCheck}>
+          <RotateCcw className={cn("h-4 w-4", checking && "animate-spin")} /> Güncellemeleri Denetle
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {flash && <FlashLine f={flash} />}
+
+        {updating && (
+          <div className="flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-400">
+            <RotateCcw className="h-4 w-4 animate-spin" /> {updating}
+          </div>
+        )}
+
+        {res && !res.ok && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{res.message}</div>
+        )}
+
+        {res && res.ok && !res.isNewer && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+            Uygulamanız güncel ({res.current}).
+          </div>
+        )}
+
+        {res && res.ok && res.isNewer && !updating && (
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-md bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-400">{res.latest}</span>
+              <span className="text-xs text-muted-foreground">
+                {res.sizeMb ? `${res.sizeMb} MB` : ""}{res.publishedAt ? ` · ${new Date(res.publishedAt).toLocaleDateString()}` : ""}
+              </span>
+              <Button size="sm" className="ml-auto" onClick={() => setConfirmOpen(true)}>
+                <Download className="h-4 w-4" /> Güncelle ve Yeniden Başlat
+              </Button>
+            </div>
+            {res.notes && (
+              <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-border/40 bg-background/40 p-2">
+                <p className="mb-1 text-xs font-semibold text-muted-foreground">Sürüm notları</p>
+                <pre className="whitespace-pre-wrap font-sans text-xs text-muted-foreground">{res.notes}</pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          Güncelleme sırasında veritabanı ve ayarlar korunur; servis birkaç saniyeliğine yeniden başlar.
+          İşlem günlüğü: Data\selfupdate.log
+        </p>
+      </CardContent>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Uygulamayı güncelle"
+        message={`${res?.current} → ${res?.latest} güncellemesi indirilecek ve uygulama yeniden başlatılacak. Devam edilsin mi?`}
+        loading={false}
+        onConfirm={doApply}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Card>
   );
 }

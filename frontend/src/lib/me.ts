@@ -23,6 +23,7 @@ export interface Me {
   theme: "dark" | "light";
   lang: "tr" | "en";
   companyName: string;
+  version: string;
   license: MeLicense | null;
 }
 
