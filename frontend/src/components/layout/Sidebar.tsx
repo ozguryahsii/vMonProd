@@ -41,12 +41,14 @@ export function Sidebar() {
       collapsed ? "w-16" : "w-44"
     )}>
       <div className={cn("flex h-16 items-center gap-2.5", collapsed ? "justify-center px-0" : "px-5")}>
-        <span className="logo-beat grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
+        {/* Logo tıklanınca ana ekrana (Dashboard'lar) döner */}
+        <NavLink to="/app/dashboard" title="Dashboard'lar"
+          className="logo-beat grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
           <Activity className="h-5 w-5 text-white" />
-        </span>
+        </NavLink>
         {!collapsed && (
           <div className="flex min-w-0 flex-col justify-center leading-none">
-            <span className="text-lg font-bold tracking-tight">vMon</span>
+            <NavLink to="/app/dashboard" className="text-lg font-bold tracking-tight hover:opacity-80">vMon</NavLink>
             {/* Lisans Fazı L1: paket rozeti "vMon" ALTINDA (dar yan panele sığar; eski PRE rozetinin yeri) */}
             <span
               title={me?.license ? `${me.license.company} · bitiş: ${me.license.expires} (${me.license.daysLeft} gün)` : undefined}
