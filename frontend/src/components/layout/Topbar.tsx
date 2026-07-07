@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Moon, Sun, Search, ChevronDown, LogOut, UserCircle } from "lucide-react";
+import { Moon, Sun, Search, ChevronDown, LogOut, UserCircle, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/useMe";
 import { setPreference, logout } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
-export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
+export function Topbar({ title, subtitle, onMenu }: { title: string; subtitle?: string; onMenu?: () => void }) {
   const { me } = useMe();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -39,6 +39,10 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background/70 px-5 backdrop-blur-xl">
+      {/* Dar ekranda menü aç (lg altında görünür) */}
+      <button onClick={onMenu} className="-ml-1 rounded-lg p-1.5 text-muted-foreground hover:bg-accent/60 lg:hidden" title="Menü" aria-label="Menü">
+        <Menu className="h-5 w-5" />
+      </button>
       <div className="min-w-0">
         <h1 className="truncate text-lg font-semibold leading-tight">{title}</h1>
         {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}

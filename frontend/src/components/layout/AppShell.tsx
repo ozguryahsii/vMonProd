@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -56,11 +56,12 @@ export function AppShell({
 }) {
   const { me } = useMe();
   useIdleLogout(!!me?.authEnabled);
+  const [mobileNav, setMobileNav] = useState(false);
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar mobileOpen={mobileNav} onClose={() => setMobileNav(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar title={title} subtitle={subtitle} />
+        <Topbar title={title} subtitle={subtitle} onMenu={() => setMobileNav(true)} />
         <motion.main
           className="flex-1 p-5"
           initial={{ opacity: 0, y: 10 }}

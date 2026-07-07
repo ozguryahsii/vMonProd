@@ -58,7 +58,8 @@ public class ApiController : ControllerBase
                 s.SelfHealEnabled,
                 s.SelfHealMaxRetries,
                 s.SelfHealAfterFailures,
-                s.LastSelfHealAt
+                s.LastSelfHealAt,
+                s.LastDiskInfo
             })
             .ToListAsync(ct);
 
@@ -77,7 +78,7 @@ public class ApiController : ControllerBase
                 s.ConsecutiveFailures, s.ResponseTimeThresholdMs,
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
-                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt,
+                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt, s.LastDiskInfo,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue
                        && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,
@@ -1220,6 +1221,8 @@ public class ApiController : ControllerBase
             s.CheckIntervalMinutes, s.FailureThreshold, s.HistoryRetentionDays,
             // E-posta
             s.EmailEnabled, s.SmtpHost, s.SmtpPort, s.MailFrom, s.MailRecipients,
+            s.SmtpUseAuth, s.SmtpUseSsl, s.SmtpUsername,
+            hasSmtpPassword = !string.IsNullOrEmpty(s.SmtpPasswordEncrypted),
             // LDAP + genel
             s.AuthEnabled, s.LdapAuthHost, s.LdapAuthPort, s.LdapAuthUseSsl, s.LdapAuthDomain,
             s.LdapAuthBaseDn, s.LdapAuthGroupDn, s.AdminUsers, s.CompanyName, s.LdapSyncCredentialId,
@@ -1248,7 +1251,7 @@ public class ApiController : ControllerBase
         });
     }
 
-    public record SettingsSaveInput(MonitorSettings Model, string? NewSmsToken, string? NewWhatsappToken, string? NewBackupPassword);
+    public record SettingsSaveInput(MonitorSettings Model, string? NewSmsToken, string? NewWhatsappToken, string? NewBackupPassword, string? NewSmtpPassword = null);
 
     /// <summary>Ayarları kaydet — klasik Save ile aynı semantik (OTP kilitlenme koruması, sır koruma, syslog/TLS anında uygula).</summary>
     [HttpPost("settings")]
@@ -1287,6 +1290,9 @@ public class ApiController : ControllerBase
             ? current.WhatsappAuthTokenEncrypted : CryptoHelper.Encrypt(input.NewWhatsappToken.Trim());
         model.BackupPasswordEncrypted = string.IsNullOrWhiteSpace(input.NewBackupPassword)
             ? current.BackupPasswordEncrypted : CryptoHelper.Encrypt(input.NewBackupPassword.Trim());
+        // SMTP şifresi: yeni girilmediyse mevcut korunur (boş bırakınca sıfırlanmaz)
+        model.SmtpPasswordEncrypted = string.IsNullOrWhiteSpace(input.NewSmtpPassword)
+            ? current.SmtpPasswordEncrypted : CryptoHelper.Encrypt(input.NewSmtpPassword.Trim());
 
         await _settings.SaveAsync(model, ct);
         syslog.Configure(model);

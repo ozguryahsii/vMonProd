@@ -108,6 +108,12 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const mpts = (metrics?.points ?? []).map((p) => ({ t: label(p.t), cpu: p.cpu, ram: p.ram, disk: p.disk }));
   const cat = service ? catOf(service) : "down";
 
+  // Disk-başına doluluk: "mount|kullanılanGb|toplamGb|yüzde;..." → satırlar (doluluğa göre azalan)
+  const diskRows = (service?.lastDiskInfo ?? "")
+    .split(";").map((s) => s.trim()).filter(Boolean)
+    .map((e) => { const [mount, used, total, pct] = e.split("|"); return { mount, used, total, pct: Number(pct) || 0 }; })
+    .sort((a, b) => b.pct - a.pct);
+
   // Durum noktaları: DOWN=büyük kırmızı, Yavaş/Hata=koyu sarı (grafikte kaybolmaz)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const statusDot = (props: any) => {
@@ -238,6 +244,30 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
                     </div>
                   )}
                   {dbDetail?.note && <div className="mt-1 text-[10px] text-muted-foreground">{dbDetail.note}</div>}
+                </div>
+              )}
+
+              {isHealth && diskRows.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold">Diskler ({diskRows.length})</h3>
+                  <div className="space-y-2">
+                    {diskRows.map((d) => {
+                      const bar = d.pct >= 90 ? "bg-rose-500" : d.pct >= 75 ? "bg-amber-500" : "bg-emerald-500";
+                      return (
+                        <div key={d.mount} className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate font-mono font-medium">{d.mount}</span>
+                            <span className="shrink-0 tabular-nums text-muted-foreground">
+                              {d.used} / {d.total} GB · <span className={cn("font-semibold", d.pct >= 90 ? "text-rose-400" : d.pct >= 75 ? "text-amber-400" : "text-emerald-400")}>%{d.pct}</span>
+                            </span>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                            <div className={cn("h-full rounded-full transition-all", bar)} style={{ width: `${Math.min(100, d.pct)}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

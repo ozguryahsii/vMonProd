@@ -1,13 +1,32 @@
+using System.Net;
 using System.Net.Mail;
 using vMonitor.Models;
 
 namespace vMonitor.Services;
 
-/// <summary>SMTP Relay üzerinden bildirim — authentication yok, EnableSsl=false.</summary>
+/// <summary>SMTP bildirimi: açık relay (auth yok) VEYA kimlik doğrulamalı (kullanıcı/şifre + TLS).
+/// Kullanıcı Ayarlar'dan seçer; port tamamen elle (25 relay / 587 STARTTLS / 465 SSL vb.).</summary>
 public class EmailService
 {
     private readonly ILogger<EmailService> _logger;
     public EmailService(ILogger<EmailService> logger) => _logger = logger;
+
+    /// <summary>Ayarlara göre SMTP istemcisi kurar: auth açıksa kullanıcı/şifre + TLS uygular.</summary>
+    private static SmtpClient BuildClient(MonitorSettings s)
+    {
+        var client = new SmtpClient(s.SmtpHost, s.SmtpPort)
+        {
+            EnableSsl = s.SmtpUseSsl,
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            UseDefaultCredentials = false
+        };
+        if (s.SmtpUseAuth && !string.IsNullOrWhiteSpace(s.SmtpUsername))
+        {
+            var pwd = string.IsNullOrWhiteSpace(s.SmtpPasswordEncrypted) ? "" : CryptoHelper.Decrypt(s.SmtpPasswordEncrypted);
+            client.Credentials = new NetworkCredential(s.SmtpUsername, pwd);
+        }
+        return client;
+    }
 
     public async Task SendAsync(MonitorSettings settings, string subject, string body, CancellationToken ct = default)
     {
@@ -19,12 +38,7 @@ public class EmailService
         if (recipients.Length == 0)
             throw new InvalidOperationException("Email alıcısı tanımlı değil.");
 
-        using var client = new SmtpClient(settings.SmtpHost, settings.SmtpPort)
-        {
-            EnableSsl = false,
-            DeliveryMethod = SmtpDeliveryMethod.Network,
-            UseDefaultCredentials = false
-        };
+        using var client = BuildClient(settings);
 
         using var msg = new MailMessage
         {
@@ -49,12 +63,7 @@ public class EmailService
         if (string.IsNullOrWhiteSpace(toAddress))
             throw new InvalidOperationException("Alıcı e-posta adresi yok.");
 
-        using var client = new SmtpClient(settings.SmtpHost, settings.SmtpPort)
-        {
-            EnableSsl = false,
-            DeliveryMethod = SmtpDeliveryMethod.Network,
-            UseDefaultCredentials = false
-        };
+        using var client = BuildClient(settings);
         using var msg = new MailMessage
         {
             From = new MailAddress(settings.MailFrom, "vMon"),

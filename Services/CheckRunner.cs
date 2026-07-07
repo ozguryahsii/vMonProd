@@ -142,6 +142,7 @@ public class CheckRunner
             svc.LastRamPercent = outcome.Metrics.Ram;
             svc.LastMaxDiskPercent = outcome.Metrics.MaxDisk;
             if (outcome.Metrics.Capacity != null) svc.CapacityInfo = outcome.Metrics.Capacity;
+            if (outcome.Metrics.Disks != null) svc.LastDiskInfo = outcome.Metrics.Disks;
             // İstatistikler için yapısal son değerler + OS
             if (outcome.Metrics.CpuCores.HasValue) svc.LastCpuCores = outcome.Metrics.CpuCores;
             if (outcome.Metrics.RamTotalGb.HasValue) svc.LastRamTotalGb = outcome.Metrics.RamTotalGb;

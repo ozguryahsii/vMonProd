@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, BarChart3, Activity, Server, KeyRound,
-  Settings, Users, ClipboardCheck, Info, ChevronsLeft, ChevronsRight, ClipboardList,
+  Settings, Users, ClipboardCheck, Info, ChevronsLeft, ChevronsRight, ClipboardList, X,
 } from "lucide-react";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,7 @@ const allNav = [
   { to: "/app/about", label: "Hakkında", icon: Info },
 ] as const;
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean; onClose?: () => void } = {}) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("vmon.sidebar") === "min");
   useEffect(() => { localStorage.setItem("vmon.sidebar", collapsed ? "min" : "max"); }, [collapsed]);
   const { me, hasPerm } = useMe();
@@ -35,7 +35,69 @@ export function Sidebar() {
     return true;
   });
 
+  // Menü bağlantıları — hem masaüstü (daraltılabilir) hem mobil drawer (hep açık) kullanır
+  const navLinks = (expanded: boolean, onNavigate?: () => void) => nav.map((item) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      onClick={onNavigate}
+      title={!expanded ? item.label : undefined}
+      className={({ isActive }) =>
+        cn(
+          "group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors",
+          expanded ? "px-3" : "justify-center px-0",
+          isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <motion.span
+              layoutId={expanded ? "sidebar-active" : "sidebar-active-m"}
+              className="absolute inset-0 rounded-xl bg-primary/15 ring-1 ring-inset ring-primary/30"
+              transition={{ type: "spring", stiffness: 500, damping: 40 }}
+            />
+          )}
+          <item.icon className="relative z-10 h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
+          {expanded && <span className="relative z-10 truncate">{item.label}</span>}
+        </>
+      )}
+    </NavLink>
+  ));
+
   return (
+    <>
+    {/* Mobil / dar ekran: üstten kayan overlay drawer (lg altında) */}
+    <div className={cn("fixed inset-0 z-50 lg:hidden", mobileOpen ? "" : "pointer-events-none")}>
+      <div className={cn("absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity", mobileOpen ? "opacity-100" : "opacity-0")}
+        onClick={onClose} />
+      <aside className={cn(
+        "absolute left-0 top-0 flex h-full w-60 flex-col border-r border-border bg-card shadow-2xl transition-transform duration-200",
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="flex h-16 items-center gap-2.5 px-5">
+          <NavLink to="/app/dashboard" onClick={onClose} className="logo-beat grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/30">
+            <Activity className="h-5 w-5 text-white" />
+          </NavLink>
+          <div className="flex min-w-0 flex-col justify-center leading-none">
+            <span className="text-lg font-bold tracking-tight">vMon</span>
+            {me?.license && (
+              <span className={cn("mt-1 w-fit rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide",
+                me.license.edition === "Enterprise" ? "bg-amber-500/15 text-amber-400"
+                  : me.license.edition === "Standard" ? "bg-sky-500/15 text-sky-400" : "bg-primary/15 text-primary")}>
+                {me.license.edition}
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="ml-auto rounded-lg p-1.5 text-muted-foreground hover:bg-accent/60" title="Kapat">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">{navLinks(true, onClose)}</nav>
+      </aside>
+    </div>
+
     <aside className={cn(
       "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border bg-card/40 backdrop-blur-xl transition-[width] duration-200 lg:flex",
       collapsed ? "w-16" : "w-44"
@@ -66,34 +128,7 @@ export function Sidebar() {
       </div>
 
       <nav className={cn("flex-1 space-y-1 py-4", collapsed ? "px-2" : "px-3")}>
-        {nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            title={collapsed ? item.label : undefined}
-            className={({ isActive }) =>
-              cn(
-                "group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors",
-                collapsed ? "justify-center px-0" : "px-3",
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-xl bg-primary/15 ring-1 ring-inset ring-primary/30"
-                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                  />
-                )}
-                <item.icon className="relative z-10 h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
-                {!collapsed && <span className="relative z-10 truncate">{item.label}</span>}
-              </>
-            )}
-          </NavLink>
-        ))}
+        {navLinks(!collapsed)}
       </nav>
 
       <div className={cn("border-t border-border p-3", collapsed && "px-2")}>
@@ -114,5 +149,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

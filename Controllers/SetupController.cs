@@ -65,6 +65,10 @@ public class SetupController : Controller
         public string MailFrom { get; set; } = "";
         public string MailRecipients { get; set; } = "";
         public string SmtpTestTo { get; set; } = "";
+        public bool SmtpUseAuth { get; set; } = false;
+        public bool SmtpUseSsl { get; set; } = false;
+        public string SmtpUsername { get; set; } = "";
+        public string SmtpPassword { get; set; } = "";
     }
 
     private BootstrapConfig ToConfig(SetupForm f)
@@ -206,7 +210,11 @@ public class SetupController : Controller
                 SmtpHost = f.SmtpHost?.Trim() ?? "",
                 SmtpPort = f.SmtpPort > 0 ? f.SmtpPort : 25,
                 MailFrom = string.IsNullOrWhiteSpace(f.MailFrom) ? "vmon@localhost" : f.MailFrom.Trim(),
-                MailRecipients = to
+                MailRecipients = to,
+                SmtpUseAuth = f.SmtpUseAuth,
+                SmtpUseSsl = f.SmtpUseSsl,
+                SmtpUsername = f.SmtpUsername?.Trim() ?? "",
+                SmtpPasswordEncrypted = string.IsNullOrWhiteSpace(f.SmtpPassword) ? "" : CryptoHelper.Encrypt(f.SmtpPassword)
             };
             await _email.SendAsync(ms, "vMon kurulum testi", "Bu bir vMon kurulum SMTP test e-postasıdır. ✅", ct);
             return Json(new { ok = true, message = "Test e-postası gönderildi ✅ (gelen kutusunu kontrol edin)" });
@@ -284,6 +292,10 @@ public class SetupController : Controller
                     ms.SmtpPort = f.SmtpPort > 0 ? f.SmtpPort : 25;
                     ms.MailFrom = string.IsNullOrWhiteSpace(f.MailFrom) ? "vmon@localhost" : f.MailFrom.Trim();
                     ms.MailRecipients = f.MailRecipients?.Trim() ?? "";
+                    ms.SmtpUseAuth = f.SmtpUseAuth;
+                    ms.SmtpUseSsl = f.SmtpUseSsl;
+                    ms.SmtpUsername = f.SmtpUsername?.Trim() ?? "";
+                    if (!string.IsNullOrWhiteSpace(f.SmtpPassword)) ms.SmtpPasswordEncrypted = CryptoHelper.Encrypt(f.SmtpPassword);
                 }
                 await ss.SaveAsync(ms, ct);
             }

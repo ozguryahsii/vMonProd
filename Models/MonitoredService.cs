@@ -154,6 +154,11 @@ public class MonitoredService
     /// <summary>Donanım kapasitesi, örn. "8 CPU · 16 GB RAM · C: 237 GB". Sağlık kontrolünde güncellenir.</summary>
     public string? CapacityInfo { get; set; }
 
+    /// <summary>Son sağlık kontrolündeki disk-başına doluluk: "mount|kullanılanGb|toplamGb|yüzde" (';' ayraçlı).
+    /// Detay panelinde her disk kapasite + doluluk çubuğuyla gösterilir (Windows + Linux).</summary>
+    [MaxLength(2000)]
+    public string? LastDiskInfo { get; set; }
+
     // --- İstatistikler için yapısal son değerler (sağlık kontrolünde güncellenir) ---
     /// <summary>İşletim sistemi tam adı, örn. "Windows Server 2019 Standard (10.0.17763)" / "Ubuntu 22.04.3 LTS (kernel 5.15.0)".</summary>
     public string? OsName { get; set; }

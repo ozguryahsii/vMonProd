@@ -8,6 +8,7 @@ import {
   createService, updateService,
 } from "@/lib/services";
 import { useMe } from "@/hooks/useMe";
+import { createCredential } from "@/lib/admin";
 
 const empty: ServiceInput = {
   name: "", type: "Http", target: "", port: null, extra: null,
@@ -39,6 +40,31 @@ export function ServiceForm({
   const [form, setForm] = useState<ServiceInput>(empty);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Satır-içi hesap ekleme (kimlik seçimin altında): forma çıkmadan yeni kimlik oluştur
+  const [creds, setCreds] = useState<{ id: number; name: string }[]>([]);
+  const [addCred, setAddCred] = useState(false);
+  const [cred, setCred] = useState({ name: "", username: "", password: "", domain: "" });
+  const [credBusy, setCredBusy] = useState(false);
+  const [credErr, setCredErr] = useState<string | null>(null);
+  useEffect(() => { setCreds(meta?.credentials ?? []); }, [meta]);
+
+  async function saveCred() {
+    if (!cred.name.trim()) { setCredErr("Tanım adı zorunlu."); return; }
+    setCredBusy(true); setCredErr(null);
+    try {
+      const r = await createCredential({
+        name: cred.name.trim(), username: cred.username.trim(),
+        newPassword: cred.password || null, domain: cred.domain.trim() || null,
+        description: null, sourceType: "Manual",
+        vaultUrl: null, newVaultToken: null, vaultKey: null, vaultUserKey: null,
+      });
+      setCreds((prev) => [...prev, { id: r.id, name: cred.name.trim() }].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm((f) => ({ ...f, credentialId: r.id }));   // yeni hesabı otomatik seç
+      setCred({ name: "", username: "", password: "", domain: "" });
+      setAddCred(false);
+    } catch (e) { setCredErr((e as Error).message); }
+    finally { setCredBusy(false); }
+  }
   // Paket kilitleri: Self-Healing ve SMS/WhatsApp/Arama alarmları yalnız Standard/Enterprise
   const { me } = useMe();
   const selfHealLicensed = me?.license?.selfHeal !== false;
@@ -138,8 +164,29 @@ export function ServiceForm({
           <Field label={tm.cred.label} hint={tm.cred.hint}>
             <Select value={form.credentialId ?? ""} onChange={(e) => set("credentialId", e.target.value ? Number(e.target.value) : null)}>
               <option value="">— Yok —</option>
-              {(meta?.credentials ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {creds.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
+            {!addCred ? (
+              <button type="button" onClick={() => { setAddCred(true); setCredErr(null); }}
+                className="mt-1.5 text-xs font-medium text-primary hover:underline">
+                + Yeni hesap ekle
+              </button>
+            ) : (
+              <div className="mt-2 space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+                <p className="text-xs font-medium text-muted-foreground">Yeni kimlik bilgisi</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Tanım adı *"><Input value={cred.name} onChange={(e) => setCred((c) => ({ ...c, name: e.target.value }))} placeholder="örn. Oracle izleme" /></Field>
+                  <Field label="Domain" hint="opsiyonel"><Input value={cred.domain} onChange={(e) => setCred((c) => ({ ...c, domain: e.target.value }))} placeholder="FIRMA" /></Field>
+                  <Field label="Kullanıcı adı"><Input value={cred.username} onChange={(e) => setCred((c) => ({ ...c, username: e.target.value }))} autoComplete="off" /></Field>
+                  <Field label="Şifre"><Input type="password" value={cred.password} onChange={(e) => setCred((c) => ({ ...c, password: e.target.value }))} autoComplete="new-password" /></Field>
+                </div>
+                {credErr && <p className="text-xs text-destructive">{credErr}</p>}
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" disabled={credBusy} onClick={saveCred}>{credBusy ? "Ekleniyor…" : "Hesabı Ekle"}</Button>
+                  <Button type="button" size="sm" variant="outline" disabled={credBusy} onClick={() => { setAddCred(false); setCredErr(null); }}>Vazgeç</Button>
+                </div>
+              </div>
+            )}
           </Field>
         )}
 

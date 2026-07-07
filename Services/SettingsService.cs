@@ -15,6 +15,11 @@ public class MonitorSettings
     public string MailFrom { get; set; } = "vmon@localhost";
     public string MailRecipients { get; set; } = "";      // virgül/noktalı virgül ile ayrılmış
     public bool EmailEnabled { get; set; } = false;
+    // Kimlik doğrulamalı SMTP (opsiyonel): açık relay yerine kullanıcı adı/şifre + TLS ile gönderim
+    public bool SmtpUseAuth { get; set; } = false;
+    public bool SmtpUseSsl { get; set; } = false;        // STARTTLS/SSL (587/465 senaryoları)
+    public string SmtpUsername { get; set; } = "";
+    public string SmtpPasswordEncrypted { get; set; } = "";
 
     // --- LDAP ile oturum açma (login) ---
     public bool AuthEnabled { get; set; } = false;
@@ -176,6 +181,10 @@ public class SettingsService
         if (dict.TryGetValue("MailFrom", out v) && !string.IsNullOrWhiteSpace(v)) s.MailFrom = v;
         if (dict.TryGetValue("MailRecipients", out v)) s.MailRecipients = v ?? "";
         if (dict.TryGetValue("EmailEnabled", out v)) s.EmailEnabled = v == "true";
+        if (dict.TryGetValue("SmtpUseAuth", out v)) s.SmtpUseAuth = v == "true";
+        if (dict.TryGetValue("SmtpUseSsl", out v)) s.SmtpUseSsl = v == "true";
+        if (dict.TryGetValue("SmtpUsername", out v)) s.SmtpUsername = v ?? "";
+        if (dict.TryGetValue("SmtpPasswordEncrypted", out v)) s.SmtpPasswordEncrypted = v ?? "";
 
         if (dict.TryGetValue("AuthEnabled", out v)) s.AuthEnabled = v == "true";
         if (dict.TryGetValue("LdapAuthHost", out v)) s.LdapAuthHost = v ?? "";
@@ -243,6 +252,10 @@ public class SettingsService
             ["MailFrom"] = s.MailFrom,
             ["MailRecipients"] = s.MailRecipients,
             ["EmailEnabled"] = s.EmailEnabled ? "true" : "false",
+            ["SmtpUseAuth"] = s.SmtpUseAuth ? "true" : "false",
+            ["SmtpUseSsl"] = s.SmtpUseSsl ? "true" : "false",
+            ["SmtpUsername"] = s.SmtpUsername,
+            ["SmtpPasswordEncrypted"] = s.SmtpPasswordEncrypted,
             ["AuthEnabled"] = s.AuthEnabled ? "true" : "false",
             ["LdapAuthHost"] = s.LdapAuthHost,
             ["LdapAuthPort"] = s.LdapAuthPort.ToString(),

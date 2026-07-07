@@ -26,6 +26,7 @@ export function Settings() {
   const [newSms, setNewSms] = useState("");
   const [newWa, setNewWa] = useState("");
   const [newBk, setNewBk] = useState("");
+  const [newSmtp, setNewSmtp] = useState("");
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
   const [testMsg, setTestMsg] = useState<Record<string, { ok: boolean; msg: string }>>({});
@@ -62,8 +63,8 @@ export function Settings() {
     if (!s) return;
     setSaving(true);
     try {
-      await saveSettings(s, newSms, newWa, newBk);
-      setNewSms(""); setNewWa(""); setNewBk("");
+      await saveSettings(s, newSms, newWa, newBk, newSmtp);
+      setNewSms(""); setNewWa(""); setNewBk(""); setNewSmtp("");
       setFlash({ ok: true, msg: "Ayarlar kaydedildi." });
       getSettings().then(setS).catch(() => {});
     } catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }
@@ -168,6 +169,26 @@ export function Settings() {
           </div>
           <Field label="Gönderen adres"><Input value={s.mailFrom} onChange={(e) => set("mailFrom", e.target.value)} /></Field>
           <Field label="Varsayılan alıcılar" hint="virgülle ayır"><Input value={s.mailRecipients} onChange={(e) => set("mailRecipients", e.target.value)} /></Field>
+
+          {/* Kimlik doğrulamalı gönderim (opsiyonel) — açık relay yerine kullanıcı/şifre + TLS */}
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+            <Switch checked={s.smtpUseAuth} onChange={(v) => set("smtpUseAuth", v)} label="Kimlik doğrulama kullan (kullanıcı adı / şifre)" />
+            {s.smtpUseAuth && (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Kullanıcı adı"><Input value={s.smtpUsername} onChange={(e) => set("smtpUsername", e.target.value)} placeholder="ornek@firma.com" autoComplete="off" /></Field>
+                  <Field label="Şifre" hint={s.hasSmtpPassword ? "kayıtlı — değiştirmek için yaz" : "gizli, şifreli saklanır"}>
+                    <Input type="password" value={newSmtp} onChange={(e) => setNewSmtp(e.target.value)} placeholder={s.hasSmtpPassword ? "••••••••" : ""} autoComplete="new-password" />
+                  </Field>
+                </div>
+                <Switch checked={s.smtpUseSsl} onChange={(v) => set("smtpUseSsl", v)} label="TLS/SSL kullan (STARTTLS 587 / SSL 465)" />
+              </div>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Kapalıysa açık SMTP relay (ör. port 25) kullanılır. Office365/Gmail gibi sağlayıcılar için kimlik doğrulama + TLS açın ve portu (587/465) elle girin.
+            </p>
+          </div>
+
           <TestRow k="email" msg={testMsg}>
             <Button variant="outline" size="sm" onClick={() => runTest("email", async () => { await testEmail(); return { ok: true, message: "Test maili gönderildi ✅" }; })}>
               <Mail className="h-4 w-4" /> Test Maili Gönder

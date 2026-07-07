@@ -5,6 +5,7 @@ export interface AppSettings {
   checkIntervalMinutes: number; failureThreshold: number; historyRetentionDays: number;
   // E-posta
   emailEnabled: boolean; smtpHost: string; smtpPort: number; mailFrom: string; mailRecipients: string;
+  smtpUseAuth: boolean; smtpUseSsl: boolean; smtpUsername: string; hasSmtpPassword: boolean;
   // LDAP + genel
   authEnabled: boolean; ldapAuthHost: string; ldapAuthPort: number; ldapAuthUseSsl: boolean;
   ldapAuthDomain: string; ldapAuthBaseDn: string; ldapAuthGroupDn: string;
@@ -33,15 +34,16 @@ export interface AppSettings {
 
 export const getSettings = (signal?: AbortSignal) => apiGet<AppSettings>("/settings", signal);
 
-export function saveSettings(s: AppSettings, newSmsToken: string, newWhatsappToken: string, newBackupPassword: string) {
+export function saveSettings(s: AppSettings, newSmsToken: string, newWhatsappToken: string, newBackupPassword: string, newSmtpPassword = "") {
   // has* bayrakları modele girmez; sunucu sırları kendisi korur
-  const { hasBackupPassword, hasSmsToken, hasWhatsappToken, ...model } = s;
-  void hasBackupPassword; void hasSmsToken; void hasWhatsappToken;
+  const { hasBackupPassword, hasSmsToken, hasWhatsappToken, hasSmtpPassword, ...model } = s;
+  void hasBackupPassword; void hasSmsToken; void hasWhatsappToken; void hasSmtpPassword;
   return apiSend<{ ok: boolean }>("POST", "/settings", {
     model,
     newSmsToken: newSmsToken || null,
     newWhatsappToken: newWhatsappToken || null,
     newBackupPassword: newBackupPassword || null,
+    newSmtpPassword: newSmtpPassword || null,
   });
 }
 

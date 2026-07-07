@@ -94,6 +94,7 @@ public class WindowsHealthChecker : CheckerBase
             var diskParts = new List<string>();
             var diskCapacities = new List<string>();
             var disks = new List<(string id, double used)>();
+            var diskStructured = new List<string>();   // "mount|kullanılanGb|toplamGb|yüzde"
             using (var searcher = new ManagementObjectSearcher(scope,
                 new ObjectQuery("SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType = 3")))
             {
@@ -107,6 +108,7 @@ public class WindowsHealthChecker : CheckerBase
                     diskParts.Add($"{id} %{used.ToString("0.#", CultureInfo.InvariantCulture)}");
                     diskCapacities.Add($"{id} {FormatGb(size)}");
                     disks.Add((id, used));
+                    diskStructured.Add(DiskEntry(id, size - freeSpace, size, used));
                     diskTotalBytes += size;
                     diskUsedBytes += size - freeSpace;
                     if (maxDisk == null || used > maxDisk) maxDisk = used;
@@ -124,7 +126,8 @@ public class WindowsHealthChecker : CheckerBase
                 CpuCores: cores, RamTotalGb: totalRamGb, RamUsedGb: ramUsedGb,
                 DiskTotalGb: diskTotalBytes > 0 ? Math.Round(diskTotalBytes / 1073741824.0, 1) : null,
                 DiskUsedGb: diskTotalBytes > 0 ? Math.Round(diskUsedBytes / 1073741824.0, 1) : null,
-                OsName: osName, OsKind: "Windows");
+                OsName: osName, OsKind: "Windows",
+                Disks: diskStructured.Count > 0 ? string.Join(";", diskStructured) : null);
 
             // Ulaşıldı; eşik aşıldıysa bu bir DOWN değil ERROR durumudur
             var thresholdErr = BuildThresholdError(service, cpu, ram, maxDisk, disks);
@@ -140,6 +143,17 @@ public class WindowsHealthChecker : CheckerBase
         return gb >= 1024
             ? $"{(gb / 1024).ToString("0.#", CultureInfo.InvariantCulture)} TB"
             : $"{gb.ToString("0", CultureInfo.InvariantCulture)} GB";
+    }
+
+    /// <summary>Disk-başına yapısal giriş: "mount|kullanılanGb|toplamGb|yüzde" (arayüz parse eder).
+    /// GB tek ondalık, InvariantCulture (nokta ondalık) — istemci güvenle Number() ile okur.</summary>
+    internal static string DiskEntry(string mount, double usedBytes, double totalBytes, double pct)
+    {
+        double G(double b) => Math.Round(b / 1073741824.0, 1);
+        string N(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+        // mount içinde '|' ve ';' olmaz ama garanti için temizle
+        var safe = (mount ?? "?").Replace("|", "/").Replace(";", "_");
+        return $"{safe}|{N(G(usedBytes))}|{N(G(totalBytes))}|{N(pct)}";
     }
 
     /// <summary>Ortak eşik kontrolü — Linux checker'ı da kullanır.

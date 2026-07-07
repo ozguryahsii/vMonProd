@@ -5,7 +5,10 @@ namespace vMonitor.Services.Checkers;
 public record HealthMetricsData(double? Cpu, double? Ram, double? MaxDisk, string? DiskDetail, string? Capacity = null,
     int? CpuCores = null, double? RamTotalGb = null, double? RamUsedGb = null,
     double? DiskTotalGb = null, double? DiskUsedGb = null,
-    string? OsName = null, string? OsKind = null);
+    string? OsName = null, string? OsKind = null,
+    // Disk-başına yapısal liste: "mount|kullanılanGb|toplamGb|yüzde" girişleri ';' ile ayrılır
+    // (detay panelinde her disk kapasite + doluluk çubuğuyla gösterilir). Windows + Linux.
+    string? Disks = null);
 
 public record CheckOutcome(bool IsUp, long ResponseTimeMs, string? Error = null, HealthMetricsData? Metrics = null, CheckStatus Status = CheckStatus.Up);
 

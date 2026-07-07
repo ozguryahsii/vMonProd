@@ -52,7 +52,7 @@ public class LinuxHealthChecker : CheckerBase
 
                 // Diskler: mount, kullanım%, toplam bayt, kullanılan bayt (kalıcı dosya sistemleri; tmpfs vb. hariç)
                 var diskRaw = Run(ssh, "df -P -B1 -x tmpfs -x devtmpfs -x overlay -x squashfs 2>/dev/null | awk 'NR>1{print $6\" \"$5\" \"$2\" \"$3}'");
-                var (maxDisk, diskDetail, diskCapacities, disks, diskTotalBytes, diskUsedBytes) = ParseDisks(diskRaw);
+                var (maxDisk, diskDetail, diskCapacities, disks, diskTotalBytes, diskUsedBytes, diskStructured) = ParseDisks(diskRaw);
 
                 var capacityParts = new List<string>();
                 if (cores.HasValue) capacityParts.Add($"{cores} CPU");
@@ -66,7 +66,8 @@ public class LinuxHealthChecker : CheckerBase
                     RamUsedGb: ramUsedGb,
                     DiskTotalGb: diskTotalBytes > 0 ? Math.Round(diskTotalBytes / 1073741824.0, 1) : null,
                     DiskUsedGb: diskTotalBytes > 0 ? Math.Round(diskUsedBytes / 1073741824.0, 1) : null,
-                    OsName: osName, OsKind: "Linux");
+                    OsName: osName, OsKind: "Linux",
+                    Disks: diskStructured.Count > 0 ? string.Join(";", diskStructured) : null);
                 var thresholdErr = WindowsHealthChecker.BuildThresholdError(service, cpu, ram, maxDisk, disks);
                 IsThresholdError = thresholdErr != null;
                 return thresholdErr;
@@ -142,13 +143,14 @@ public class LinuxHealthChecker : CheckerBase
         return string.IsNullOrWhiteSpace(kernel) ? pretty : $"{pretty} (kernel {kernel})";
     }
 
-    private static (double? maxDisk, string? detail, List<string> capacities, List<(string id, double used)> disks, double totalBytes, double usedBytes) ParseDisks(string raw)
+    private static (double? maxDisk, string? detail, List<string> capacities, List<(string id, double used)> disks, double totalBytes, double usedBytes, List<string> structured) ParseDisks(string raw)
     {
         double? max = null;
         double totalSum = 0, usedSum = 0;
         var parts = new List<string>();
         var capacities = new List<string>();
         var disks = new List<(string id, double used)>();
+        var structured = new List<string>();
         foreach (var line in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             // "mount kullanım% toplamBayt kullanılanBayt" — örn. "/ 82% 53687091200 44000000000"
@@ -161,12 +163,14 @@ public class LinuxHealthChecker : CheckerBase
             {
                 capacities.Add($"{cols[0]} {WindowsHealthChecker.FormatGb(totalBytes)}");
                 totalSum += totalBytes;
-                if (cols.Length >= 4 && double.TryParse(cols[3], NumberStyles.Any, CultureInfo.InvariantCulture, out var usedBytes))
+                double usedBytes = 0;
+                if (cols.Length >= 4 && double.TryParse(cols[3], NumberStyles.Any, CultureInfo.InvariantCulture, out usedBytes))
                     usedSum += usedBytes;
+                structured.Add(WindowsHealthChecker.DiskEntry(cols[0], usedBytes, totalBytes, pct));
             }
             disks.Add((cols[0], pct));
             if (max == null || pct > max) max = pct;
         }
-        return (max, parts.Count > 0 ? string.Join(" · ", parts) : null, capacities, disks, totalSum, usedSum);
+        return (max, parts.Count > 0 ? string.Join(" · ", parts) : null, capacities, disks, totalSum, usedSum, structured);
     }
 }

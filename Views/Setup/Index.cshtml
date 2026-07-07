@@ -194,6 +194,14 @@
                 </div>
                 <label>Gönderen adres</label><input type="text" name="MailFrom" id="MailFrom" placeholder="vmon@firma.com" />
                 <label>Varsayılan alıcılar</label><input type="text" name="MailRecipients" id="MailRecipients" placeholder="ops@firma.com, admin@firma.com" />
+                <label class="chk"><input type="checkbox" name="SmtpUseAuth" id="SmtpUseAuth" /> Kimlik doğrulama kullan (kullanıcı adı / şifre)</label>
+                <div id="smtpAuthFields" class="hidden">
+                    <div class="row">
+                        <div><label>Kullanıcı adı</label><input type="text" name="SmtpUsername" id="SmtpUsername" placeholder="ornek@firma.com" autocomplete="off" /></div>
+                        <div><label>Şifre</label><input type="password" name="SmtpPassword" id="SmtpPassword" autocomplete="new-password" /></div>
+                    </div>
+                    <label class="chk"><input type="checkbox" name="SmtpUseSsl" id="SmtpUseSsl" /> TLS/SSL kullan (STARTTLS 587 / SSL 465)</label>
+                </div>
                 <div class="testbar">
                     <div><label>Test alıcısı</label><input type="text" name="SmtpTestTo" id="SmtpTestTo" placeholder="sen@firma.com" /></div>
                     <button type="button" class="btn btn-o" id="btnTestSmtp"><i class="bi bi-send"></i> Test Gönder</button>
@@ -260,6 +268,10 @@
     });
     document.getElementById('SmtpEnabled').addEventListener('change', function () {
         document.getElementById('smtpFields').classList.toggle('hidden', !this.checked);
+        smtpTested = false;
+    });
+    document.getElementById('SmtpUseAuth').addEventListener('change', function () {
+        document.getElementById('smtpAuthFields').classList.toggle('hidden', !this.checked);
         smtpTested = false;
     });
 
