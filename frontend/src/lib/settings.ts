@@ -5,7 +5,7 @@ export interface AppSettings {
   checkIntervalMinutes: number; failureThreshold: number; historyRetentionDays: number;
   // E-posta
   emailEnabled: boolean; smtpHost: string; smtpPort: number; mailFrom: string; mailRecipients: string;
-  smtpUseAuth: boolean; smtpUseSsl: boolean; smtpUsername: string; hasSmtpPassword: boolean;
+  smtpSecurity: "none" | "starttls" | "ssl"; smtpUseAuth: boolean; smtpUsername: string; hasSmtpPassword: boolean;
   // LDAP + genel
   authEnabled: boolean; ldapAuthHost: string; ldapAuthPort: number; ldapAuthUseSsl: boolean;
   ldapAuthDomain: string; ldapAuthBaseDn: string; ldapAuthGroupDn: string;

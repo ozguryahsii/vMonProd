@@ -66,7 +66,7 @@ public class SetupController : Controller
         public string MailRecipients { get; set; } = "";
         public string SmtpTestTo { get; set; } = "";
         public bool SmtpUseAuth { get; set; } = false;
-        public bool SmtpUseSsl { get; set; } = false;
+        public string SmtpSecurity { get; set; } = "none";   // none | starttls | ssl
         public string SmtpUsername { get; set; } = "";
         public string SmtpPassword { get; set; } = "";
     }
@@ -212,7 +212,7 @@ public class SetupController : Controller
                 MailFrom = string.IsNullOrWhiteSpace(f.MailFrom) ? "vmon@localhost" : f.MailFrom.Trim(),
                 MailRecipients = to,
                 SmtpUseAuth = f.SmtpUseAuth,
-                SmtpUseSsl = f.SmtpUseSsl,
+                SmtpSecurity = string.IsNullOrWhiteSpace(f.SmtpSecurity) ? "none" : f.SmtpSecurity,
                 SmtpUsername = f.SmtpUsername?.Trim() ?? "",
                 SmtpPasswordEncrypted = string.IsNullOrWhiteSpace(f.SmtpPassword) ? "" : CryptoHelper.Encrypt(f.SmtpPassword)
             };
@@ -293,7 +293,7 @@ public class SetupController : Controller
                     ms.MailFrom = string.IsNullOrWhiteSpace(f.MailFrom) ? "vmon@localhost" : f.MailFrom.Trim();
                     ms.MailRecipients = f.MailRecipients?.Trim() ?? "";
                     ms.SmtpUseAuth = f.SmtpUseAuth;
-                    ms.SmtpUseSsl = f.SmtpUseSsl;
+                    ms.SmtpSecurity = string.IsNullOrWhiteSpace(f.SmtpSecurity) ? "none" : f.SmtpSecurity;
                     ms.SmtpUsername = f.SmtpUsername?.Trim() ?? "";
                     if (!string.IsNullOrWhiteSpace(f.SmtpPassword)) ms.SmtpPasswordEncrypted = CryptoHelper.Encrypt(f.SmtpPassword);
                 }

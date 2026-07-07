@@ -1221,7 +1221,7 @@ public class ApiController : ControllerBase
             s.CheckIntervalMinutes, s.FailureThreshold, s.HistoryRetentionDays,
             // E-posta
             s.EmailEnabled, s.SmtpHost, s.SmtpPort, s.MailFrom, s.MailRecipients,
-            s.SmtpUseAuth, s.SmtpUseSsl, s.SmtpUsername,
+            s.SmtpUseAuth, s.SmtpSecurity, s.SmtpUsername,
             hasSmtpPassword = !string.IsNullOrEmpty(s.SmtpPasswordEncrypted),
             // LDAP + genel
             s.AuthEnabled, s.LdapAuthHost, s.LdapAuthPort, s.LdapAuthUseSsl, s.LdapAuthDomain,

@@ -15,9 +15,9 @@ public class MonitorSettings
     public string MailFrom { get; set; } = "vmon@localhost";
     public string MailRecipients { get; set; } = "";      // virgül/noktalı virgül ile ayrılmış
     public bool EmailEnabled { get; set; } = false;
-    // Kimlik doğrulamalı SMTP (opsiyonel): açık relay yerine kullanıcı adı/şifre + TLS ile gönderim
-    public bool SmtpUseAuth { get; set; } = false;
-    public bool SmtpUseSsl { get; set; } = false;        // STARTTLS/SSL (587/465 senaryoları)
+    // SMTP gönderim: bağlantı güvenliği tek yerden seçilir; port ona göre girilir.
+    public string SmtpSecurity { get; set; } = "none";   // "none" (25) | "starttls" (587) | "ssl" (465)
+    public bool SmtpUseAuth { get; set; } = false;        // kullanıcı adı/şifre ile kimlik doğrulama
     public string SmtpUsername { get; set; } = "";
     public string SmtpPasswordEncrypted { get; set; } = "";
 
@@ -182,7 +182,7 @@ public class SettingsService
         if (dict.TryGetValue("MailRecipients", out v)) s.MailRecipients = v ?? "";
         if (dict.TryGetValue("EmailEnabled", out v)) s.EmailEnabled = v == "true";
         if (dict.TryGetValue("SmtpUseAuth", out v)) s.SmtpUseAuth = v == "true";
-        if (dict.TryGetValue("SmtpUseSsl", out v)) s.SmtpUseSsl = v == "true";
+        if (dict.TryGetValue("SmtpSecurity", out v) && !string.IsNullOrWhiteSpace(v)) s.SmtpSecurity = v!;
         if (dict.TryGetValue("SmtpUsername", out v)) s.SmtpUsername = v ?? "";
         if (dict.TryGetValue("SmtpPasswordEncrypted", out v)) s.SmtpPasswordEncrypted = v ?? "";
 
@@ -253,7 +253,7 @@ public class SettingsService
             ["MailRecipients"] = s.MailRecipients,
             ["EmailEnabled"] = s.EmailEnabled ? "true" : "false",
             ["SmtpUseAuth"] = s.SmtpUseAuth ? "true" : "false",
-            ["SmtpUseSsl"] = s.SmtpUseSsl ? "true" : "false",
+            ["SmtpSecurity"] = s.SmtpSecurity,
             ["SmtpUsername"] = s.SmtpUsername,
             ["SmtpPasswordEncrypted"] = s.SmtpPasswordEncrypted,
             ["AuthEnabled"] = s.AuthEnabled ? "true" : "false",

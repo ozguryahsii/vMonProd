@@ -1,81 +1,61 @@
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 using vMonitor.Models;
 
 namespace vMonitor.Services;
 
-/// <summary>SMTP bildirimi: açık relay (auth yok) VEYA kimlik doğrulamalı (kullanıcı/şifre + TLS).
-/// Kullanıcı Ayarlar'dan seçer; port tamamen elle (25 relay / 587 STARTTLS / 465 SSL vb.).</summary>
+/// <summary>SMTP bildirimi (MailKit): bağlantı güvenliği tek yerden seçilir — Yok / STARTTLS / SSL(465).
+/// Kimlik doğrulama açıksa kullanıcı/şifre uygulanır. Port kullanıcı tarafından girilir (güvenlik seçimine
+/// göre önerilir). System.Net.Mail 465'i desteklemediği için MailKit kullanılır.</summary>
 public class EmailService
 {
     private readonly ILogger<EmailService> _logger;
     public EmailService(ILogger<EmailService> logger) => _logger = logger;
 
-    /// <summary>Ayarlara göre SMTP istemcisi kurar: auth açıksa kullanıcı/şifre + TLS uygular.</summary>
-    private static SmtpClient BuildClient(MonitorSettings s)
+    private static SecureSocketOptions Security(MonitorSettings s) => (s.SmtpSecurity ?? "none").ToLowerInvariant() switch
     {
-        var client = new SmtpClient(s.SmtpHost, s.SmtpPort)
-        {
-            EnableSsl = s.SmtpUseSsl,
-            DeliveryMethod = SmtpDeliveryMethod.Network,
-            UseDefaultCredentials = false
-        };
+        "starttls" => SecureSocketOptions.StartTls,
+        "ssl" => SecureSocketOptions.SslOnConnect,
+        _ => SecureSocketOptions.None
+    };
+
+    private async Task SendCoreAsync(MonitorSettings s, IEnumerable<string> to, string subject, string body, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(s.SmtpHost))
+            throw new InvalidOperationException("SMTP sunucusu tanımlı değil (Ayarlar sayfasından girin).");
+        var toList = to.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).ToList();
+        if (toList.Count == 0) throw new InvalidOperationException("Email alıcısı tanımlı değil.");
+
+        var msg = new MimeMessage();
+        msg.From.Add(new MailboxAddress("vMon", s.MailFrom));
+        foreach (var r in toList) msg.To.Add(MailboxAddress.Parse(r));
+        msg.Subject = subject;
+        msg.Body = new BodyBuilder { HtmlBody = body }.ToMessageBody();
+
+        using var client = new SmtpClient();
+        var port = s.SmtpPort > 0 ? s.SmtpPort : 25;
+        await client.ConnectAsync(s.SmtpHost, port, Security(s), ct);
         if (s.SmtpUseAuth && !string.IsNullOrWhiteSpace(s.SmtpUsername))
         {
             var pwd = string.IsNullOrWhiteSpace(s.SmtpPasswordEncrypted) ? "" : CryptoHelper.Decrypt(s.SmtpPasswordEncrypted);
-            client.Credentials = new NetworkCredential(s.SmtpUsername, pwd);
+            await client.AuthenticateAsync(s.SmtpUsername, pwd, ct);
         }
-        return client;
+        await client.SendAsync(msg, ct);
+        await client.DisconnectAsync(true, ct);
     }
 
-    public async Task SendAsync(MonitorSettings settings, string subject, string body, CancellationToken ct = default)
+    public Task SendAsync(MonitorSettings settings, string subject, string body, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(settings.SmtpHost))
-            throw new InvalidOperationException("SMTP sunucusu tanımlı değil (Ayarlar sayfasından girin).");
-
         var recipients = settings.MailRecipients
             .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (recipients.Length == 0)
-            throw new InvalidOperationException("Email alıcısı tanımlı değil.");
-
-        using var client = BuildClient(settings);
-
-        using var msg = new MailMessage
-        {
-            From = new MailAddress(settings.MailFrom, "vMon"),
-            Subject = subject,
-            Body = body,
-            IsBodyHtml = true,
-            BodyEncoding = System.Text.Encoding.UTF8,
-            SubjectEncoding = System.Text.Encoding.UTF8
-        };
-        foreach (var r in recipients) msg.To.Add(r);
-
-        await client.SendMailAsync(msg, ct);
-        _logger.LogInformation("Email gönderildi: {Subject} -> {Recipients}", subject, settings.MailRecipients);
+        _logger.LogInformation("Email gönderiliyor: {Subject} -> {Recipients}", subject, settings.MailRecipients);
+        return SendCoreAsync(settings, recipients, subject, body, ct);
     }
 
     /// <summary>Belirli bir adrese e-posta gönderir (OTP gibi kullanıcıya özel mesajlar için).</summary>
-    public async Task SendToAsync(MonitorSettings settings, string toAddress, string subject, string body, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(settings.SmtpHost))
-            throw new InvalidOperationException("SMTP sunucusu tanımlı değil (Ayarlar sayfasından girin).");
-        if (string.IsNullOrWhiteSpace(toAddress))
-            throw new InvalidOperationException("Alıcı e-posta adresi yok.");
-
-        using var client = BuildClient(settings);
-        using var msg = new MailMessage
-        {
-            From = new MailAddress(settings.MailFrom, "vMon"),
-            Subject = subject,
-            Body = body,
-            IsBodyHtml = true,
-            BodyEncoding = System.Text.Encoding.UTF8,
-            SubjectEncoding = System.Text.Encoding.UTF8
-        };
-        msg.To.Add(toAddress.Trim());
-        await client.SendMailAsync(msg, ct);
-    }
+    public Task SendToAsync(MonitorSettings settings, string toAddress, string subject, string body, CancellationToken ct = default)
+        => SendCoreAsync(settings, new[] { toAddress }, subject, body, ct);
 
     public Task SendDownAlertAsync(MonitorSettings settings, MonitoredService svc, string? error, CancellationToken ct = default)
     {
