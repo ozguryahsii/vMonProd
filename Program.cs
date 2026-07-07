@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
@@ -109,6 +110,13 @@ var secrets = new DpapiSecretProtector();
 builder.Services.AddSingleton(bootstrap);
 builder.Services.AddSingleton(bcfg);
 builder.Services.AddSingleton<ISecretProtector>(secrets);
+
+// Oturum çerezleri için KALICI DataProtection anahtarları (Data/keys — güncellemede korunur).
+// Aksi halde servis her yeniden başladığında (özellikle self-update sonrası) anahtar değişip
+// tüm oturumlar düşer; /api/me 401 döner ve arayüz "yeniden başlatılıyor" ekranında takılır.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "Data", "keys")))
+    .SetApplicationName("vMon");
 
 // Lisans Fazı L1: offline imzalı key doğrulama (bootstrap.json'daki LicenseKey'den yüklenir)
 builder.Services.AddSingleton<LicenseService>();

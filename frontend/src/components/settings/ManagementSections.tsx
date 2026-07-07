@@ -387,14 +387,23 @@ export function UpdateCard() {
       const r = await applyUpdate();
       if (!r.ok) { setUpdating(null); setFlash({ ok: false, msg: r.message }); return; }
       setUpdating("Uygulama yeniden başlatılıyor — sayfa otomatik yenilenecek…");
-      // Yeni sürüm ayağa kalkana dek /api/me'yi yokla; sürüm değişince yenile
+      // Yeni sürüm ayağa kalkınca yenile. Ham fetch kullanılır (apiGet'in 401→login yönlendirmesini
+      // TETİKLEMEZ), no-store ile önbellek atlanır. Her koşulda 25 sn'lik GARANTİLİ yenileme takılmayı önler.
       const startVer = me?.version;
+      let done = false;
+      const finish = () => { if (!done) { done = true; window.location.reload(); } };
       const poll = setInterval(async () => {
         try {
-          const m = await getMe();
-          if (m.version && m.version !== startVer) { clearInterval(poll); window.location.reload(); }
+          const res = await fetch(`/api/me?_=${Date.now()}`, { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+          if (res.ok) {
+            const m = await res.json();
+            if (m.version && m.version !== startVer) { clearInterval(poll); finish(); }   // yeni sürüm ayakta
+          } else if (res.status === 401) {
+            clearInterval(poll); finish();   // oturum yenilenmeli → yine de yenile (gerekirse login'e düşer)
+          }
         } catch { /* servis yeniden başlarken kısa süre erişilemez — normal */ }
-      }, 5000);
+      }, 4000);
+      setTimeout(() => { clearInterval(poll); finish(); }, 25000);   // garantili çıkış
     } catch (e) {
       setUpdating(null);
       setFlash({ ok: false, msg: (e as Error).message });
