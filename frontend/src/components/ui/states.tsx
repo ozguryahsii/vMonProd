@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AlertTriangle, Inbox, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,6 +7,16 @@ import { cn } from "@/lib/utils";
 /** Yükleme iskeleti bloğu */
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("skeleton", className)} />;
+}
+
+/** Lisans kilidi notu — paket-kısıtlı özelliklerde standart sarı bilgi kutusu.
+ *  Amaç: kullanıcı denemeye uğraşmadan neyin hangi pakette olduğunu görsün. */
+export function LicenseLockNote({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400", className)}>
+      {children}
+    </div>
+  );
 }
 
 /** Hata durumu — yeniden dene ile */

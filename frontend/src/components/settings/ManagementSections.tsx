@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea, Field, Switch } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/drawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Skeleton } from "@/components/ui/states";
+import { Skeleton, LicenseLockNote } from "@/components/ui/states";
+import { useMe } from "@/hooks/useMe";
 import {
   getChannels, createChannel, updateChannel, deleteChannel, toggleChannel, testChannel,
   getBackups, backupNow, backupDelete, backupRestore, backupDownloadUrl,
@@ -22,6 +23,9 @@ type Flash = { ok: boolean; msg: string } | null;
 
 /* ================= Bildirim Kanalları ================= */
 export function ChannelsCard() {
+  // Lisans: Basic yalnız e-posta — SMS/WhatsApp/IVR entegrasyonları kilitli (deneme zahmeti olmasın)
+  const { me } = useMe();
+  const channelsLicensed = me?.license?.emailOnly !== true;
   const [rows, setRows] = useState<ChannelRow[] | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ChannelRow | null>(null);
@@ -60,9 +64,12 @@ export function ChannelsCard() {
           <CardTitle className="text-base">Bildirim Kanalları</CardTitle>
           <CardDescription>Özel SMS / WhatsApp / Sesli-IVR entegrasyonları (şablonlu HTTP)</CardDescription>
         </div>
-        <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> Ekle</Button>
+        <Button size="sm" disabled={!channelsLicensed} onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> Ekle</Button>
       </CardHeader>
       <CardContent className="space-y-2">
+        {!channelsLicensed && (
+          <LicenseLockNote>SMS, WhatsApp ve Sesli/IVR entegrasyonları Standard ve Enterprise paketlerde kullanılabilir. Basic paket yalnız e-posta bildirimi destekler.</LicenseLockNote>
+        )}
         {flash && <FlashLine f={flash} />}
         {rows === null ? <Skeleton className="h-24 w-full" /> :
           rows.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Entegrasyon yok — Twilio yerleşik kanalları yukarıdaki bölümlerden yönetilir.</p> :

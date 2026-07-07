@@ -583,6 +583,10 @@
         "1-10 (sorun döngüsü başına)": "1-10 (per incident cycle)",
         "Self-Healing açık": "Self-Healing on",
         "Self-Healing özelliği Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.": "Self-Healing is available in the Standard and Enterprise editions. It cannot be enabled in Basic.",
+        "SIEM/Syslog log aktarımı Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.": "SIEM/Syslog forwarding is available in the Standard and Enterprise editions. It cannot be enabled in Basic.",
+        "SMS, WhatsApp ve Sesli/IVR entegrasyonları Standard ve Enterprise paketlerde kullanılabilir. Basic paket yalnız e-posta bildirimi destekler.": "SMS, WhatsApp and Voice/IVR integrations are available in the Standard and Enterprise editions. The Basic edition supports email notifications only.",
+        "SMS, WhatsApp ve Arama alarmları Standard ve Enterprise paketlerde kullanılabilir. Basic paket yalnız e-posta bildirimi destekler.": "SMS, WhatsApp and Call alarms are available in the Standard and Enterprise editions. The Basic edition supports email notifications only.",
+        "LDAP senkronizasyonu Standard ve Enterprise paketlerde kullanılabilir. Basic paket en fazla 1 kullanıcı destekler.": "LDAP synchronization is available in the Standard and Enterprise editions. The Basic edition supports at most 1 user.",
         "ardışık down sonrası": "consecutive downs, then",
         "deneme otomatik yeniden başlatma": "automatic restart attempts",
         // Yol haritası #2 — Yaklaşan Disk Dolumları

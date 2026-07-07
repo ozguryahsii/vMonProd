@@ -39,9 +39,11 @@ export function ServiceForm({
   const [form, setForm] = useState<ServiceInput>(empty);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  // Self-Healing yalnız Standard/Enterprise lisansta (Basic'te kilit + yükseltme notu)
+  // Paket kilitleri: Self-Healing ve SMS/WhatsApp/Arama alarmları yalnız Standard/Enterprise
   const { me } = useMe();
-  const selfHealLicensed = me?.license?.edition !== "Basic";
+  const selfHealLicensed = me?.license?.selfHeal !== false;
+  const emailOnly = me?.license?.emailOnly === true;
+  const cnLock = emailOnly ? "pointer-events-none opacity-50" : "";
 
   useEffect(() => {
     if (open) { setForm(service ? toInput(service) : empty); setErr(null); }
@@ -207,11 +209,24 @@ export function ServiceForm({
 
         <div>
           <p className="mb-2 text-sm font-medium text-muted-foreground">Alarm Kanalları</p>
-          <div className="flex flex-wrap gap-6 rounded-lg border border-border/60 bg-muted/30 p-4">
-            <Switch checked={form.alertMail} onChange={(v) => set("alertMail", v)} label="Mail" />
-            <Switch checked={form.alertSms} onChange={(v) => set("alertSms", v)} label="SMS" />
-            <Switch checked={form.alertWhatsapp} onChange={(v) => set("alertWhatsapp", v)} label="WhatsApp" />
-            <Switch checked={form.alertCall} onChange={(v) => set("alertCall", v)} label="Arama" />
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+            {emailOnly && (
+              <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                SMS, WhatsApp ve Arama alarmları Standard ve Enterprise paketlerde kullanılabilir. Basic paket yalnız e-posta bildirimi destekler.
+              </div>
+            )}
+            <div className="flex flex-wrap gap-6">
+              <Switch checked={form.alertMail} onChange={(v) => set("alertMail", v)} label="Mail" />
+              <div className={cnLock}>
+                <Switch checked={form.alertSms && !emailOnly} onChange={(v) => { if (!emailOnly) set("alertSms", v); }} label="SMS" />
+              </div>
+              <div className={cnLock}>
+                <Switch checked={form.alertWhatsapp && !emailOnly} onChange={(v) => { if (!emailOnly) set("alertWhatsapp", v); }} label="WhatsApp" />
+              </div>
+              <div className={cnLock}>
+                <Switch checked={form.alertCall && !emailOnly} onChange={(v) => { if (!emailOnly) set("alertCall", v); }} label="Arama" />
+              </div>
+            </div>
           </div>
         </div>
       </div>

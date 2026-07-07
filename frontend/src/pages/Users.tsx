@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Field } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/drawer";
-import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
+import { Skeleton, ErrorState, EmptyState, LicenseLockNote } from "@/components/ui/states";
+import { useMe } from "@/hooks/useMe";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   getUsers, updateUser, deleteUser, syncUsers,
@@ -15,6 +16,9 @@ import { cn } from "@/lib/utils";
 const dt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
 export function Users() {
+  // Lisans: Basic 1 kullanıcı — LDAP senkron kilitli (grup üyeleri limiti aşar)
+  const { me } = useMe();
+  const syncLicensed = (me?.license?.maxUsers ?? Infinity) > 1;
   const [data, setData] = useState<UsersData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -56,11 +60,15 @@ export function Users() {
         </div>
       )}
 
+      {!syncLicensed && (
+        <LicenseLockNote>LDAP senkronizasyonu Standard ve Enterprise paketlerde kullanılabilir. Basic paket en fazla 1 kullanıcı destekler.</LicenseLockNote>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Yetkiler kullanıcının <b>bir sonraki girişinde</b> geçerli olur. <Star className="inline h-3 w-3 text-amber-400" /> = uygulama admini (Ayarlar'dan yönetilir).
         </p>
-        <Button variant="outline" size="sm" onClick={doSync} disabled={busy}>
+        <Button variant="outline" size="sm" onClick={doSync} disabled={busy || !syncLicensed}>
           <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} /> LDAP Senkronizasyonu
         </Button>
       </div>

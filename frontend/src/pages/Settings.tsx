@@ -6,7 +6,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Field, Switch } from "@/components/ui/input";
-import { Skeleton, ErrorState } from "@/components/ui/states";
+import { Skeleton, ErrorState, LicenseLockNote } from "@/components/ui/states";
 import {
   getSettings, saveSettings, testEmail, testLdap, testSyslog, eolSyncNow,
   type AppSettings,
@@ -17,7 +17,9 @@ import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
 
 export function Settings() {
-  const { reloadMe } = useMe();
+  const { me, reloadMe } = useMe();
+  // Paket kilitleri: Basic'te SIEM kapalı (arayüzde de kilitli — kullanıcı denemeye uğraşmasın)
+  const siemLicensed = me?.license?.siem !== false;
   const [s, setS] = useState<AppSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creds, setCreds] = useState<CredentialRow[]>([]);
@@ -187,15 +189,20 @@ export function Settings() {
           <Field label="Denetim kaydı saklama (gün)" hint="min 365 — PCI 10.5.1"><Input type="number" value={s.auditRetentionDays} onChange={(e) => set("auditRetentionDays", num(e.target.value, 365))} /></Field>
         </Section>
 
-        {/* SIEM */}
+        {/* SIEM — Basic pakette kilitli */}
         <Section icon={<Radio className="h-4 w-4" />} title="SIEM / Syslog Aktarımı"
-          action={<Button variant="outline" size="sm" onClick={() => runTest("syslog", testSyslog)}><Radio className="h-4 w-4" /> Test</Button>}>
-          <Switch checked={s.syslogEnabled} onChange={(v) => set("syslogEnabled", v)} label="Denetim kayıtlarını syslog'a ilet" />
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2"><Field label="Sunucu"><Input value={s.syslogHost} onChange={(e) => set("syslogHost", e.target.value)} placeholder="siem.firma.local" /></Field></div>
-            <Field label="Port"><Input type="number" value={s.syslogPort} onChange={(e) => set("syslogPort", num(e.target.value, 514))} /></Field>
+          action={<Button variant="outline" size="sm" disabled={!siemLicensed} onClick={() => runTest("syslog", testSyslog)}><Radio className="h-4 w-4" /> Test</Button>}>
+          {!siemLicensed && (
+            <LicenseLockNote>SIEM/Syslog log aktarımı Standard ve Enterprise paketlerde kullanılabilir. Basic pakette açılamaz.</LicenseLockNote>
+          )}
+          <div className={cn(!siemLicensed && "pointer-events-none opacity-50")}>
+            <Switch checked={s.syslogEnabled && siemLicensed} onChange={(v) => { if (siemLicensed) set("syslogEnabled", v); }} label="Denetim kayıtlarını syslog'a ilet" />
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2"><Field label="Sunucu"><Input value={s.syslogHost} onChange={(e) => set("syslogHost", e.target.value)} placeholder="siem.firma.local" /></Field></div>
+              <Field label="Port"><Input type="number" value={s.syslogPort} onChange={(e) => set("syslogPort", num(e.target.value, 514))} /></Field>
+            </div>
+            <Switch checked={s.syslogTcp} onChange={(v) => set("syslogTcp", v)} label="TCP kullan (varsayılan UDP)" />
           </div>
-          <Switch checked={s.syslogTcp} onChange={(v) => set("syslogTcp", v)} label="TCP kullan (varsayılan UDP)" />
           <TestNote k="syslog" msg={testMsg} />
         </Section>
 

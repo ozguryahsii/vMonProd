@@ -273,6 +273,7 @@ public class CheckRunner
     private async Task FireIntegrationsAsync(string[] kinds, MonitorSettings settings, MonitoredService svc,
         Func<SmsProvider, string> textFor, CancellationToken ct)
     {
+        if (EmailOnly) return;   // Lisans: Basic yalnız e-posta — özel SMS/IVR entegrasyonları da göndermez
         List<SmsProvider> list;
         try
         {
@@ -308,6 +309,7 @@ public class CheckRunner
     private async Task FireWhatsappIntegrationsAsync(MonitorSettings settings, MonitoredService svc,
         bool recovered, bool isError, string? error, DateTime now, CancellationToken ct)
     {
+        if (EmailOnly) return;   // Lisans: Basic yalnız e-posta — özel WhatsApp entegrasyonları da göndermez
         List<SmsProvider> list;
         try { list = await _db.SmsProviders.AsNoTracking().Where(p => p.Enabled && p.Kind == "Whatsapp").ToListAsync(ct); }
         catch (Exception ex) { _logger.LogError(ex, "WhatsApp entegrasyonları okunamadı"); return; }

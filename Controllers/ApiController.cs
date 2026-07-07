@@ -1036,9 +1036,17 @@ public class ApiController : ControllerBase
             theme,
             lang,
             companyName = settings.CompanyName,
-            // Lisans Fazı L1: sol üst rozet + Hakkında kalan gün bilgisi buradan beslenir
+            // Lisans Fazı L1: sol üst rozet + Hakkında kalan gün + arayüz kilitleri buradan beslenir
             license = _lic.Current is { } lic
-                ? new { edition = lic.Edition.ToString(), company = lic.Company, expires = lic.ExpiresAt.ToString("yyyy-MM-dd"), daysLeft = lic.DaysLeft }
+                ? new
+                {
+                    edition = lic.Edition.ToString(), company = lic.Company,
+                    expires = lic.ExpiresAt.ToString("yyyy-MM-dd"), daysLeft = lic.DaysLeft,
+                    maxMonitors = lic.MaxMonitors == int.MaxValue ? (int?)null : lic.MaxMonitors,
+                    maxUsers = lic.MaxUsers == int.MaxValue ? (int?)null : lic.MaxUsers,
+                    maxDashboards = lic.MaxDashboards == int.MaxValue ? (int?)null : lic.MaxDashboards,
+                    emailOnly = lic.EmailOnlyNotifications, siem = lic.SiemAllowed, selfHeal = lic.SelfHealAllowed
+                }
                 : null
         });
     }
@@ -1403,6 +1411,8 @@ public class ApiController : ControllerBase
     {
         var s = await _settings.GetAsync(ct);
         if (!AdminAllowed(s)) return Forbid403();
+        if (_lic.Current is { EmailOnlyNotifications: true })
+            return BadRequest("Lisans: Basic paket yalnız e-posta bildirimi destekler.");
         var p = await _db.SmsProviders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (p == null) return NotFound("Entegrasyon bulunamadı");
         if (string.IsNullOrWhiteSpace(m.To)) return BadRequest("Test için bir alıcı girin.");

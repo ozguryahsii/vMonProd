@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ServiceForm } from "@/components/services/ServiceForm";
 import { BulkEditForm } from "@/components/services/BulkEditForm";
 import { useAsync } from "@/hooks/useAsync";
+import { useMe } from "@/hooks/useMe";
 import {
   type ServiceItem, type ServicesMeta, statusOf, CONTROL_TYPES, fmtDbValue,
   listServices, servicesMeta, deleteService, checkService, serviceAction,
@@ -28,6 +29,7 @@ const badge: Record<string, { label: string; cls: string; dot: string }> = {
 
 export function Services() {
   const { data, loading, error, reload } = useAsync(listServices, 30000);
+  const { me } = useMe();
   const [meta, setMeta] = useState<ServicesMeta | null>(null);
   const [searchParams] = useSearchParams();
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
@@ -163,9 +165,18 @@ export function Services() {
           <option value="">Tüm etiketler</option>
           {tags.map((t) => <option key={t} value={t}>{t}</option>)}
         </Select>
-        <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
-          <Plus className="h-4 w-4" /> Yeni İzleme
-        </Button>
+        {/* Lisans limiti (Basic 40 / Standard 200): limit dolunca buton kilitli */}
+        {(() => {
+          const maxMon = me?.license?.maxMonitors ?? null;
+          const monFull = maxMon != null && (data?.length ?? 0) >= maxMon;
+          return (
+            <Button size="sm" disabled={monFull}
+              title={monFull ? `Lisans limiti: ${me?.license?.edition} paket en fazla ${maxMon} izleme destekler.` : undefined}
+              onClick={() => { setEditing(null); setFormOpen(true); }}>
+              <Plus className="h-4 w-4" /> Yeni İzleme
+            </Button>
+          );
+        })()}
         <div className="flex gap-1">
           <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={onImportFile} />
           <Button variant="outline" size="sm" disabled={bulkBusy} onClick={() => fileRef.current?.click()} title="CSV'den toplu servis ekle">

@@ -14,6 +14,7 @@ import {
   type StatusService, type Board, type Cat, catOf, getStatus, getBoards, deleteBoard,
 } from "@/lib/monitor";
 import { checkIds, isDbHealthType, fmtDbValue } from "@/lib/services";
+import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
 
 const cats: { key: Cat; label: string; num: string; ring: string; dot: string }[] = [
@@ -38,6 +39,7 @@ const badgeOf: Record<string, { label: string; cls: string }> = {
 
 export function Dashboard() {
   const { data, loading, error, reload } = useAsync(getStatus, 20000);
+  const { me } = useMe();
   const [boards, setBoards] = useState<Board[]>([]);
   const [boardId, setBoardId] = useState<number | "all">("all");
   const [active, setActive] = useState<Cat>("all");
@@ -115,7 +117,18 @@ export function Dashboard() {
               <Button variant="destructive" size="sm" onClick={() => setToDelete(board)}><Trash2 className="h-4 w-4" /> Sil</Button>
             </>
           )}
-          <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> Yeni Dashboard</Button>
+          {/* Lisans limiti (Basic 5): limit dolunca buton kilitli — kullanıcı denemeye uğraşmasın */}
+          {(() => {
+            const maxDash = me?.license?.maxDashboards ?? null;
+            const dashFull = maxDash != null && boards.length >= maxDash;
+            return (
+              <Button size="sm" disabled={dashFull}
+                title={dashFull ? `Lisans limiti: ${me?.license?.edition} paket en fazla ${maxDash} dashboard destekler.` : undefined}
+                onClick={() => { setEditing(null); setFormOpen(true); }}>
+                <Plus className="h-4 w-4" /> Yeni Dashboard
+              </Button>
+            );
+          })()}
         </div>
       </div>
 

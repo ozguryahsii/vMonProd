@@ -5,6 +5,12 @@ export interface MeLicense {
   company: string;
   expires: string;    // yyyy-MM-dd
   daysLeft: number;
+  maxMonitors: number | null;      // null = sınırsız
+  maxUsers: number | null;
+  maxDashboards: number | null;
+  emailOnly: boolean;
+  siem: boolean;
+  selfHeal: boolean;
 }
 
 export interface Me {
