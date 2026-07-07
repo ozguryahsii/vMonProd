@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MultiLineChart, type SeriesDef } from "@/components/charts/MultiLineChart";
 import { Skeleton } from "@/components/ui/states";
 import { type StatusService, getTimeSeries, getMetricsSeries } from "@/lib/monitor";
-import { isDbHealthType } from "@/lib/services";
+import { isDbHealthType, isCertType } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const HEALTH_TYPES = ["WindowsHealth", "LinuxHealth"];
@@ -34,7 +34,7 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
     const respIds = manualIds.size > 0
       ? enabled.filter((s) => manualIds.has(s.id)).slice(0, 20).map((s) => s.id)
       : enabled
-          .filter((s) => !isDbHealthType(s.type))
+          .filter((s) => !isDbHealthType(s.type) && !isCertType(s.type))
           .slice().sort((a, b) => (b.lastResponseTimeMs ?? 0) - (a.lastResponseTimeMs ?? 0))
           .slice(0, 12).map((s) => s.id);
     const healthIds = enabled.filter((s) => HEALTH_TYPES.includes(s.type)).slice(0, 20).map((s) => s.id);

@@ -34,6 +34,7 @@ export interface StatsData {
   };
   heatmap: { rows: string[]; data: [number, number, number][] };
   diskForecast: { name: string; current: number; perDay: number; daysLeft: number; date: string }[];
+  certExpiry: { name: string; target: string; daysLeft: number | null; status: number; error: string | null; lastChecked: string | null }[];
   dbHealth: {
     counts: { total: number; ok: number; warn: number; err: number; down: number };
     items: {

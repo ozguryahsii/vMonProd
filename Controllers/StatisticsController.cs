@@ -226,6 +226,21 @@ public class StatisticsController : Controller
         var diskForecast = forecastList.OrderBy(x => x.daysLeft).Take(20)
             .Select(x => new { x.name, x.current, x.perDay, x.daysLeft, x.date }).ToList();
 
+        // SSL sertifika izlemeleri: "Yaklaşan Sertifika Bitişleri" widget'ı (kalan gün = LastResponseTimeMs)
+        var certExpiry = await _db.Services.AsNoTracking()
+            .Where(s => s.Enabled && s.Type == ServiceType.SslCertificate)
+            .OrderBy(s => s.LastResponseTimeMs)
+            .Select(s => new
+            {
+                name = s.Name,
+                target = s.Target,
+                daysLeft = s.LastResponseTimeMs,
+                status = s.LastStatus,
+                error = s.LastError,
+                lastChecked = s.LastCheckedAt
+            })
+            .ToListAsync();
+
         // DB İzleme Fazı: veritabanı sağlık izlemeleri özeti (İstatistikler DB widget'ları)
         var dbSvcAll = await DbHealthServicesAsync();
         var dbItems = dbSvcAll.Select(s => new
@@ -291,7 +306,8 @@ public class StatisticsController : Controller
             rising,
             heatmap = new { rows = heatRows, data = heatData },
             dbHealth,
-            diskForecast
+            diskForecast,
+            certExpiry
         };
     }
 
@@ -566,5 +582,7 @@ public class StatisticsController : Controller
         new() { Type="db_alerts",Source="db_alerts",     X=6, Y=38, W=6, H=4, SortOrder=25 },
         // Yol haritası #2 — disk dolum tahmini
         new() { Type="disk_forecast", Source="disk_forecast", X=0, Y=42, W=6, H=4, SortOrder=26 },
+        // SSL sertifika izleme — yaklaşan bitişler
+        new() { Type="cert_expiry", Source="cert_expiry", X=6, Y=42, W=6, H=4, SortOrder=27 },
     };
 }

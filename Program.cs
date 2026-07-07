@@ -188,6 +188,8 @@ builder.Services.AddScoped<IServiceChecker, MySqlBlockedSessionsChecker>();
 builder.Services.AddScoped<IServiceChecker, MySqlLongQueriesChecker>();
 builder.Services.AddScoped<IServiceChecker, MySqlReplicationChecker>();
 builder.Services.AddScoped<IServiceChecker, MySqlConnectionUsageChecker>();
+// SSL sertifika izleme (SLLTracker mirası — iç/dış çift kontrol + thumbprint karşılaştırma)
+builder.Services.AddScoped<IServiceChecker, SslCertificateChecker>();
 builder.Services.AddScoped<IServiceChecker, LdapChecker>();
 builder.Services.AddScoped<IServiceChecker, DnsChecker>();
 builder.Services.AddScoped<IServiceChecker, SftpChecker>();

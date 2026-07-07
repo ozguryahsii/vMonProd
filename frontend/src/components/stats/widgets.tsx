@@ -46,6 +46,7 @@ export const WIDGET_CATALOG: CatalogItem[] = [
   { type: "os_eol", source: "os_eol", label: "Destek sonu (EOL) OS", group: "İçgörü", w: 6, h: 4 },
   { type: "heatmap", source: "heatmap", label: "CPU ısı haritası (24s)", group: "İçgörü", w: 12, h: 5 },
   { type: "disk_forecast", source: "disk_forecast", label: "Yaklaşan Disk Dolumları", group: "İçgörü", w: 6, h: 4 },
+  { type: "cert_expiry", source: "cert_expiry", label: "Yaklaşan Sertifika Bitişleri", group: "İçgörü", w: 6, h: 4 },
   // DB İzleme Fazı — veritabanı sağlık widget'ları
   { type: "db_health", source: "db_health", label: "Veritabanı Sağlığı", group: "Veritabanı", w: 12, h: 4 },
   { type: "db_usage", source: "db_usage", label: "DB Bağlantı Doluluğu", group: "Veritabanı", w: 6, h: 4 },
@@ -78,6 +79,7 @@ export function WidgetRenderer({ w, data, onDrill }: { w: StatWidgetDef; data: S
     case "os_eol": return <OsEol d={data} onDrill={onDrill} />;
     case "heatmap": return <Heatmap d={data} />;
     case "disk_forecast": return <DiskForecastW d={data} onDrill={onDrill} />;
+    case "cert_expiry": return <CertExpiryW d={data} />;
     case "db_health": return <DbHealthW d={data} onDrill={onDrill} />;
     case "db_usage": return <DbUsageW d={data} onDrill={onDrill} />;
     case "db_alerts": return <DbAlertsW d={data} onDrill={onDrill} />;
@@ -450,6 +452,47 @@ function DiskForecastW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
               <div className={cn("h-full rounded-full", bar)} style={{ width: `${Math.min(100, i.current)}%` }} />
             </div>
           </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ================= SSL Sertifika: Yaklaşan Bitişler ================= */
+/** SSL sertifika izlemelerinin kalan günleri (≤7 kırmızı, ≤30 amber); iç/dış uyumsuzluk işaretlenir. */
+function CertExpiryW({ d }: { d: StatsData }) {
+  const items = d.certExpiry ?? [];
+  if (items.length === 0)
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+        <span>Henüz SSL sertifika izlemesi yok</span>
+        <span className="text-xs">İzlemeler ekranından "SSL Sertifikası" tipiyle ekleyebilirsiniz.</span>
+      </div>
+    );
+  return (
+    <div className="h-full space-y-1.5 overflow-y-auto px-4 py-2">
+      {items.map((i) => {
+        const days = i.daysLeft;
+        const mismatch = (i.error ?? "").includes("FARKLI");
+        const expired = days != null && days < 0;
+        const chip = expired || mismatch ? "bg-rose-500/15 text-rose-400"
+          : days != null && days <= 7 ? "bg-rose-500/15 text-rose-400"
+          : days != null && days <= 30 ? "bg-amber-500/15 text-amber-400"
+          : "bg-emerald-500/15 text-emerald-400";
+        return (
+          <div key={i.name} title={i.error ?? i.target}
+            className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-xs">
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{i.name}</span>
+              <span className="block truncate font-mono text-[10px] text-muted-foreground">{i.target}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {mismatch && <span className="rounded bg-rose-500/15 px-1.5 py-0.5 font-semibold text-rose-400">iç≠dış</span>}
+              <span className={cn("rounded px-1.5 py-0.5 font-semibold tabular-nums", chip)}>
+                {days == null ? "—" : expired ? "SÜRESİ DOLDU" : `${days} gün`}
+              </span>
+            </span>
+          </div>
         );
       })}
     </div>

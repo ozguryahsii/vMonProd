@@ -110,17 +110,22 @@ export const DB_METRIC_META: Record<string, DbMetricMeta> = {
 };
 export const isDbHealthType = (t: string) => t in DB_METRIC_META;
 
+/** SSL sertifika izleme (SLLTracker mirası): değer = KALAN GÜN (ms değil). */
+export const isCertType = (t: string) => t === "SslCertificate";
+
 /** Metrik kutusuna tıklayınca yan panelde canlı liste (kim/hangisi/ne kadar) gösterilebilen tipler:
  *  aktif/bloklu oturum, uzun sorgu, (Oracle tablespace / MSSQL DB durumu), bağlantı doluluğu. */
 export const hasDbDetail = (t: string) => {
+  if (isCertType(t)) return true;   // canlı sertifika detayı (iç/dış CN, veren, bitiş, parmak izi)
   const m = DB_METRIC_META[t];
   return !!m && (m.metric === "active" || m.metric === "blocked" || m.metric === "long"
     || m.metric === "status" || m.metric === "usage");
 };
 
-/** DB metriği değer biçimlendirme: "34 oturum", "%71", "12 sn", "45 ms" */
+/** DB metriği değer biçimlendirme: "34 oturum", "%71", "12 sn", "45 ms", sertifikada "N gün" */
 export function fmtDbValue(type: string, v: number | null | undefined): string {
   if (v == null) return "—";
+  if (isCertType(type)) return `${v} gün`;
   const m = DB_METRIC_META[type];
   if (!m) return `${v} ms`;
   if (m.unit === "%") return `%${v}`;
@@ -172,6 +177,7 @@ export const TYPE_META: Record<string, TypeMeta> = {
   MySqlLongQueries: { group: "Veritabanı", label: "MySQL Uzun Süren Sorgular", hint: "60 sn'den uzun süredir çalışan sorgu adedi çekilir; adet grafiğe yazılır. Yavaşlık Eşiği alanı bu adede eşik olur (aşınca YAVAŞ).", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
   MySqlReplication: { group: "Veritabanı", label: "MySQL Replikasyon Sağlığı", hint: "Replika IO/SQL thread durumu + kaynağın kaç sn gerisinde olduğu çekilir; gecikme (sn) grafiğe yazılır. Thread durmuşsa HATA; Yavaşlık Eşiği alanı gecikmeye sn eşiği olur.", target: { label: "Replika Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "REPLICATION CLIENT yetkili kullanıcı (GRANT REPLICATION CLIENT)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
   MySqlConnectionUsage: { group: "Veritabanı", label: "MySQL Bağlantı Doluluğu (%)", hint: "Bağlantı adedinin max_connections limitine oranı (%) çekilir; yüzde grafiğe yazılır. Yavaşlık Eşiği alanına örn. 90 yazarsanız aşınca YAVAŞ işaretlenir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "PROCESS yetkili izleme kullanıcısı (GRANT PROCESS)." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  SslCertificate: { group: "Web / Genel", label: "SSL Sertifikası (iç/dış kontrol)", hint: "Alan adının SSL sertifikası DIŞARIDAN denetlenir (public DNS ile — iç ağın DNS'i atlanır, gerçekten dışarıdan görünen sertifika alınır); kalan gün grafiğe yazılır. İç kontrol hedefi doldurulursa sunucudaki sertifika da alınıp dışarıdakiyle KARŞILAŞTIRILIR — sunucuda yenilenen ama F5/yük dengeleyicide eski kalan sertifika yakalanır. Uyarı eşiği (gün) altına inince veya süre dolunca HATA üretir.", target: { label: "Alan adı *", hint: "örn. portal.firma.com (https:// yazmadan da olur)" }, port: { hint: "Boşsa 443." }, extra: { label: "İç kontrol hedefi (host[:port])", hint: "Opsiyonel — örn. 10.184.10.5 veya sunucu.local:8443. Doluysa iç/dış sertifikalar karşılaştırılır." }, cred: null, ssl: null, cert: false },
   Ldap: { group: "Altyapı", label: "Active Directory / LDAP(S)", hint: "Domain Controller'a yetkili kullanıcıyla gerçek bind yapılır. LDAPS için SSL işaretleyin (port 636).", target: { label: "Domain Controller / IP *" }, port: { hint: "Boşsa 389 (LDAP) / 636 (SSL işaretliyse)." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "AD hesabı (Domain alanını doldurun) veya tam DN." }, ssl: "LDAPS kullan", cert: true },
   Dns: { group: "Altyapı", label: "DNS", hint: "Hedef DNS sunucusuna doğrudan A kaydı sorgusu atılır (OS resolver kullanılmaz).", target: { label: "DNS Sunucu IP *" }, port: { hint: "Boşsa 53." }, extra: { label: "Test edilecek hostname *", hint: "örn. intranet.firma.local — bu kayıt çözülürse UP." }, cred: null, ssl: null, cert: false },
   Sftp: { group: "Altyapı", label: "SFTP", hint: "Yetkili kullanıcıyla gerçek SSH/SFTP oturumu açılır ve dizin listelenir.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SFTP kullanıcısı." }, ssl: null, cert: false },

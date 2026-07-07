@@ -607,6 +607,27 @@
         "Kurum içi açık relay için \"Yok\" + port 25 seçin. Office365/Gmail gibi sağlayıcılar için STARTTLS (587) veya SSL/TLS (465) + kimlik doğrulama kullanın.": "For an internal open relay, choose \"None\" + port 25. For providers like Office365/Gmail, use STARTTLS (587) or SSL/TLS (465) with authentication.",
         "kayıtlı — değiştirmek için yaz": "saved — type to change",
         "gizli, şifreli saklanır": "hidden, stored encrypted",
+        // SSL Sertifika izleme (SLLTracker mirası)
+        "SSL Sertifikası (iç/dış kontrol)": "SSL Certificate (internal/external check)",
+        "Alan adının SSL sertifikası DIŞARIDAN denetlenir (public DNS ile — iç ağın DNS'i atlanır, gerçekten dışarıdan görünen sertifika alınır); kalan gün grafiğe yazılır. İç kontrol hedefi doldurulursa sunucudaki sertifika da alınıp dışarıdakiyle KARŞILAŞTIRILIR — sunucuda yenilenen ama F5/yük dengeleyicide eski kalan sertifika yakalanır. Uyarı eşiği (gün) altına inince veya süre dolunca HATA üretir.": "The domain's SSL certificate is checked FROM OUTSIDE (via public DNS — the internal network's DNS is bypassed, so the certificate actually visible externally is retrieved); days remaining are charted. If an internal check target is set, the certificate on the server is also retrieved and COMPARED with the external one — catching certificates renewed on the server but left stale on the F5/load balancer. Produces ERROR below the warning threshold (days) or when expired.",
+        "Alan adı": "Domain name",
+        "örn. portal.firma.com (https:// yazmadan da olur)": "e.g. portal.company.com (with or without https://)",
+        "İç kontrol hedefi (host[:port])": "Internal check target (host[:port])",
+        "Opsiyonel — örn. 10.184.10.5 veya sunucu.local:8443. Doluysa iç/dış sertifikalar karşılaştırılır.": "Optional — e.g. 10.184.10.5 or server.local:8443. When set, internal/external certificates are compared.",
+        "Uyarı eşiği (gün)": "Warning threshold (days)",
+        "boş = 30 gün": "empty = 30 days",
+        "Yaklaşan Sertifika Bitişleri": "Approaching Certificate Expirations",
+        "Henüz SSL sertifika izlemesi yok": "No SSL certificate monitors yet",
+        "İzlemeler ekranından \"SSL Sertifikası\" tipiyle ekleyebilirsiniz.": "You can add one from the Monitors screen with the \"SSL Certificate\" type.",
+        "SÜRESİ DOLDU": "EXPIRED",
+        "iç≠dış": "int≠ext",
+        "Sertifika Detayı": "Certificate Details",
+        "Kontrol": "Check",
+        "Veren": "Issuer",
+        "Bitiş": "Expires",
+        "Kalan Gün": "Days Left",
+        "Parmak İzi": "Thumbprint",
+        "⚠ İç ve dış sertifika FARKLI — sunucuda yenilenen sertifika F5/yük dengeleyiciye taşınmamış olabilir.": "⚠ Internal and external certificates DIFFER — the certificate renewed on the server may not have been deployed to the F5/load balancer.",
         // Yol haritası #2 — Yaklaşan Disk Dolumları
         "Yaklaşan Disk Dolumları": "Approaching Disk Full",
         "90 gün içinde dolması beklenen disk yok 🎉": "No disks expected to fill within 90 days 🎉",
@@ -644,6 +665,7 @@
         "Son yenileme: ": "Last refresh: ",
         "Kesintiler (": "Outages (",
         "Yanıt Süresi (": "Response Time (",
+        "Kalan Gün (": "Days Left (",
         "Diskler (": "Disks (",
         "son: ": "last: ",
         "son müdahale: ": "last intervention: ",
@@ -687,6 +709,7 @@
         // DB İzleme Fazı — metrik değer birimleri ("34 adet" → "34", "12 sn" → "12 s")
         " adet": "",
         " sn": " s",
+        " gün": " days",
         "%/gün": "%/day"
     };
 

@@ -40,7 +40,9 @@ public enum ServiceType
     MySqlBlockedSessions = 30,   // INNODB_TRX: trx_state='LOCK WAIT' adedi (>0 ERROR)
     MySqlLongQueries = 31,       // PROCESSLIST: COMMAND<>'Sleep' AND TIME>60 adedi
     MySqlReplication = 32,       // replika IO/SQL thread durumu + Seconds_Behind (sn)
-    MySqlConnectionUsage = 33    // PROCESSLIST / max_connections yüzdesi
+    MySqlConnectionUsage = 33,   // PROCESSLIST / max_connections yüzdesi
+    // Yol haritası (SLLTracker mirası): SSL sertifika izleme — iç/dış çift kontrol + thumbprint karşılaştırma
+    SslCertificate = 34          // kalan gün grafiğe; eşik gün/bitmiş/iç-dış farklı → ERROR
 }
 
 /// <summary>Bir kontrolün sonucu: Up=sorunsuz, Down=ulaşılamıyor/bağlantı hatası,

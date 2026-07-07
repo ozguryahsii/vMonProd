@@ -89,6 +89,9 @@ public sealed class DbDetailService
                 "SELECT ID, USER, HOST, TIME, LEFT(INFO,200) " +
                 "FROM information_schema.PROCESSLIST WHERE COMMAND<>'Sleep' AND TIME>60 ORDER BY TIME DESC LIMIT 50"),
 
+            // ---- SSL Sertifikası: iç/dış CANLI sertifika detayı (SLLTracker mirası) ----
+            ServiceType.SslCertificate => await SslCertDetailAsync(svc, ct),
+
             // ---- Bağlantı Doluluğu: en çok bağlantı tutanlar (gruplu) + limit kırılımı (not) ----
             ServiceType.OracleConnectionUsage => await OracleUsageAsync(svc, cred, ct),
             ServiceType.MsSqlConnectionUsage => await MsSqlUsageAsync(svc, cred, ct),
@@ -96,6 +99,42 @@ public sealed class DbDetailService
 
             _ => null
         };
+    }
+
+    /// <summary>SSL sertifika detayı: dış (public DNS ile) ve varsa iç kontrol satırları.
+    /// Thumbprint'ler farklıysa uyarı notu düşülür.</summary>
+    private static async Task<Result> SslCertDetailAsync(MonitoredService svc, CancellationToken ct)
+    {
+        var host = (svc.Target ?? "").Trim();
+        if (host.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            host = new Uri(host.Contains("://") ? host : "https://" + host).Host;
+        var port = svc.Port ?? 443;
+        var cols = new[] { "Kontrol", "CN", "Veren", "Bitiş", "Kalan Gün", "Parmak İzi" };
+        var rows = new List<IReadOnlyList<string>>();
+        string? note = null;
+
+        var publicIp = await Checkers.SslCertificateChecker.ResolvePublicIpAsync(host, ct);
+        var ext = await Checkers.SslCertificateChecker.GetCertificateAsync(host, publicIp ?? host, port,
+            publicIp != null ? "Dış (public DNS)" : "Dış (sistem DNS)", ct);
+        rows.Add(new[] { ext.Via, ext.CommonName, ext.Issuer, ext.NotAfter.ToString("dd.MM.yyyy"), ext.DaysRemaining.ToString(), ext.Thumbprint[..Math.Min(16, ext.Thumbprint.Length)] });
+
+        if (!string.IsNullOrWhiteSpace(svc.Extra))
+        {
+            var (inHost, inPort) = Checkers.SslCertificateChecker.ParseHostPort(svc.Extra!, port);
+            try
+            {
+                var inn = await Checkers.SslCertificateChecker.GetCertificateAsync(host, inHost, inPort, $"İç ({inHost}:{inPort})", ct);
+                rows.Add(new[] { inn.Via, inn.CommonName, inn.Issuer, inn.NotAfter.ToString("dd.MM.yyyy"), inn.DaysRemaining.ToString(), inn.Thumbprint[..Math.Min(16, inn.Thumbprint.Length)] });
+                if (!string.Equals(inn.Thumbprint, ext.Thumbprint, StringComparison.OrdinalIgnoreCase))
+                    note = "⚠ İç ve dış sertifika FARKLI — sunucuda yenilenen sertifika F5/yük dengeleyiciye taşınmamış olabilir.";
+            }
+            catch (Exception ex)
+            {
+                rows.Add(new[] { $"İç ({inHost}:{inPort})", "—", "—", "—", "—", ex.GetBaseException().Message });
+            }
+        }
+
+        return new Result("Sertifika Detayı", cols, rows, note);
     }
 
     // ---- Bağlantı doluluğu detayları (kim tutuyor + limit) ----

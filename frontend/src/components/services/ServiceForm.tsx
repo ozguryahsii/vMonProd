@@ -199,7 +199,10 @@ export function ServiceForm({
         <div className="grid grid-cols-3 gap-4">
           <Field label="Aralık (dk)" hint="boş = global"><Input type="number" value={form.intervalMinutesOverride ?? ""} onChange={(e) => set("intervalMinutesOverride", numOrNull(e.target.value))} /></Field>
           <Field label="Zaman aşımı (sn)"><Input type="number" value={form.timeoutSeconds} onChange={(e) => set("timeoutSeconds", Number(e.target.value) || 15)} /></Field>
-          <Field label={form.type === "OracleActiveSessions" ? "Session eşiği (adet)" : "Yavaşlık eşiği (ms)"} hint="boş = kapalı">
+          <Field
+            label={form.type === "OracleActiveSessions" ? "Session eşiği (adet)"
+              : form.type === "SslCertificate" ? "Uyarı eşiği (gün)" : "Yavaşlık eşiği (ms)"}
+            hint={form.type === "SslCertificate" ? "boş = 30 gün" : "boş = kapalı"}>
             <Input type="number" value={form.responseTimeThresholdMs ?? ""} onChange={(e) => set("responseTimeThresholdMs", numOrNull(e.target.value))} />
           </Field>
         </div>
