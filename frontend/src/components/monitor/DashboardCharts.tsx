@@ -10,6 +10,9 @@ import { isDbHealthType, isCertType } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const HEALTH_TYPES = ["WindowsHealth", "LinuxHealth"];
+/** Hedef eşleme anahtarı: farklı tipteki izlemeler (örn. Oracle + Windows Health) aynı sunucuyu
+ *  hedefliyorsa birbirine bağlanır (üstte gizle → altta da gizle). Küçük harf + boşluk kırp. */
+const normTarget = (t: string | null | undefined) => (t ?? "").trim().toLocaleLowerCase("tr");
 // NOT: istemci tarafı inceltme kaldırıldı — backend artık seri başına ~300 kovalı özet döndürür
 // (sunucu tarafı özetleme; spike'lar max ile, down/hata durumları kova içinde korunur).
 
@@ -45,7 +48,16 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
           .filter((s) => !isDbHealthType(s.type) && !isCertType(s.type))
           .slice().sort((a, b) => (b.lastResponseTimeMs ?? 0) - (a.lastResponseTimeMs ?? 0))
           .slice(0, 12).map((s) => s.id);
-    const healthIds = enabled.filter((s) => HEALTH_TYPES.includes(s.type)).slice(0, 20).map((s) => s.id);
+    // CPU/RAM/Disk: elle seçim varsa YALNIZ seçilen izlemeler + AYNI SUNUCUDAKİ (target eşleşen)
+    // sağlık izlemeleri çizilir — üstteki "Servis Seç" ayarı alttaki grafiklere de uygulanır.
+    const healthAll = enabled.filter((s) => HEALTH_TYPES.includes(s.type));
+    const selTargets = manualIds.size > 0
+      ? new Set(enabled.filter((s) => manualIds.has(s.id)).map((s) => normTarget(s.target)))
+      : null;
+    const healthIds = (selTargets
+      ? healthAll.filter((s) => manualIds.has(s.id) || selTargets.has(normTarget(s.target)))
+      : healthAll
+    ).slice(0, 20).map((s) => s.id);
 
     setResp(null); setCpu(null); setRam(null); setDisk(null);
 
@@ -88,6 +100,15 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
 
   const hasResp = resp === null || resp.length > 0;
   const hasHealth = cpu === null || (cpu?.length ?? 0) > 0;
+
+  // Üstte gizlenen izlemenin SUNUCUSU (target) alttaki CPU/RAM/Disk serilerinden de düşsün:
+  // isim eşleşmesi + hedef eşleşmesi birlikte (Oracle izlemesi ≠ sağlık izlemesi adı olsa bile çalışır)
+  const hiddenTargets = new Set(
+    services.filter((s) => hiddenNames.has(s.name)).map((s) => normTarget(s.target)));
+  const metricHidden = new Set<string>(hiddenNames);
+  for (const s of services)
+    if (HEALTH_TYPES.includes(s.type) && hiddenTargets.has(normTarget(s.target))) metricHidden.add(s.name);
+
   if (!hasResp && !hasHealth) return null;
 
   return (
@@ -120,9 +141,9 @@ export function DashboardCharts({ services }: { services: StatusService[] }) {
 
       {hasHealth && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <MetricCard key={`cpu-${tick}`} title="CPU Kullanımı" data={cpu} longRange={minutes > 1440} hiddenNames={hiddenNames} onToggleName={toggleName} />
-          <MetricCard key={`ram-${tick}`} title="RAM Kullanımı" data={ram} longRange={minutes > 1440} hiddenNames={hiddenNames} onToggleName={toggleName} />
-          <MetricCard key={`disk-${tick}`} title="Disk Doluluk" data={disk} longRange={minutes > 1440} hiddenNames={hiddenNames} onToggleName={toggleName} />
+          <MetricCard key={`cpu-${tick}`} title="CPU Kullanımı" data={cpu} longRange={minutes > 1440} hiddenNames={metricHidden} onToggleName={toggleName} />
+          <MetricCard key={`ram-${tick}`} title="RAM Kullanımı" data={ram} longRange={minutes > 1440} hiddenNames={metricHidden} onToggleName={toggleName} />
+          <MetricCard key={`disk-${tick}`} title="Disk Doluluk" data={disk} longRange={minutes > 1440} hiddenNames={metricHidden} onToggleName={toggleName} />
         </div>
       )}
     </div>
