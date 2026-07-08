@@ -96,7 +96,10 @@ export function Settings() {
       )}
 
       {/* TEK SÜTUN: her kart tam genişlik, alanlar satır içine yayılır.
-          Sıralama kullanıcının belirlediği düzendedir (2026-07-09). */}
+          Sıralama kullanıcının belirlediği düzendedir (2026-07-09; Güncelleme EN ÜSTTE). */}
+
+      {/* 0. Güncelleme — en tepede */}
+      <UpdateCard />
 
       {/* 1. Genel */}
       <Section icon={<Building2 className="h-4 w-4" />} title="Genel">
@@ -117,10 +120,7 @@ export function Settings() {
       {/* 3. Lisans (anında uygulanır) */}
       <LicenseCard onChanged={reloadMe} />
 
-      {/* 4. Güncelleme */}
-      <UpdateCard />
-
-      {/* 5. E-posta — birincil alarm kanalı */}
+      {/* 4. E-posta — birincil alarm kanalı */}
       <Section icon={<Mail className="h-4 w-4" />} title="E-posta (SMTP)">
         <Switch checked={s.emailEnabled} onChange={(v) => set("emailEnabled", v)} label="E-posta alarmları açık" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">

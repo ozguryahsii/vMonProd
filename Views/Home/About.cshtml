@@ -71,24 +71,20 @@
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
                         @if (en)
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.0 — Public Status Page</p>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.1 — Redesigned Settings page</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Public status page:</strong> a no-login <code>/durum</code> (alias <code>/status</code>) address shows the live status of the monitors you select, a 90-day uptime strip per monitor and an overall status banner. Enabled from Settings (with a custom title); monitors are opted in one by one or in bulk with "Show on status page". Only the monitor name, its description and its status are visible — server, address and error details are never exposed. Bilingual (TR/EN), light/dark theme, auto-refreshes every 60 seconds.</li>
-                                <li><strong>Self-Healing shows what actually happened:</strong> the monitor detail now shows the last intervention itself — how many restart attempts were made and whether the service came back up — instead of just the configuration summary.</li>
-                                <li><strong>Search on the dashboard:</strong> when you are on the dashboard, the top search bar now filters the results right on the dashboard (by name, target and description).</li>
-                                <li><strong>Descriptions are visible:</strong> a monitor's description now appears on its dashboard card and in the detail panel.</li>
-                                <li><strong>About page refreshed:</strong> capabilities are now itemized; the release notes section shows only the latest version.</li>
+                                <li><strong>Single-column Settings:</strong> every settings card is now full width in a single column — no more mixed card sizes or layout shifts. Fields spread across the row and adapt to narrow screens automatically.</li>
+                                <li><strong>New order:</strong> cards are arranged top-down as Update, General, Login Logo, License, Email (SMTP), Notification Channels, Sign-in (LDAP/AD), Two-Step Verification (OTP), Local Password Policy, Global Monitoring Settings, SIEM/Syslog, Backup, Backups, Status Page, End-of-Life (EOL) and Reconciliation — the Update card sits at the very top.</li>
+                                <li><strong>Renamed cards:</strong> "Security &amp; Compliance" is now <b>Local Password Policy</b>; "Monitoring" is now <b>Global Monitoring Settings</b>. All settings and functions are unchanged.</li>
                             </ul>
                         }
                         else
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.0 — Herkese Açık Durum Sayfası</p>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.1 — Yenilenen Ayarlar sayfası</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Herkese açık durum sayfası:</strong> giriş gerektirmeyen <code>/durum</code> (İngilizce takma ad <code>/status</code>) adresi, seçtiğiniz izlemelerin anlık durumunu, izleme başına 90 günlük uptime şeridini ve genel durum bandını gösterir. Ayarlar'dan açılır (başlık verilebilir); izlemeler tek tek veya toplu düzenlemeyle "Durum sayfasında göster" ile seçilir. Sayfada yalnız izleme adı, açıklaması ve durumu görünür — sunucu, adres ve hata detayı asla gösterilmez. İki dilli (TR/EN), açık/koyu tema, 60 saniyede bir kendini yeniler.</li>
-                                <li><strong>Self-Healing artık gerçekte olanı gösterir:</strong> izleme detayında ayar özeti yerine son müdahalenin kendisi görünür — kaç yeniden başlatma denemesi yapıldığı ve servisin ayağa kalkıp kalkmadığı.</li>
-                                <li><strong>Dashboard'da arama:</strong> dashboard'dayken üstteki arama çubuğu sonuçları artık dashboard üzerinde süzer (ad, hedef ve açıklamaya göre).</li>
-                                <li><strong>Açıklamalar görünür:</strong> izlemenin açıklaması artık dashboard kartında ve detay panelinde gösterilir.</li>
-                                <li><strong>Hakkında yenilendi:</strong> yetenekler madde madde yazıldı; sürüm notları bölümünde yalnız son sürüm gösterilir.</li>
+                                <li><strong>Tek sütun Ayarlar:</strong> tüm ayar kartları artık tek sütunda tam genişlik — küçük/büyük kutu farkları ve kaymalar bitti. Alanlar satır boyunca yayılır, dar ekranda otomatik alt alta iner.</li>
+                                <li><strong>Yeni sıralama:</strong> kartlar yukarıdan aşağı Güncelleme, Genel, Giriş Ekranı Logosu, Lisans, E-posta (SMTP), Bildirim Kanalları, Oturum Açma (LDAP/AD), İki Adımlı Doğrulama (OTP), Local Parola Politikası, Global İzleme Ayarları, SIEM/Syslog, Yedekleme, Yedekler, Durum Sayfası, Destek Sonu (EOL) ve Mutabakat düzenindedir — Güncelleme kartı en tepededir.</li>
+                                <li><strong>Yeniden adlandırma:</strong> "Güvenlik ve Uyumluluk" artık <b>Local Parola Politikası</b>; "İzleme" artık <b>Global İzleme Ayarları</b>. Tüm ayarlar ve işlevler aynen korundu.</li>
                             </ul>
                         }
                     </div>
