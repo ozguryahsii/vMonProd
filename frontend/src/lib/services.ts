@@ -272,7 +272,7 @@ async function sendForm<T>(path: string, body: URLSearchParams): Promise<T> {
     body,
   });
   if (res.status === 401) throw new ApiError(401, "Oturum gerekli.");
-  if (res.status === 403) throw new ApiError(403, "Yetkiniz yok.");
+  if (res.status === 403) throw new ApiError(403, "Bu işlem için yetkiniz yok. Yöneticinizden 'Servis başlat/durdur' yetkisi isteyebilirsiniz.");
   if (!res.ok) throw new ApiError(res.status, `Sunucu hatası (${res.status})`);
   return res.json() as Promise<T>;
 }

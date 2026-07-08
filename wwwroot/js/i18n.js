@@ -78,6 +78,8 @@
         "Toplam Servis": "Total Services", "KAPALI": "DOWN", "HATA": "ERROR", "YAVAŞ": "SLOW",
         "Atanan kaynaklar:": "Allocated resources:",
         "Açıklama:": "Description:",
+        "Bu işlem için yetkiniz yok.": "You do not have permission for this action.",
+        "Bu işlem için yetkiniz yok. Yöneticinizden 'Servis başlat/durdur' yetkisi isteyebilirsiniz.": "You do not have permission for this action. Ask your administrator for the 'Service start/stop' permission.",
         "Local Parola Politikası": "Local Password Policy",
         "Global İzleme Ayarları": "Global Monitoring Settings",
         "Dashboard'da ara… (Enter)": "Search dashboard… (Enter)",

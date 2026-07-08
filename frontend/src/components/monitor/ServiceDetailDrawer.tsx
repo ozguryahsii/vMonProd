@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   LineChart, Line, AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
-import { RefreshCw, Play, Square, RotateCw } from "lucide-react";
+import { RefreshCw, Play, Square, RotateCw, CheckCircle2, XCircle } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -41,7 +41,8 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  // İşlem sonucu bildirimi: başarı YEŞİL, hata (yetki yok dahil) KIRMIZI — kullanıcı sonucu mutlaka görür
+  const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
   const [pendingAction, setPendingAction] = useState<"start" | "stop" | "restart" | null>(null);
   const [rangeMin, setRangeMin] = useState(180); // 3s varsayılan; 24s/7g/1a seçilebilir
   const [dbDetail, setDbDetail] = useState<DbDetailData | null>(null);
@@ -87,10 +88,14 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   useEffect(() => { setFlash(null); return load(); /* eslint-disable-next-line */ }, [service?.id, service?.lastCheckedAt, rangeMin]);
   useEffect(() => { if (service) { setHist(null); setMetrics(null); } /* eslint-disable-next-line */ }, [service?.id]);
 
-  async function act(fn: () => Promise<{ message?: string }>, label: string) {
+  async function act(fn: () => Promise<{ ok?: boolean; message?: string }>, label: string) {
     setBusy(true); setFlash(null);
-    try { const r = await fn(); setFlash(r.message ? `${label}: ${r.message}` : `${label} tamam`); load(); onChanged(); }
-    catch (e) { setFlash((e as Error).message); }
+    try {
+      const r = await fn();
+      setFlash({ ok: r.ok !== false, msg: r.message ? `${label}: ${r.message}` : `${label} tamam` });
+      load(); onChanged();
+    }
+    catch (e) { setFlash({ ok: false, msg: (e as Error).message }); }   // 403 → "Bu işlem için yetkiniz yok."
     finally { setBusy(false); }
   }
 
@@ -150,6 +155,16 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
             </div>
           </div>
 
+          {/* İşlem sonucu — butonların hemen altında, renk+ikonlu (yetki hatası kaçmaz) */}
+          {flash && (
+            <div className={cn("flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium",
+              flash.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                       : "border-destructive/40 bg-destructive/10 text-destructive")}>
+              {flash.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0" />}
+              <span>{flash.msg}</span>
+            </div>
+          )}
+
           {service.description && (
             <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">Açıklama: </span>{service.description}
@@ -178,7 +193,6 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
               <span className="font-semibold text-foreground">Atanan kaynaklar: </span>{service.capacityInfo}
             </div>
           )}
-          {flash && <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">{flash}</div>}
           {service.lastError && cat !== "up" && <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{service.lastError}</div>}
 
           {loading && !hist ? (
