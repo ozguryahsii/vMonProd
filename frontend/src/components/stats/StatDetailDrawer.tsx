@@ -84,7 +84,12 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
             {data.trend && (
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Ortalama {data.trend.metric.toUpperCase()} trendi</h3>
+                  {/* Disk / bağlantı doluluğu: "Ortalama" denmez (doluluk zaten mutlak değer); CPU/RAM'de ortalama anlamlı */}
+                  <h3 className="text-sm font-semibold">
+                    {data.trend.metric === "disk" ? "Disk trendi"
+                      : data.trend.metric === "bağlantı doluluğu" ? "Bağlantı doluluğu trendi"
+                      : `Ortalama ${data.trend.metric.toUpperCase()} trendi`}
+                  </h3>
                   <div className="flex gap-1">
                     {RANGES.map((r) => (
                       <Button key={r.d} variant={days === r.d ? "default" : "ghost"} size="sm"
@@ -99,7 +104,7 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
                     <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={26} />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" }}
-                      formatter={(v: number) => [`%${v}`, "Ortalama"]} />
+                      formatter={(v: number) => [`%${v}`, data.trend!.metric === "cpu" || data.trend!.metric === "ram" ? "Ortalama" : "Doluluk"]} />
                     <Area type="monotone" dataKey="value" stroke="hsl(217 91% 60%)" strokeWidth={2} fill="url(#gT)" animationDuration={700} />
                   </AreaChart>
                 </ResponsiveContainer>

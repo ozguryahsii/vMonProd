@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, Line, LineChart } from "recharts";
 import { DonutChart } from "@/components/charts/DonutChart";
 import type { StatsData, StatWidgetDef } from "@/lib/stats";
@@ -440,12 +441,13 @@ function DiskForecastW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
         return (
           <button key={i.name} type="button"
             onClick={() => onDrill({ source: "disk", value: i.name, title: `${i.name} — disk trendi` })}
-            className="block w-full rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
+            className="group block w-full cursor-pointer rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/50 hover:bg-accent">
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate font-medium">{i.name}</span>
+              <span className="truncate font-medium group-hover:text-primary">{i.name}</span>
               <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
                 <span className="text-muted-foreground">%{i.current} · +{i.perDay}%/gün</span>
                 <span className={cn("rounded px-1.5 py-0.5 font-semibold", cls)}>~{i.daysLeft} gün · {i.date}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
               </span>
             </div>
             <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
@@ -600,12 +602,16 @@ function DbUsageW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
         const pct = Math.max(0, Math.min(100, i.value ?? 0));
         const bar = pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
         return (
-          <button key={i.id} type="button" className="block w-full text-left"
+          <button key={i.id} type="button"
+            className="group block w-full cursor-pointer rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-primary/50 hover:bg-accent"
             onClick={() => onDrill({ source: "db_usage", value: i.name, title: `${i.name} — bağlantı doluluğu trendi` })}>
             <div className="flex justify-between text-xs">
-              <span className="truncate pr-1"><span className={cn("font-semibold", DB_PLATFORM_CLS[meta.platform])}>{meta.platform}</span> {i.target}{i.port ? `:${i.port}` : ""}</span>
-              <span className={cn("shrink-0 tabular-nums font-semibold", dbCat(i) === "down" ? "text-rose-400" : "text-muted-foreground")}>
-                {dbCat(i) === "down" ? "KAPALI" : `%${pct}`}
+              <span className="truncate pr-1 group-hover:text-primary"><span className={cn("font-semibold", DB_PLATFORM_CLS[meta.platform])}>{meta.platform}</span> {i.target}{i.port ? `:${i.port}` : ""}</span>
+              <span className="flex shrink-0 items-center gap-1">
+                <span className={cn("tabular-nums font-semibold", dbCat(i) === "down" ? "text-rose-400" : "text-muted-foreground")}>
+                  {dbCat(i) === "down" ? "KAPALI" : `%${pct}`}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
               </span>
             </div>
             <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
