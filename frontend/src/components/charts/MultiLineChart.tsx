@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, LineChart } from "recharts";
 
 export interface SeriesDef {
@@ -15,14 +16,31 @@ const PALETTE = [
  *  - noktalar GERÇEK zamana göre sıralanır (kopukluk yok)
  *  - durum işaretleri ÇİZGİNİN ÜZERİNDE kendi değerinde çizilir (down=büyük kırmızı,
  *    yavaş/hata=koyu sarı) — ayrı şerit/katman yok, lejant temiz
- *  - animasyon ve hover tooltip (servis adı + değer) korunur */
-export function MultiLineChart({ series, height = 260, unit = "", domainMax, longRange = false }: {
+ *  - animasyon ve hover tooltip (servis adı + değer) korunur
+ *  - LEJANT TIKLANABİLİR: isme basınca seri gizlenir (üstü çizilir), tekrar basınca döner.
+ *    hiddenNames/onToggleName verilirse durum DIŞARIDAN yönetilir (birden çok grafik
+ *    aynı seçimi paylaşır — dashboard'da yanıt süresi + CPU/RAM/Disk birlikte). */
+export function MultiLineChart({ series, height = 260, unit = "", domainMax, longRange = false, hiddenNames, onToggleName }: {
   series: SeriesDef[];
   height?: number;
   unit?: string;
   domainMax?: number;
   longRange?: boolean;   // 7g/1a: eksende tarih de göster
+  hiddenNames?: Set<string>;            // opsiyonel: paylaşılan gizli-seri kümesi
+  onToggleName?: (name: string) => void; // opsiyonel: paylaşılan toggle
 }) {
+  // Dışarıdan yönetilmiyorsa grafik kendi gizli kümesini tutar (her lejantlı grafikte çalışsın)
+  const [localHidden, setLocalHidden] = useState<Set<string>>(new Set());
+  const hidden = hiddenNames ?? localHidden;
+  const toggle = (name: string) => {
+    if (onToggleName) { onToggleName(name); return; }
+    setLocalHidden((prev) => {
+      const n = new Set(prev);
+      if (n.has(name)) n.delete(name); else n.add(name);
+      return n;
+    });
+  };
+
   const fmt = (ms: number) => {
     const d = new Date(ms);
     const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -73,13 +91,24 @@ export function MultiLineChart({ series, height = 260, unit = "", domainMax, lon
           }}
         />
         {series.length <= 12 && (
-          <Legend iconType="circle" formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 11 }}>{v}</span>} />
+          <Legend iconType="circle"
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={(e: any) => { const n = String(e?.dataKey ?? e?.value ?? ""); if (n) toggle(n); }}
+            formatter={(v) => (
+              <span style={{
+                color: "hsl(var(--muted-foreground))", fontSize: 11, cursor: "pointer", userSelect: "none",
+                textDecoration: hidden.has(String(v)) ? "line-through" : "none",
+                opacity: hidden.has(String(v)) ? 0.45 : 1,
+              }}>{v}</span>
+            )} />
         )}
         {series.map((s, i) => (
           // Gerçek çizgi animasyonu GERİ: backend artık seri başına ~300 kovalı özet döndüğü
-          // için (100k ham satır yok) animasyon her aralıkta akıcı çalışır
+          // için (100k ham satır yok) animasyon her aralıkta akıcı çalışır.
+          // hide: lejantta kalır (üstü çizili) ama çizgi çizilmez; renk sırası değişmez.
           <Line key={s.name} type="monotone" dataKey={s.name} stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls animationDuration={900} />
+            strokeWidth={1.8} dot={makeDot(s.name)} connectNulls animationDuration={900}
+            hide={hidden.has(s.name)} />
         ))}
       </LineChart>
     </ResponsiveContainer>

@@ -84,6 +84,8 @@
         "Global İzleme Ayarları": "Global Monitoring Settings",
         "Dashboard'da ara… (Enter)": "Search dashboard… (Enter)",
         "Aramayla eşleşen servis yok": "No services match the search",
+        "Servis ara…": "Search services…",
+        "Eşleşen servis yok": "No matching services",
         "Farklı bir arama dene veya aramayı temizle.": "Try a different search or clear it.",
         "Yanıt Süresi": "Response Time", "Kesinti geçmişi": "Outage history",
         "Bu aralıkta kontrol yok": "No checks in this range",
