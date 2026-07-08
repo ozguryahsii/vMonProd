@@ -80,7 +80,7 @@ export function WidgetRenderer({ w, data, onDrill }: { w: StatWidgetDef; data: S
     case "os_eol": return <OsEol d={data} onDrill={onDrill} />;
     case "heatmap": return <Heatmap d={data} />;
     case "disk_forecast": return <DiskForecastW d={data} onDrill={onDrill} />;
-    case "cert_expiry": return <CertExpiryW d={data} />;
+    case "cert_expiry": return <CertExpiryW d={data} onDrill={onDrill} />;
     case "db_health": return <DbHealthW d={data} onDrill={onDrill} />;
     case "db_usage": return <DbUsageW d={data} onDrill={onDrill} />;
     case "db_alerts": return <DbAlertsW d={data} onDrill={onDrill} />;
@@ -462,7 +462,7 @@ function DiskForecastW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
 
 /* ================= SSL Sertifika: Yaklaşan Bitişler ================= */
 /** SSL sertifika izlemelerinin kalan günleri (≤7 kırmızı, ≤30 amber); iç/dış uyumsuzluk işaretlenir. */
-function CertExpiryW({ d }: { d: StatsData }) {
+function CertExpiryW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
   const items = d.certExpiry ?? [];
   if (items.length === 0)
     return (
@@ -482,10 +482,11 @@ function CertExpiryW({ d }: { d: StatsData }) {
           : days != null && days <= 30 ? "bg-amber-500/15 text-amber-400"
           : "bg-emerald-500/15 text-emerald-400";
         return (
-          <div key={i.name} title={i.error ?? i.target}
-            className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-xs">
+          <button key={i.name} type="button" title={i.error ?? i.target}
+            onClick={() => onDrill({ source: "cert_expiry", value: i.name, title: `${i.name} — kalan gün trendi` })}
+            className="group flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/50 hover:bg-accent">
             <span className="min-w-0">
-              <span className="block truncate font-medium">{i.name}</span>
+              <span className="block truncate font-medium group-hover:text-primary">{i.name}</span>
               <span className="block truncate font-mono text-[10px] text-muted-foreground">{i.target}</span>
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
@@ -493,8 +494,9 @@ function CertExpiryW({ d }: { d: StatsData }) {
               <span className={cn("rounded px-1.5 py-0.5 font-semibold tabular-nums", chip)}>
                 {days == null ? "—" : expired ? "SÜRESİ DOLDU" : `${days} gün`}
               </span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -564,12 +566,17 @@ function DbHealthW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         {Array.from(groups.values()).map((g) => (
           <button key={`${g.platform}|${g.dbName ?? g.host}`} type="button"
-            onClick={() => onDrill({ source: "db_health", value: g.platform, title: `${g.platform} izlemeleri` })}
-            className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
-            {g.dbName && <span className="font-semibold">{g.dbName}</span>}
+            onClick={() => onDrill({
+              // Tıklanan ENSTANSIN kendi izlemeleri açılır (platform geneli değil): db adı ya da host ile süz
+              source: "db_health",
+              value: `${g.platform}|${g.dbName ? `db:${g.dbName}` : `host:${g.host}`}`,
+              title: `${g.dbName ?? g.host} — izlemeler`,
+            })}
+            className="group flex w-full cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/50 hover:bg-accent">
+            {g.dbName && <span className="font-semibold group-hover:text-primary">{g.dbName}</span>}
             <span className={cn("font-semibold", DB_PLATFORM_CLS[g.platform])}>{g.dbName ? `· ${g.platform}` : g.platform}</span>
             <span className="truncate font-mono text-muted-foreground">{g.host}</span>
-            <span className="ml-auto flex flex-wrap justify-end gap-x-2.5 gap-y-0.5">
+            <span className="ml-auto flex flex-wrap items-center justify-end gap-x-2.5 gap-y-0.5">
               {g.items.map((i) => {
                 const cat = dbCat(i);
                 return (
@@ -581,6 +588,7 @@ function DbHealthW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
                   </span>
                 );
               })}
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
           </button>
         ))}
@@ -644,16 +652,19 @@ function DbAlertsW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
         const cat = dbCat(i);
         return (
           <button key={i.id} type="button"
-            onClick={() => onDrill({ source: "db_health", value: meta.platform, title: `${meta.platform} izlemeleri` })}
-            className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
+            onClick={() => onDrill({ source: "db_health", value: `name:${i.name}`, title: `${i.name} — detay` })}
+            className="group flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/50 hover:bg-accent">
             <span className="min-w-0">
-              <span className="block truncate font-medium">{i.name}</span>
+              <span className="block truncate font-medium group-hover:text-primary">{i.name}</span>
               <span className="block truncate text-[10px] text-muted-foreground" title={i.lastError ?? undefined}>
                 <span className={DB_PLATFORM_CLS[meta.platform]}>{meta.platform}</span> · {meta.short}
                 {i.lastError ? ` — ${i.lastError}` : cat !== "down" && i.value != null ? ` — ${fmtDbValue(i.type, i.value)}` : ""}
               </span>
             </span>
-            <span className={cn("shrink-0 rounded px-1.5 py-0.5 font-semibold", catBadge[cat])}>{catLabel[cat]}</span>
+            <span className="flex shrink-0 items-center gap-1">
+              <span className={cn("rounded px-1.5 py-0.5 font-semibold", catBadge[cat])}>{catLabel[cat]}</span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
+            </span>
           </button>
         );
       })}

@@ -369,12 +369,47 @@ public class StatisticsController : Controller
             });
         }
 
-        // DB İzleme Fazı widget'ları: veritabanı izleme listesi (value = platform filtresi, boşsa tümü)
+        // DB İzleme Fazı widget'ları: veritabanı izleme listesi. value biçimleri:
+        //   boş                          → tümü
+        //   "Oracle"/"MSSQL"/"MySQL"     → platform (eski davranış)
+        //   "name:<izleme adı>"          → tek izleme (DB Uyarıları satırı)
+        //   "<Platform>|db:<ad>"         → enstans grubu: DB/SID adına göre (Veritabanı Sağlığı satırı)
+        //   "<Platform>|host:<host:port>"→ enstans grubu: DB adı yoksa host'a göre
         if (source == "db_health")
         {
             var dbs = await DbHealthServicesAsync();
+            static string? DbNameOf(string? extra)
+            {
+                var v = (extra ?? "").Trim();
+                if (v.StartsWith("SID=", StringComparison.OrdinalIgnoreCase)) v = v[4..];
+                return string.IsNullOrWhiteSpace(v) ? null : v;
+            }
             if (!string.IsNullOrWhiteSpace(value))
-                dbs = dbs.Where(s => string.Equals(DbPlatform(s.Type), value, StringComparison.OrdinalIgnoreCase)).ToList();
+            {
+                if (value.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var nm = value[5..];
+                    dbs = dbs.Where(s => string.Equals(s.Name, nm, StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+                else if (value.Contains('|'))
+                {
+                    var parts = value.Split('|', 2);
+                    dbs = dbs.Where(s => string.Equals(DbPlatform(s.Type), parts[0], StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (parts[1].StartsWith("db:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dn = parts[1][3..];
+                        dbs = dbs.Where(s => string.Equals(DbNameOf(s.Extra), dn, StringComparison.OrdinalIgnoreCase)).ToList();
+                    }
+                    else if (parts[1].StartsWith("host:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var h = parts[1][5..];
+                        dbs = dbs.Where(s => DbNameOf(s.Extra) == null
+                            && string.Equals(s.Target + (s.Port.HasValue ? $":{s.Port}" : ""), h, StringComparison.OrdinalIgnoreCase)).ToList();
+                    }
+                }
+                else
+                    dbs = dbs.Where(s => string.Equals(DbPlatform(s.Type), value, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
             string Unit(ServiceType t) => t is ServiceType.OracleSysdate or ServiceType.MsSqlGetDate or ServiceType.MySqlNow ? "ms"
                 : t is ServiceType.OracleConnectionUsage or ServiceType.MsSqlConnectionUsage or ServiceType.MySqlConnectionUsage ? "%"
                 : t == ServiceType.MySqlReplication ? "sn" : "adet";
@@ -392,6 +427,46 @@ public class StatisticsController : Controller
                     lastChecked = s.LastCheckedAt
                 }).ToList(),
                 trend = (object?)null
+            });
+        }
+
+        // Yaklaşan Sertifika Bitişleri: SSL izlemesi + KALAN GÜN trendi (value = izleme adı → tek sertifika)
+        if (source == "cert_expiry")
+        {
+            var certs = await _db.Services.AsNoTracking()
+                .Where(s => s.Enabled && s.Type == ServiceType.SslCertificate)
+                .OrderBy(s => s.Name).ToListAsync();
+            if (!string.IsNullOrWhiteSpace(value))
+                certs = certs.Where(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            var cids = certs.Select(s => s.Id).ToHashSet();
+            var csince = DateTime.UtcNow.AddDays(-days);
+            var crows = await _db.CheckResults.AsNoTracking()
+                .Where(r => r.CheckedAt >= csince && cids.Contains(r.ServiceId) && r.IsUp)
+                .Select(r => new { r.CheckedAt, r.ResponseTimeMs })
+                .ToListAsync();
+            DateTime CBucket(DateTime d) => days <= 30 ? d.Date
+                : days <= 180 ? d.Date.AddDays(-(((int)d.DayOfWeek + 6) % 7))
+                : new DateTime(d.Year, d.Month, 1);
+            string CLabel(DateTime d) => days <= 180 ? d.ToString("dd.MM") : d.ToString("MM.yyyy");
+            var cpoints = crows.GroupBy(r => CBucket(r.CheckedAt.ToLocalTime())).OrderBy(g => g.Key)
+                .Select(g => new { day = CLabel(g.Key), value = Math.Round(g.Average(x => (double)x.ResponseTimeMs), 1) })
+                .ToList();
+
+            var cStatusText = new[] { "Up", "Down", "Hata" };
+            return Json(new
+            {
+                count = certs.Count,
+                servers = certs.Select(s => new
+                {
+                    name = s.Name, target = s.Target,
+                    os = "SSL",
+                    status = s.LastStatus is >= 0 and < 3 ? cStatusText[s.LastStatus] : "?",
+                    cpu = (double?)null, ram = (double?)null, disk = (double?)null,
+                    capacity = s.LastResponseTimeMs.HasValue ? $"{s.LastResponseTimeMs} gün kaldı" : null,
+                    lastChecked = s.LastCheckedAt
+                }).ToList(),
+                trend = cpoints.Count > 0 ? new { metric = "kalan gün", days, points = cpoints } : (object?)null
             });
         }
 

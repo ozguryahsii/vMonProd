@@ -84,10 +84,11 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
             {data.trend && (
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  {/* Disk / bağlantı doluluğu: "Ortalama" denmez (doluluk zaten mutlak değer); CPU/RAM'de ortalama anlamlı */}
+                  {/* Disk / bağlantı doluluğu / kalan gün: "Ortalama" denmez; CPU/RAM'de ortalama anlamlı */}
                   <h3 className="text-sm font-semibold">
                     {data.trend.metric === "disk" ? "Disk trendi"
                       : data.trend.metric === "bağlantı doluluğu" ? "Bağlantı doluluğu trendi"
+                      : data.trend.metric === "kalan gün" ? "Kalan gün trendi"
                       : `Ortalama ${data.trend.metric.toUpperCase()} trendi`}
                   </h3>
                   <div className="flex gap-1">
@@ -102,9 +103,11 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
                     <defs><linearGradient id="gT" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(217 91% 60%)" stopOpacity={0.4} /><stop offset="100%" stopColor="hsl(217 91% 60%)" stopOpacity={0} /></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={26} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                    {/* Kalan gün 100'ü aşabilir → serbest eksen; yüzde metriklerinde 0-100 sabit */}
+                    <YAxis domain={data.trend.metric === "kalan gün" ? [0, "auto"] : [0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" }}
-                      formatter={(v: number) => [`%${v}`, data.trend!.metric === "cpu" || data.trend!.metric === "ram" ? "Ortalama" : "Doluluk"]} />
+                      formatter={(v: number) => data.trend!.metric === "kalan gün" ? [`${v} gün`, "Kalan"]
+                        : [`%${v}`, data.trend!.metric === "cpu" || data.trend!.metric === "ram" ? "Ortalama" : "Doluluk"]} />
                     <Area type="monotone" dataKey="value" stroke="hsl(217 91% 60%)" strokeWidth={2} fill="url(#gT)" animationDuration={700} />
                   </AreaChart>
                 </ResponsiveContainer>
