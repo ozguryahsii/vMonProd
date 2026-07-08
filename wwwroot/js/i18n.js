@@ -86,6 +86,7 @@
         "Aramayla eşleşen servis yok": "No services match the search",
         "Servis ara…": "Search services…",
         "Eşleşen servis yok": "No matching services",
+        "BAĞLANTI DOLULUĞU": "CONNECTION USAGE",
         "Farklı bir arama dene veya aramayı temizle.": "Try a different search or clear it.",
         "Yanıt Süresi": "Response Time", "Kesinti geçmişi": "Outage history",
         "Bu aralıkta kontrol yok": "No checks in this range",
@@ -729,6 +730,9 @@
         " izleme": " monitors",
         " yetki": " permissions",
         " sonuç": " results",
+        " — disk trendi": " — disk trend",
+        " — bağlantı doluluğu trendi": " — connection usage trend",
+        " doluluk": " usage",
         " kayıt (en yeni 500)": " records (newest 500)",
         // DB İzleme Fazı — metrik değer birimleri ("34 adet" → "34", "12 sn" → "12 s")
         " adet": "",

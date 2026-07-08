@@ -395,6 +395,47 @@ public class StatisticsController : Controller
             });
         }
 
+        // DB Bağlantı Doluluğu: ConnectionUsage izlemeleri + doluluk (%) TRENDİ.
+        // value = izleme adı → yalnız o izleme + kendi trendi (widget'ta satıra tıklanınca).
+        if (source == "db_usage")
+        {
+            var usage = (await DbHealthServicesAsync())
+                .Where(s => s.Type is ServiceType.OracleConnectionUsage or ServiceType.MsSqlConnectionUsage or ServiceType.MySqlConnectionUsage)
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(value))
+                usage = usage.Where(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            var uids = usage.Select(s => s.Id).ToHashSet();
+            var usince = DateTime.UtcNow.AddDays(-days);
+            var urows = await _db.CheckResults.AsNoTracking()
+                .Where(r => r.CheckedAt >= usince && uids.Contains(r.ServiceId) && r.IsUp)
+                .Select(r => new { r.CheckedAt, r.ResponseTimeMs })
+                .ToListAsync();
+            DateTime UBucket(DateTime d) => days <= 30 ? d.Date
+                : days <= 180 ? d.Date.AddDays(-(((int)d.DayOfWeek + 6) % 7))
+                : new DateTime(d.Year, d.Month, 1);
+            string ULabel(DateTime d) => days <= 180 ? d.ToString("dd.MM") : d.ToString("MM.yyyy");
+            var upoints = urows.GroupBy(r => UBucket(r.CheckedAt.ToLocalTime())).OrderBy(g => g.Key)
+                .Select(g => new { day = ULabel(g.Key), value = Math.Round(g.Average(x => (double)x.ResponseTimeMs), 1) })
+                .ToList();
+
+            var uStatusText = new[] { "Up", "Down", "Hata" };
+            return Json(new
+            {
+                count = usage.Count,
+                servers = usage.Select(s => new
+                {
+                    name = s.Name, target = s.Target + (s.Port.HasValue ? $":{s.Port}" : ""),
+                    os = DbPlatform(s.Type),
+                    status = s.LastStatus is >= 0 and < 3 ? uStatusText[s.LastStatus] : "?",
+                    cpu = (double?)null, ram = (double?)null, disk = (double?)null,
+                    capacity = s.LastResponseTimeMs.HasValue ? $"%{s.LastResponseTimeMs} doluluk" : null,
+                    lastChecked = s.LastCheckedAt
+                }).ToList(),
+                trend = upoints.Count > 0 ? new { metric = "bağlantı doluluğu", days, points = upoints } : (object?)null
+            });
+        }
+
         // Kesinti kaynağı: son 7 günde kesinti yaşayan sunucular (kesinti özeti widget'ı tıklaması)
         HashSet<int>? outageIds = null;
         if (source == "outage")
@@ -422,7 +463,11 @@ public class StatisticsController : Controller
                 : all.Where(s => string.Equals(s.OsName, value, StringComparison.OrdinalIgnoreCase)),
             "tag" => string.IsNullOrWhiteSpace(value) ? all.Where(s => !string.IsNullOrWhiteSpace(s.Keyword))
                 : all.Where(s => MonitoredService.SplitKeywords(s.Keyword).Any(t => string.Equals(t, value, StringComparison.OrdinalIgnoreCase))),
-            _ => all   // total_servers, cpu, ram, disk, avg_* → tüm sağlık sunucuları
+            // cpu/ram/disk: value = sunucu adı → YALNIZ o sunucu (disk dolum tahmini satırına tıklama);
+            // value boşsa eski davranış (tüm sağlık sunucuları + ortalama trend)
+            "cpu" or "ram" or "disk" => string.IsNullOrWhiteSpace(value) ? all
+                : all.Where(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase)),
+            _ => all   // total_servers, avg_* → tüm sağlık sunucuları
         };
 
         var statusText = new[] { "Up", "Down", "Hata" };

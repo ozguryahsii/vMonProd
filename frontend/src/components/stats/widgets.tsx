@@ -439,7 +439,7 @@ function DiskForecastW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
         const bar = i.current >= 85 ? "bg-rose-500" : i.current >= 65 ? "bg-amber-500" : "bg-emerald-500";
         return (
           <button key={i.name} type="button"
-            onClick={() => onDrill({ source: "disk", title: "Disk — sunucular ve trend" })}
+            onClick={() => onDrill({ source: "disk", value: i.name, title: `${i.name} — disk trendi` })}
             className="block w-full rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent/50">
             <div className="flex items-center justify-between gap-2">
               <span className="truncate font-medium">{i.name}</span>
@@ -601,7 +601,7 @@ function DbUsageW({ d, onDrill }: { d: StatsData; onDrill: OnDrill }) {
         const bar = pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
         return (
           <button key={i.id} type="button" className="block w-full text-left"
-            onClick={() => onDrill({ source: "db_health", value: meta.platform, title: `${meta.platform} izlemeleri` })}>
+            onClick={() => onDrill({ source: "db_usage", value: i.name, title: `${i.name} — bağlantı doluluğu trendi` })}>
             <div className="flex justify-between text-xs">
               <span className="truncate pr-1"><span className={cn("font-semibold", DB_PLATFORM_CLS[meta.platform])}>{meta.platform}</span> {i.target}{i.port ? `:${i.port}` : ""}</span>
               <span className={cn("shrink-0 tabular-nums font-semibold", dbCat(i) === "down" ? "text-rose-400" : "text-muted-foreground")}>
