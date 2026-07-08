@@ -78,6 +78,8 @@
         "Toplam Servis": "Total Services", "KAPALI": "DOWN", "HATA": "ERROR", "YAVAŞ": "SLOW",
         "Atanan kaynaklar:": "Allocated resources:",
         "Açıklama:": "Description:",
+        "Local Parola Politikası": "Local Password Policy",
+        "Global İzleme Ayarları": "Global Monitoring Settings",
         "Dashboard'da ara… (Enter)": "Search dashboard… (Enter)",
         "Aramayla eşleşen servis yok": "No services match the search",
         "Farklı bir arama dene veya aramayı temizle.": "Try a different search or clear it.",

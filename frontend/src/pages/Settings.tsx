@@ -95,19 +95,32 @@ export function Settings() {
         </div>
       )}
 
-      {/* TEK SÜTUN: her kart tam genişlik (Güncelleme kartı gibi), alanlar satır içine yayılır.
-          Sıralama ÖNEM sırasına göre: izleme çekirdeği → bildirim → erişim/güvenlik → yayın/veri → yönetim. */}
+      {/* TEK SÜTUN: her kart tam genişlik, alanlar satır içine yayılır.
+          Sıralama kullanıcının belirlediği düzendedir (2026-07-09). */}
 
-      {/* 1. İzleme — uygulamanın çekirdeği */}
-      <Section icon={<Timer className="h-4 w-4" />} title="İzleme">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Aralık (dk)"><Input type="number" value={s.checkIntervalMinutes} onChange={(e) => set("checkIntervalMinutes", num(e.target.value, 5))} /></Field>
-          <Field label="Hata eşiği" hint="ardışık hata → alarm"><Input type="number" value={s.failureThreshold} onChange={(e) => set("failureThreshold", num(e.target.value, 2))} /></Field>
-          <Field label="Geçmiş (gün)"><Input type="number" value={s.historyRetentionDays} onChange={(e) => set("historyRetentionDays", num(e.target.value, 365))} /></Field>
+      {/* 1. Genel */}
+      <Section icon={<Building2 className="h-4 w-4" />} title="Genel">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <Field label="Şirket adı"><Input value={s.companyName} onChange={(e) => set("companyName", e.target.value)} /></Field>
+          <Field label="Admin kullanıcıları" hint="virgülle ayrılmış sAMAccountName — bu kullanıcılar tüm yetkilere sahiptir">
+            <Input value={s.adminUsers} onChange={(e) => set("adminUsers", e.target.value)} placeholder="admin, ozgur.yahsi" />
+          </Field>
+          <div className="flex items-center">
+            <Switch checked={s.trustInternalTlsCertificates} onChange={(v) => set("trustInternalTlsCertificates", v)} label="Kurum içi TLS sertifikalarına güven (Vault vb.)" />
+          </div>
         </div>
       </Section>
 
-      {/* 2. E-posta — birincil alarm kanalı */}
+      {/* 2. Giriş ekranı logosu (anında uygulanır) */}
+      <LogoCard current={s.loginLogoFile} onChanged={() => getSettings().then(setS).catch(() => {})} />
+
+      {/* 3. Lisans (anında uygulanır) */}
+      <LicenseCard onChanged={reloadMe} />
+
+      {/* 4. Güncelleme */}
+      <UpdateCard />
+
+      {/* 5. E-posta — birincil alarm kanalı */}
       <Section icon={<Mail className="h-4 w-4" />} title="E-posta (SMTP)">
         <Switch checked={s.emailEnabled} onChange={(v) => set("emailEnabled", v)} label="E-posta alarmları açık" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -153,27 +166,14 @@ export function Settings() {
         </TestRow>
       </Section>
 
-      {/* 3. Bildirim Kanalları (SMS/WhatsApp/IVR — anında uygulanır) */}
+      {/* 6. Bildirim Kanalları (SMS/WhatsApp/IVR — anında uygulanır) */}
       <ChannelsCard />
 
       {/* SMS ve WhatsApp Twilio ayarları KALDIRILDI (kullanıcı isteği):
           özel kanallar yukarıdaki Bildirim Kanalları'ndan yönetilir. Alanlar DB'de duruyor,
           klasik arayüzden hâlâ erişilebilir (OTP SMS/WhatsApp kanalı onları kullanır). */}
 
-      {/* 4. Genel */}
-      <Section icon={<Building2 className="h-4 w-4" />} title="Genel">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="Şirket adı"><Input value={s.companyName} onChange={(e) => set("companyName", e.target.value)} /></Field>
-          <Field label="Admin kullanıcıları" hint="virgülle ayrılmış sAMAccountName — bu kullanıcılar tüm yetkilere sahiptir">
-            <Input value={s.adminUsers} onChange={(e) => set("adminUsers", e.target.value)} placeholder="admin, ozgur.yahsi" />
-          </Field>
-          <div className="flex items-center">
-            <Switch checked={s.trustInternalTlsCertificates} onChange={(v) => set("trustInternalTlsCertificates", v)} label="Kurum içi TLS sertifikalarına güven (Vault vb.)" />
-          </div>
-        </div>
-      </Section>
-
-      {/* 5. LDAP / Active Directory */}
+      {/* 7. LDAP / Active Directory */}
       <Section icon={<KeyRound className="h-4 w-4" />} title="Oturum Açma (LDAP / Active Directory)">
         <div className="flex flex-wrap items-center gap-6">
           <Switch checked={s.authEnabled} onChange={(v) => set("authEnabled", v)} label="Giriş zorunlu (LDAP + yerel)" />
@@ -209,7 +209,7 @@ export function Settings() {
         </TestRow>
       </Section>
 
-      {/* 6. OTP */}
+      {/* 8. OTP */}
       <Section icon={<ShieldCheck className="h-4 w-4" />} title="İki Adımlı Doğrulama (OTP)">
         <div className="grid items-center gap-3 md:grid-cols-2 xl:grid-cols-3">
           <Switch checked={s.otpEnabled} onChange={(v) => set("otpEnabled", v)} label="Girişte OTP zorunlu" />
@@ -224,8 +224,8 @@ export function Settings() {
         </div>
       </Section>
 
-      {/* 7. Güvenlik ve Uyumluluk */}
-      <Section icon={<ShieldCheck className="h-4 w-4" />} title="Güvenlik ve Uyumluluk">
+      {/* 9. Local Parola Politikası (eski adı: Güvenlik ve Uyumluluk) */}
+      <Section icon={<ShieldCheck className="h-4 w-4" />} title="Local Parola Politikası">
         <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Min. şifre uzunluğu"><Input type="number" value={s.minPasswordLength} onChange={(e) => set("minPasswordLength", num(e.target.value, 12))} /></Field>
           <Field label="Şifre geçmişi" hint="tekrar kullanılamaz"><Input type="number" value={s.passwordHistoryCount} onChange={(e) => set("passwordHistoryCount", num(e.target.value, 4))} /></Field>
@@ -236,7 +236,16 @@ export function Settings() {
         </div>
       </Section>
 
-      {/* 8. SIEM — Basic pakette kilitli */}
+      {/* 10. Global İzleme Ayarları (eski adı: İzleme) */}
+      <Section icon={<Timer className="h-4 w-4" />} title="Global İzleme Ayarları">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Aralık (dk)"><Input type="number" value={s.checkIntervalMinutes} onChange={(e) => set("checkIntervalMinutes", num(e.target.value, 5))} /></Field>
+          <Field label="Hata eşiği" hint="ardışık hata → alarm"><Input type="number" value={s.failureThreshold} onChange={(e) => set("failureThreshold", num(e.target.value, 2))} /></Field>
+          <Field label="Geçmiş (gün)"><Input type="number" value={s.historyRetentionDays} onChange={(e) => set("historyRetentionDays", num(e.target.value, 365))} /></Field>
+        </div>
+      </Section>
+
+      {/* 11. SIEM — Basic pakette kilitli */}
       <Section icon={<Radio className="h-4 w-4" />} title="SIEM / Syslog Aktarımı"
         action={<Button variant="outline" size="sm" disabled={!siemLicensed} onClick={() => runTest("syslog", testSyslog)}><Radio className="h-4 w-4" /> Test</Button>}>
         {!siemLicensed && (
@@ -253,40 +262,7 @@ export function Settings() {
         <TestNote k="syslog" msg={testMsg} />
       </Section>
 
-      {/* 9. Durum sayfası (herkese açık) */}
-      <Section icon={<Globe className="h-4 w-4" />} title="Durum Sayfası (Herkese Açık)">
-        <div className="grid items-center gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <Switch checked={s.statusPageEnabled} onChange={(v) => set("statusPageEnabled", v)} label="Durum sayfası yayında (giriş gerektirmez)" />
-          <Field label="Sayfa başlığı" hint="boş bırakılırsa şirket adı gösterilir">
-            <Input value={s.statusPageTitle} onChange={(e) => set("statusPageTitle", e.target.value)} placeholder="Örn. Şirket Sistem Durumu" />
-          </Field>
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="rounded bg-muted px-2 py-1 text-xs">{window.location.origin + "/durum"}</code>
-            <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(window.location.origin + "/durum")}>Kopyala</Button>
-            <Button variant="ghost" size="sm" onClick={() => window.open("/durum", "_blank")}>Sayfayı aç</Button>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {'İzleme formunda "Durum sayfasında göster" işaretlenen izlemeler bu sayfada listelenir. Sayfada yalnız izleme adı ve durum görünür; sunucu, adres ve hata detayı asla gösterilmez.'}
-        </p>
-      </Section>
-
-      {/* 10. EOL */}
-      <Section icon={<CalendarClock className="h-4 w-4" />} title="Destek Sonu (EOL)"
-        action={<Button variant="outline" size="sm" onClick={() => runTest("eol", eolSyncNow)}><CalendarClock className="h-4 w-4" /> Senkronize Et</Button>}>
-        <div className="grid items-center gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Switch checked={s.eolEnabled} onChange={(v) => set("eolEnabled", v)} label="endoflife.date verisiyle EOL takibi" />
-          <Field label="Uyarı eşiği (gün)"><Input type="number" value={s.eolWarnDays} onChange={(e) => set("eolWarnDays", num(e.target.value, 90))} /></Field>
-          <Field label="Proxy URL" hint="kapalı ağda opsiyonel"><Input value={s.eolProxyUrl} onChange={(e) => set("eolProxyUrl", e.target.value)} /></Field>
-          <div className="flex items-center gap-2">
-            <input ref={eolFileRef} type="file" accept=".json" className="hidden" onChange={onEolImport} />
-            <Button variant="ghost" size="sm" onClick={() => eolFileRef.current?.click()}>JSON içe aktar (kapalı ağ)</Button>
-          </div>
-        </div>
-        <TestNote k="eol" msg={testMsg} />
-      </Section>
-
-      {/* 11. Yedekleme (zamanlanmış) */}
+      {/* 12. Yedekleme (zamanlanmış) */}
       <Section icon={<Database className="h-4 w-4" />} title="Yedekleme (zamanlanmış)">
         <div className="flex flex-wrap items-center gap-6">
           <Switch checked={s.backupEnabled} onChange={(v) => set("backupEnabled", v)} label="Günlük otomatik yedek (yalnız SQLite)" />
@@ -304,10 +280,43 @@ export function Settings() {
         </div>
       </Section>
 
-      {/* 12. Yedekler listesi (anında uygulanır) */}
+      {/* 13. Yedekler listesi (anında uygulanır) */}
       <BackupsCard />
 
-      {/* 13. Mutabakat */}
+      {/* 14. Durum sayfası (herkese açık) */}
+      <Section icon={<Globe className="h-4 w-4" />} title="Durum Sayfası (Herkese Açık)">
+        <div className="grid items-center gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <Switch checked={s.statusPageEnabled} onChange={(v) => set("statusPageEnabled", v)} label="Durum sayfası yayında (giriş gerektirmez)" />
+          <Field label="Sayfa başlığı" hint="boş bırakılırsa şirket adı gösterilir">
+            <Input value={s.statusPageTitle} onChange={(e) => set("statusPageTitle", e.target.value)} placeholder="Örn. Şirket Sistem Durumu" />
+          </Field>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded bg-muted px-2 py-1 text-xs">{window.location.origin + "/durum"}</code>
+            <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(window.location.origin + "/durum")}>Kopyala</Button>
+            <Button variant="ghost" size="sm" onClick={() => window.open("/durum", "_blank")}>Sayfayı aç</Button>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {'İzleme formunda "Durum sayfasında göster" işaretlenen izlemeler bu sayfada listelenir. Sayfada yalnız izleme adı ve durum görünür; sunucu, adres ve hata detayı asla gösterilmez.'}
+        </p>
+      </Section>
+
+      {/* 15. EOL */}
+      <Section icon={<CalendarClock className="h-4 w-4" />} title="Destek Sonu (EOL)"
+        action={<Button variant="outline" size="sm" onClick={() => runTest("eol", eolSyncNow)}><CalendarClock className="h-4 w-4" /> Senkronize Et</Button>}>
+        <div className="grid items-center gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Switch checked={s.eolEnabled} onChange={(v) => set("eolEnabled", v)} label="endoflife.date verisiyle EOL takibi" />
+          <Field label="Uyarı eşiği (gün)"><Input type="number" value={s.eolWarnDays} onChange={(e) => set("eolWarnDays", num(e.target.value, 90))} /></Field>
+          <Field label="Proxy URL" hint="kapalı ağda opsiyonel"><Input value={s.eolProxyUrl} onChange={(e) => set("eolProxyUrl", e.target.value)} /></Field>
+          <div className="flex items-center gap-2">
+            <input ref={eolFileRef} type="file" accept=".json" className="hidden" onChange={onEolImport} />
+            <Button variant="ghost" size="sm" onClick={() => eolFileRef.current?.click()}>JSON içe aktar (kapalı ağ)</Button>
+          </div>
+        </div>
+        <TestNote k="eol" msg={testMsg} />
+      </Section>
+
+      {/* 16. Mutabakat */}
       <Section icon={<Building2 className="h-4 w-4" />} title="Mutabakat (Envanter Karşılaştırma)">
         <div className="grid items-center gap-3 md:grid-cols-2 xl:grid-cols-3">
           <Switch checked={s.mutabakatEnabled} onChange={(v) => set("mutabakatEnabled", v)} label="Mutabakat ekranı açık" />
@@ -315,15 +324,6 @@ export function Settings() {
           <Field label="Hizmet sağlayıcı"><Input value={s.mutabakatVendorCompany} onChange={(e) => set("mutabakatVendorCompany", e.target.value)} /></Field>
         </div>
       </Section>
-
-      {/* 14. Logo (anında uygulanır) */}
-      <LogoCard current={s.loginLogoFile} onChanged={() => getSettings().then(setS).catch(() => {})} />
-
-      {/* 15. Lisans (anında uygulanır) */}
-      <LicenseCard onChanged={reloadMe} />
-
-      {/* 16. Güncelleme: en altta tam genişlik */}
-      <UpdateCard />
 
       {/* Kaydet çubuğu */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/80 px-5 py-3 backdrop-blur lg:left-44">
