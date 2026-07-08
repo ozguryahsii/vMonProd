@@ -196,7 +196,7 @@ public class ApiController : ControllerBase
                 s.Enabled, s.IntervalMinutesOverride, s.ResponseTimeThresholdMs, s.TimeoutSeconds,
                 s.CpuThresholdPercent, s.RamThresholdPercent, s.DiskThresholdPercent,
                 s.Keyword, s.Description, s.AlertMail, s.AlertSms, s.AlertWhatsapp, s.AlertCall,
-                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures,
+                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.ShowOnStatusPage,
                 s.LastCheckedAt, s.LastIsUp, s.LastStatus, s.LastResponseTimeMs, s.LastError,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue && s.LastResponseTimeMs > s.ResponseTimeThresholdMs
             })
@@ -221,7 +221,8 @@ public class ApiController : ControllerBase
         int? CpuThresholdPercent, int? RamThresholdPercent, int? DiskThresholdPercent,
         string? Keyword, string? Description,
         bool AlertMail, bool AlertSms, bool AlertWhatsapp, bool AlertCall,
-        bool SelfHealEnabled = false, int? SelfHealMaxRetries = null, int? SelfHealAfterFailures = null);
+        bool SelfHealEnabled = false, int? SelfHealMaxRetries = null, int? SelfHealAfterFailures = null,
+        bool ShowOnStatusPage = false);
 
     private static string? ValidateInput(ServiceInput m, out ServiceType type)
     {
@@ -252,6 +253,7 @@ public class ApiController : ControllerBase
         s.SelfHealMaxRetries = Math.Clamp(m.SelfHealMaxRetries ?? s.SelfHealMaxRetries, 1, 10);
         s.SelfHealAfterFailures = Math.Clamp(m.SelfHealAfterFailures ?? s.SelfHealAfterFailures, 1, 10);
         if (!s.SelfHealEnabled) s.SelfHealAttemptsUsed = 0;
+        s.ShowOnStatusPage = m.ShowOnStatusPage;
     }
 
     [HttpPost("services")]
@@ -1244,6 +1246,8 @@ public class ApiController : ControllerBase
             s.WhatsappEnabled, s.WhatsappAccountSid, s.WhatsappFrom, s.WhatsappRecipients,
             s.WhatsappAlarmTemplateSid, s.WhatsappWebhookSecret,
             hasWhatsappToken = !string.IsNullOrEmpty(s.WhatsappAuthTokenEncrypted),
+            // Herkese açık durum sayfası
+            s.StatusPageEnabled, s.StatusPageTitle,
             // Mutabakat
             s.MutabakatEnabled, s.MutabakatOwnCompany, s.MutabakatVendorCompany,
             // Logo (yalnız görüntüleme)

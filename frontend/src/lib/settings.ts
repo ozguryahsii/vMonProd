@@ -26,6 +26,8 @@ export interface AppSettings {
   smsEnabled: boolean; smsProvider: string; smsAccountSid: string; smsFrom: string; smsRecipients: string; hasSmsToken: boolean;
   whatsappEnabled: boolean; whatsappAccountSid: string; whatsappFrom: string; whatsappRecipients: string;
   whatsappAlarmTemplateSid: string; whatsappWebhookSecret: string; hasWhatsappToken: boolean;
+  // Durum sayfası (herkese açık)
+  statusPageEnabled: boolean; statusPageTitle: string;
   // Mutabakat
   mutabakatEnabled: boolean; mutabakatOwnCompany: string; mutabakatVendorCompany: string;
   // Logo

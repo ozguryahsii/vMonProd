@@ -18,6 +18,7 @@ const empty: ServiceInput = {
   keyword: null, description: null,
   alertMail: true, alertSms: false, alertWhatsapp: false, alertCall: false,
   selfHealEnabled: false, selfHealMaxRetries: 1, selfHealAfterFailures: 1,
+  showOnStatusPage: false,
 };
 
 function toInput(s: ServiceItem): ServiceInput {
@@ -192,6 +193,7 @@ export function ServiceForm({
 
         <div className="flex flex-wrap gap-6 rounded-lg border border-border/60 bg-muted/30 p-4">
           <Switch checked={form.enabled} onChange={(v) => set("enabled", v)} label="Aktif" />
+          <Switch checked={form.showOnStatusPage} onChange={(v) => set("showOnStatusPage", v)} label="Durum sayfasında göster" />
           {tm.ssl && <Switch checked={form.useSsl} onChange={(v) => set("useSsl", v)} label={tm.ssl} />}
           {tm.cert && <Switch checked={form.ignoreCertErrors} onChange={(v) => set("ignoreCertErrors", v)} label="Sertifika hatalarını yoksay" />}
         </div>

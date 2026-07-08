@@ -1,0 +1,173 @@
+@{
+    Layout = null;
+    var title = (string?)ViewBag.Title ?? "Sistem Durumu";
+    var unavailable = (bool?)ViewBag.Unavailable == true;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>@title</title>
+    <style>
+        :root {
+            --bg: #f6f7f9; --card: #ffffff; --text: #111827; --muted: #6b7280;
+            --border: #e5e7eb; --green: #22c55e; --amber: #f59e0b; --orange: #fb923c;
+            --red: #ef4444; --gray: #d1d5db; --shadow: 0 1px 3px rgba(0,0,0,.06);
+        }
+        @@media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0b1120; --card: #111a2e; --text: #e5e7eb; --muted: #94a3b8;
+                --border: #1e293b; --gray: #334155; --shadow: 0 1px 3px rgba(0,0,0,.4);
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text);
+               font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+        .wrap { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+        h1 { font-size: 22px; margin: 0; font-weight: 700; }
+        .lang { border: 1px solid var(--border); background: var(--card); color: var(--muted);
+                border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+        .banner { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 16px 20px;
+                  color: #fff; font-size: 17px; font-weight: 600; box-shadow: var(--shadow); }
+        .banner.up { background: linear-gradient(90deg, #16a34a, #22c55e); }
+        .banner.warn { background: linear-gradient(90deg, #d97706, #f59e0b); }
+        .banner.down { background: linear-gradient(90deg, #dc2626, #ef4444); }
+        .banner.unknown { background: linear-gradient(90deg, #64748b, #94a3b8); }
+        .banner .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; opacity: .9; flex: none; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+                padding: 16px 20px; margin-top: 14px; box-shadow: var(--shadow); }
+        .row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .svc-name { font-weight: 600; font-size: 15px; }
+        .svc-status { font-size: 13px; font-weight: 600; white-space: nowrap; }
+        .svc-status.up { color: var(--green); } .svc-status.warn { color: var(--amber); }
+        .svc-status.down { color: var(--red); } .svc-status.unknown { color: var(--muted); }
+        .bars { display: flex; gap: 2px; margin-top: 12px; height: 30px; }
+        .bars span { flex: 1 1 0; border-radius: 2px; background: var(--gray); min-width: 2px; }
+        .bars .g { background: var(--green); } .bars .a { background: var(--amber); }
+        .bars .o { background: var(--orange); } .bars .r { background: var(--red); }
+        .legend { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; }
+        footer { margin-top: 28px; color: var(--muted); font-size: 12px; text-align: center; }
+        footer b { color: var(--text); }
+        .empty, .offline { text-align: center; color: var(--muted); padding: 40px 0 20px; font-size: 15px; }
+        .skel { opacity: .45; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <h1 id="pageTitle">@title</h1>
+        <button class="lang" id="langBtn" type="button">EN</button>
+    </header>
+
+    @if (unavailable)
+    {
+        <div class="card offline" id="offlineMsg">Durum sayfası şu anda kullanılamıyor. / The status page is currently unavailable.</div>
+    }
+    else
+    {
+        <div class="banner unknown" id="banner"><span class="dot"></span><span id="bannerText">…</span></div>
+        <div id="list"></div>
+        <footer>
+            <span id="updatedText"></span><br />
+            <b>vMon</b> <span id="poweredText"></span>
+        </footer>
+    }
+</div>
+@if (!unavailable)
+{
+<script>
+(function () {
+    var T = {
+        tr: {
+            up: "Tüm sistemler çalışıyor", warn: "Bazı sistemlerde uyarı var",
+            down: "Bazı sistemlerde kesinti yaşanıyor", unknown: "Henüz veri yok",
+            sUp: "Çalışıyor", sWarn: "Uyarı", sDown: "Kesinti", sUnknown: "Bilinmiyor",
+            daysAgo: "90 gün önce", today: "Bugün", uptime: "uptime",
+            noData: "veri yok", updated: "Son güncelleme", powered: "ile izleniyor",
+            empty: "Durum sayfasında gösterilecek izleme seçilmemiş.",
+            fetchErr: "Veri alınamadı — bağlantı yeniden denenecek."
+        },
+        en: {
+            up: "All systems operational", warn: "Some systems have warnings",
+            down: "Some systems are experiencing an outage", unknown: "No data yet",
+            sUp: "Operational", sWarn: "Warning", sDown: "Outage", sUnknown: "Unknown",
+            daysAgo: "90 days ago", today: "Today", uptime: "uptime",
+            noData: "no data", updated: "Last updated", powered: "powered monitoring",
+            empty: "No monitors are selected for the status page.",
+            fetchErr: "Could not load data — retrying."
+        }
+    };
+    var lang = localStorage.getItem("vmon.status.lang")
+        || ((navigator.language || "tr").toLowerCase().indexOf("tr") === 0 ? "tr" : "en");
+    var last = null;
+
+    function t(k) { return T[lang][k]; }
+    function fmtPct(p) { return p == null ? "—" : p.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { maximumFractionDigits: 2 }) + "%"; }
+    function fmtDate(d) { return d.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { day: "2-digit", month: "short", year: "numeric" }); }
+
+    function render() {
+        document.getElementById("langBtn").textContent = lang === "tr" ? "EN" : "TR";
+        if (!last) return;
+        var banner = document.getElementById("banner");
+        banner.className = "banner " + last.overall;
+        document.getElementById("bannerText").textContent = t(last.overall);
+        document.title = document.getElementById("pageTitle").textContent;
+
+        var start = new Date(last.startDay + "T00:00:00Z");
+        var html = "";
+        if (!last.services.length) html = '<div class="empty">' + t("empty") + "</div>";
+        for (var i = 0; i < last.services.length; i++) {
+            var s = last.services[i];
+            var stKey = { up: "sUp", warn: "sWarn", down: "sDown", unknown: "sUnknown" }[s.status] || "sUnknown";
+            var bars = "";
+            for (var d = 0; d < s.bars.length; d++) {
+                var day = new Date(start.getTime() + d * 86400000);
+                var tip = fmtDate(day) + " — " + (s.pcts[d] < 0 ? t("noData") : fmtPct(s.pcts[d]) + " " + t("uptime"));
+                var cls = s.bars[d] === "n" ? "" : s.bars[d];
+                bars += '<span class="' + cls + '" title="' + tip + '"></span>';
+            }
+            html += '<div class="card">'
+                 + '<div class="row-head"><span class="svc-name">' + esc(s.name) + '</span>'
+                 + '<span class="svc-status ' + s.status + '">' + t(stKey)
+                 + (s.uptimePct != null ? ' · ' + fmtPct(s.uptimePct) : '') + '</span></div>'
+                 + '<div class="bars">' + bars + '</div>'
+                 + '<div class="legend"><span>' + t("daysAgo") + '</span><span>' + t("today") + '</span></div>'
+                 + '</div>';
+        }
+        document.getElementById("list").innerHTML = html;
+        var upd = new Date(last.updatedAt);
+        document.getElementById("updatedText").textContent = t("updated") + ": " +
+            upd.toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", { hour: "2-digit", minute: "2-digit" });
+        document.getElementById("poweredText").textContent = t("powered");
+    }
+
+    function esc(x) { var d = document.createElement("div"); d.textContent = x; return d.innerHTML; }
+
+    function load() {
+        fetch(window.location.pathname.replace(/\/$/, "") + "/data", { cache: "no-store" })
+            .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+            .then(function (j) { last = j; render(); })
+            .catch(function () {
+                if (!last) {
+                    document.getElementById("bannerText").textContent = t("fetchErr");
+                    document.getElementById("banner").className = "banner unknown skel";
+                }
+            });
+    }
+
+    document.getElementById("langBtn").addEventListener("click", function () {
+        lang = lang === "tr" ? "en" : "tr";
+        localStorage.setItem("vmon.status.lang", lang);
+        render();
+    });
+
+    load();
+    setInterval(load, 60000);
+})();
+</script>
+}
+</body>
+</html>

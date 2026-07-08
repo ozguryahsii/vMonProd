@@ -142,6 +142,12 @@ public class MonitorSettings
     /// (true ise tekrar oluşturulmaz.)</summary>
     public bool TwilioChannelsMigrated { get; set; } = false;
 
+    // --- Herkese açık durum sayfası (yol haritası #5) ---
+    /// <summary>Login'siz /durum sayfası açık mı? Kapalıyken adres 404 döner (varlığı belli edilmez).</summary>
+    public bool StatusPageEnabled { get; set; } = false;
+    /// <summary>Durum sayfası başlığı. Boşsa şirket adı, o da boşsa "Sistem Durumu" gösterilir.</summary>
+    public string StatusPageTitle { get; set; } = "";
+
     // --- Mutabakat (envanter karşılaştırma) modülü ---
     /// <summary>Mutabakat sekmesi açık mı? Kapalıyken kimseye görünmez.</summary>
     public bool MutabakatEnabled { get; set; } = false;
@@ -234,6 +240,8 @@ public class SettingsService
         if (dict.TryGetValue("WhatsappAlarmTemplateSid", out v)) s.WhatsappAlarmTemplateSid = v ?? "";
         if (dict.TryGetValue("WhatsappWebhookSecret", out v)) s.WhatsappWebhookSecret = v ?? "";
         if (dict.TryGetValue("TwilioChannelsMigrated", out v)) s.TwilioChannelsMigrated = v == "true";
+        if (dict.TryGetValue("StatusPageEnabled", out v)) s.StatusPageEnabled = v == "true";
+        if (dict.TryGetValue("StatusPageTitle", out v)) s.StatusPageTitle = v ?? "";
         if (dict.TryGetValue("MutabakatEnabled", out v)) s.MutabakatEnabled = v == "true";
         if (dict.TryGetValue("MutabakatOwnCompany", out v)) s.MutabakatOwnCompany = v ?? "";
         if (dict.TryGetValue("MutabakatVendorCompany", out v)) s.MutabakatVendorCompany = v ?? "";
@@ -304,6 +312,8 @@ public class SettingsService
             ["WhatsappAlarmTemplateSid"] = s.WhatsappAlarmTemplateSid,
             ["WhatsappWebhookSecret"] = s.WhatsappWebhookSecret,
             ["TwilioChannelsMigrated"] = s.TwilioChannelsMigrated ? "true" : "false",
+            ["StatusPageEnabled"] = s.StatusPageEnabled ? "true" : "false",
+            ["StatusPageTitle"] = s.StatusPageTitle,
             ["MutabakatEnabled"] = s.MutabakatEnabled ? "true" : "false",
             ["MutabakatOwnCompany"] = s.MutabakatOwnCompany,
             ["MutabakatVendorCompany"] = s.MutabakatVendorCompany

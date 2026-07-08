@@ -628,6 +628,16 @@
         "Kalan Gün": "Days Left",
         "Parmak İzi": "Thumbprint",
         "⚠ İç ve dış sertifika FARKLI — sunucuda yenilenen sertifika F5/yük dengeleyiciye taşınmamış olabilir.": "⚠ Internal and external certificates DIFFER — the certificate renewed on the server may not have been deployed to the F5/load balancer.",
+        // Yol haritası #5 — Herkese açık durum sayfası
+        "Durum Sayfası (Herkese Açık)": "Status Page (Public)",
+        "Durum sayfası yayında (giriş gerektirmez)": "Status page is live (no sign-in required)",
+        "Sayfa başlığı": "Page title",
+        "boş bırakılırsa şirket adı gösterilir": "if left empty, the company name is shown",
+        "Örn. Şirket Sistem Durumu": "e.g. Company System Status",
+        "İzleme formunda \"Durum sayfasında göster\" işaretlenen izlemeler bu sayfada listelenir. Sayfada yalnız izleme adı ve durum görünür; sunucu, adres ve hata detayı asla gösterilmez.": "Monitors with \"Show on status page\" checked in the monitor form are listed on this page. Only the monitor name and status are shown; server, address and error details are never exposed.",
+        "Kopyala": "Copy",
+        "Sayfayı aç": "Open page",
+        "Durum sayfasında göster": "Show on status page",
         // Yol haritası #2 — Yaklaşan Disk Dolumları
         "Yaklaşan Disk Dolumları": "Approaching Disk Full",
         "90 gün içinde dolması beklenen disk yok 🎉": "No disks expected to fill within 90 days 🎉",

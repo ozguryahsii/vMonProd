@@ -86,6 +86,10 @@ public class MonitoredService
 
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Login'siz herkese açık durum sayfasında (/durum) gösterilsin mi? (Opt-in — varsayılan kapalı.)
+    /// Sayfada yalnızca izleme ADI ve durumu görünür; hedef/host/hata detayı asla sızmaz.</summary>
+    public bool ShowOnStatusPage { get; set; } = false;
+
     /// <summary>Serbest etiket(ler) — virgülle ayrılmış birden çok olabilir (örn. "uretim, kritik").
     /// Raporlarda gösterilir, dashboard ve rapor filtrelerinde tek tek eşleşir.</summary>
     [MaxLength(300)]

@@ -158,6 +158,11 @@ builder.Services.AddRateLimiter(options =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Herkese açık durum sayfası (/durum) — login'siz olduğundan IP başına daha sıkı pencere
+    options.AddPolicy("public", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddScoped<CheckRunner>();
 builder.Services.AddScoped<AuditService>();
@@ -370,6 +375,7 @@ if (bcfg.Configured)
         bool allow = path.StartsWithSegments("/Account/License")
                   || path.StartsWithSegments("/Account/Logout")
                   || path.StartsWithSegments("/Home/Error")
+                  || path.StartsWithSegments("/durum") || path.StartsWithSegments("/status")   // public durum sayfası: lisans dolunca controller nötr "kullanılamıyor" gösterir (iç ekran sızmaz)
                   || path.StartsWithSegments("/lib") || path.StartsWithSegments("/css")
                   || path.StartsWithSegments("/js") || path.StartsWithSegments("/img")
                   || path.Value == "/favicon.ico";
@@ -437,6 +443,8 @@ app.Use(async (ctx, next) =>
                 || path.StartsWithSegments("/js")
                 || path.StartsWithSegments("/api/whatsapp")   // gelen WhatsApp webhook'u (kendi gizli anahtarıyla doğrulanır)
                 || path.StartsWithSegments("/.well-known")    // security.txt vb. (RFC 9116) — herkese açık olmalı
+                || path.StartsWithSegments("/durum")          // herkese açık durum sayfası (ayardan açılır; opt-in izlemeler, iç bilgi sızdırmaz)
+                || path.StartsWithSegments("/status")         // /durum EN alias
                 || path.Value == "/favicon.ico";
     if (open)
     {

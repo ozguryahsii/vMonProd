@@ -27,6 +27,7 @@ export interface ServiceItem {
   selfHealEnabled: boolean;
   selfHealMaxRetries: number;
   selfHealAfterFailures: number;
+  showOnStatusPage: boolean;
   lastCheckedAt: string | null;
   lastIsUp: boolean | null;
   lastStatus: number;
@@ -69,6 +70,7 @@ export interface ServiceInput {
   selfHealEnabled: boolean;
   selfHealMaxRetries: number | null;
   selfHealAfterFailures: number | null;
+  showOnStatusPage: boolean;
 }
 
 export interface ServicesMeta {

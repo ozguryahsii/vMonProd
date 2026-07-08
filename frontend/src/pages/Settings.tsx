@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   Save, CheckCircle2, XCircle, Mail, ShieldCheck,
-  Radio, CalendarClock, Database, Building2, KeyRound, Timer, FlaskConical,
+  Radio, CalendarClock, Database, Building2, KeyRound, Timer, FlaskConical, Globe,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -266,6 +266,22 @@ export function Settings() {
             <Input type="password" autoComplete="new-password" value={newBk} onChange={(e) => setNewBk(e.target.value)}
               placeholder={s.hasBackupPassword ? "•••••• (değiştirmek için girin)" : "parola"} />
           </Field>
+        </Section>
+
+        {/* Durum sayfası (herkese açık) */}
+        <Section icon={<Globe className="h-4 w-4" />} title="Durum Sayfası (Herkese Açık)">
+          <Switch checked={s.statusPageEnabled} onChange={(v) => set("statusPageEnabled", v)} label="Durum sayfası yayında (giriş gerektirmez)" />
+          <Field label="Sayfa başlığı" hint="boş bırakılırsa şirket adı gösterilir">
+            <Input value={s.statusPageTitle} onChange={(e) => set("statusPageTitle", e.target.value)} placeholder="Örn. Şirket Sistem Durumu" />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            {'İzleme formunda "Durum sayfasında göster" işaretlenen izlemeler bu sayfada listelenir. Sayfada yalnız izleme adı ve durum görünür; sunucu, adres ve hata detayı asla gösterilmez.'}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded bg-muted px-2 py-1 text-xs">{window.location.origin + "/durum"}</code>
+            <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(window.location.origin + "/durum")}>Kopyala</Button>
+            <Button variant="ghost" size="sm" onClick={() => window.open("/durum", "_blank")}>Sayfayı aç</Button>
+          </div>
         </Section>
 
         {/* Mutabakat */}
