@@ -59,6 +59,8 @@ public class ApiController : ControllerBase
                 s.SelfHealMaxRetries,
                 s.SelfHealAfterFailures,
                 s.LastSelfHealAt,
+                s.LastSelfHealAttempts,
+                s.LastSelfHealOk,
                 s.LastDiskInfo
             })
             .ToListAsync(ct);
@@ -78,7 +80,8 @@ public class ApiController : ControllerBase
                 s.ConsecutiveFailures, s.ResponseTimeThresholdMs,
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
-                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt, s.LastDiskInfo,
+                s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt,
+                s.LastSelfHealAttempts, s.LastSelfHealOk, s.LastDiskInfo,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue
                        && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,

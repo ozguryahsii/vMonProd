@@ -121,6 +121,11 @@ public class MonitoredService
     public int SelfHealAttemptsUsed { get; set; } = 0;
     /// <summary>Son otomatik iyileştirme müdahalesinin zamanı (UTC).</summary>
     public DateTime? LastSelfHealAt { get; set; }
+    /// <summary>Son müdahale döngüsünde GERÇEKTE yapılan deneme sayısı — gösterim için kalıcı
+    /// (SelfHealAttemptsUsed UP olunca sıfırlanır, bu alan silinmez).</summary>
+    public int? LastSelfHealAttempts { get; set; }
+    /// <summary>Son self-healing müdahalesi servisi ayağa kaldırdı mı?</summary>
+    public bool? LastSelfHealOk { get; set; }
 
     /// <summary>Keyword alanını ayrı ayrı etiketlere böler (virgül ayraçlı, tekrarsız).</summary>
     public static List<string> SplitKeywords(string? keyword) =>

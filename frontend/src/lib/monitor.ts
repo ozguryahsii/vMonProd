@@ -24,6 +24,8 @@ export interface StatusService {
   selfHealMaxRetries: number;
   selfHealAfterFailures: number;
   lastSelfHealAt: string | null;
+  lastSelfHealAttempts: number | null;
+  lastSelfHealOk: boolean | null;
   lastDiskInfo: string | null;   // "mount|kullanılanGb|toplamGb|yüzde" ';' ayraçlı
   isError: boolean;
   slow: boolean;

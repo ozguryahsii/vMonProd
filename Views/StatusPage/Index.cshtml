@@ -39,8 +39,9 @@
         .banner .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; opacity: .9; flex: none; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
                 padding: 16px 20px; margin-top: 14px; box-shadow: var(--shadow); }
-        .row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
         .svc-name { font-weight: 600; font-size: 15px; }
+        .svc-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
         .svc-status { font-size: 13px; font-weight: 600; white-space: nowrap; }
         .svc-status.up { color: var(--green); } .svc-status.warn { color: var(--amber); }
         .svc-status.down { color: var(--red); } .svc-status.unknown { color: var(--muted); }
@@ -130,7 +131,8 @@
                 bars += '<span class="' + cls + '" title="' + tip + '"></span>';
             }
             html += '<div class="card">'
-                 + '<div class="row-head"><span class="svc-name">' + esc(s.name) + '</span>'
+                 + '<div class="row-head"><div><span class="svc-name">' + esc(s.name) + '</span>'
+                 + (s.description ? '<div class="svc-desc">' + esc(s.description) + '</div>' : '') + '</div>'
                  + '<span class="svc-status ' + s.status + '">' + t(stKey)
                  + (s.uptimePct != null ? ' · ' + fmtPct(s.uptimePct) : '') + '</span></div>'
                  + '<div class="bars">' + bars + '</div>'

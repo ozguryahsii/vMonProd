@@ -153,8 +153,17 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
           {service.selfHealEnabled && (
             <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-xs text-muted-foreground">
               <span className="font-semibold text-emerald-400">Self-Healing açık</span>
-              {" — "}{service.selfHealAfterFailures}{" ardışık down sonrası "}{service.selfHealMaxRetries}{" deneme otomatik yeniden başlatma"}
-              {service.lastSelfHealAt && <span> · son müdahale: {dt(service.lastSelfHealAt)}</span>}
+              {service.lastSelfHealAt ? (
+                <>
+                  {" — "}<span>son müdahale: {dt(service.lastSelfHealAt)}</span>{" · "}
+                  {service.lastSelfHealAttempts ?? 1}{" "}
+                  {service.lastSelfHealOk
+                    ? <span className="font-medium text-emerald-400">deneme yapıldı → servis ayağa kalktı ✓</span>
+                    : <span className="font-medium text-rose-400">deneme yapıldı → servis ayağa kalkmadı ✗</span>}
+                </>
+              ) : (
+                <>{" — "}{service.selfHealAfterFailures}{" ardışık down sonrası "}{service.selfHealMaxRetries}{" deneme otomatik yeniden başlatma · henüz müdahale gerekmedi"}</>
+              )}
             </div>
           )}
 

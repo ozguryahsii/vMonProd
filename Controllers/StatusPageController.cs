@@ -64,7 +64,7 @@ public class StatusPageController : Controller
         var services = await _db.Services.AsNoTracking()
             .Where(x => x.Enabled && x.ShowOnStatusPage)
             .OrderBy(x => x.Name)
-            .Select(x => new { x.Id, x.Name, x.LastStatus, x.LastIsUp, x.LastCheckedAt })
+            .Select(x => new { x.Id, x.Name, x.Description, x.LastStatus, x.LastIsUp, x.LastCheckedAt })
             .ToListAsync(ct);
 
         var startDay = DateTime.UtcNow.Date.AddDays(-(Days - 1));
@@ -113,6 +113,7 @@ public class StatusPageController : Controller
             rows.Add(new
             {
                 name = svc.Name,
+                description = string.IsNullOrWhiteSpace(svc.Description) ? null : svc.Description.Trim(),
                 status,
                 uptimePct = total == 0 ? (double?)null : Math.Round((total - down) * 100.0 / total, 2),
                 bars = new string(bars),

@@ -4,7 +4,7 @@ namespace vMonitor.Services;
 /// Sürüm çıkarken YALNIZCA burası artırılır (About.cshtml rozeti otomatik izler).</summary>
 public static class VersionInfo
 {
-    public const string AppVersion = "v2.26.0-pre.2";
+    public const string AppVersion = "v2.26.0-pre.3";
 
     /// <summary>"v2.23.4" / "v2.23.5-pre.2" → karşılaştırılabilir dörtlü (major, minor, patch, pre).
     /// Pre içermeyen final sürüm, aynı numaralı pre'lerden BÜYÜK sayılır (pre=MaxValue).</summary>

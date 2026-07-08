@@ -84,6 +84,10 @@ public class CheckRunner
                     outcome = await checker.CheckAsync(svc, svc.Credential, ct);
                 }
 
+                // Gerçek müdahale bilgisi kalıcı tutulur (dashboard notu bunu gösterir; UP olunca silinmez)
+                svc.LastSelfHealAttempts = attemptNo;
+                svc.LastSelfHealOk = outcome.IsUp;
+
                 if (outcome.IsUp)
                 {
                     await _audit.LogAsync("selfheal.success", svc.Name,
