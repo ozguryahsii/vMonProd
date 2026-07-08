@@ -55,6 +55,7 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
   const [wa, setWa] = useState<Tri>("");
   const [call, setCall] = useState<Tri>("");
   const [enabled, setEnabled] = useState<Tri>("");
+  const [statusPage, setStatusPage] = useState<Tri>("");
   const [ivOn, setIvOn] = useState(false); const [iv, setIv] = useState("");
   const [slOn, setSlOn] = useState(false); const [sl, setSl] = useState("");
   const [cpOn, setCpOn] = useState(false); const [cp, setCp] = useState("");
@@ -66,7 +67,7 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
 
   useEffect(() => {
     if (open) {
-      setMail(""); setSms(""); setWa(""); setCall(""); setEnabled("");
+      setMail(""); setSms(""); setWa(""); setCall(""); setEnabled(""); setStatusPage("");
       setIvOn(false); setIv(""); setSlOn(false); setSl(""); setCpOn(false); setCp("");
       setRmOn(false); setRm(""); setDkOn(false); setDk(""); setKw(""); setErr(null);
     }
@@ -80,6 +81,7 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
       ids,
       alertMail: mail || null, alertSms: sms || null, alertWhatsapp: wa || null,
       alertCall: call || null, enabled: enabled || null,
+      showOnStatusPage: statusPage || null,
       setInterval: ivOn, interval: num(iv),
       setSlow: slOn, slow: num(sl),
       setCpu: cpOn, cpu: num(cp),
@@ -109,7 +111,7 @@ export function BulkEditForm({ open, ids, onClose, onDone }: {
         <div>
           <p className="mb-2 text-sm font-medium text-muted-foreground">Alarm Kanalları & Aktiflik</p>
           <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-4">
-            {([["Mail", mail, setMail], ["SMS", sms, setSms], ["WhatsApp", wa, setWa], ["Arama", call, setCall], ["Aktif", enabled, setEnabled]] as const).map(([label, v, set]) => (
+            {([["Mail", mail, setMail], ["SMS", sms, setSms], ["WhatsApp", wa, setWa], ["Arama", call, setCall], ["Aktif", enabled, setEnabled], ["Durum sayfasında göster", statusPage, setStatusPage]] as const).map(([label, v, set]) => (
               <div key={label} className="flex items-center justify-between gap-3">
                 <span className="text-sm">{label}</span>
                 <Segmented value={v} onChange={set} />

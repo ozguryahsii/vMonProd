@@ -213,6 +213,7 @@ export interface BulkEditInput {
   alertWhatsapp: string | null;
   alertCall: string | null;
   enabled: string | null;
+  showOnStatusPage: string | null;
   setInterval: boolean; interval: number | null;
   setSlow: boolean; slow: number | null;
   setCpu: boolean; cpu: number | null;

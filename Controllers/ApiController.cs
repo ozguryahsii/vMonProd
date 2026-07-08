@@ -332,6 +332,7 @@ public class ApiController : ControllerBase
     public record BulkEditInput(
         int[] Ids,
         string? AlertMail, string? AlertSms, string? AlertWhatsapp, string? AlertCall, string? Enabled,
+        string? ShowOnStatusPage,
         bool SetInterval, int? Interval,
         bool SetSlow, int? Slow,
         bool SetCpu, int? Cpu,
@@ -368,6 +369,7 @@ public class ApiController : ControllerBase
             Apply(m.AlertWhatsapp, "WhatsApp", b => s.AlertWhatsapp = b);
             Apply(m.AlertCall, "Arama", b => s.AlertCall = b);
             Apply(m.Enabled, "Aktif", b => s.Enabled = b);
+            Apply(m.ShowOnStatusPage, "Durum sayfası", b => s.ShowOnStatusPage = b);
 
             if (m.SetInterval) s.IntervalMinutesOverride = iv;
             if (m.SetSlow) s.ResponseTimeThresholdMs = sl;
