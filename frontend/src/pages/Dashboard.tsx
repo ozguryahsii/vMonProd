@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, ChevronRight, Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
+import { LayoutGrid, ChevronRight, Plus, Pencil, Trash2, RefreshCw, Search, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
@@ -62,13 +63,25 @@ export function Dashboard() {
     [all, board]
   );
 
-  const counts = useMemo(() => {
-    const c = { all: inBoard.length, up: 0, slow: 0, down: 0, error: 0 };
-    for (const s of inBoard) c[catOf(s)]++;
-    return c;
-  }, [inBoard]);
+  // Üst arama çubuğu dashboard'dayken buraya ?q= yazar — sonuç yerinde süzülür (ad/hedef/açıklama/ekstra)
+  const [params, setParams] = useSearchParams();
+  const q = (params.get("q") ?? "").trim();
+  const searched = useMemo(() => {
+    if (!q) return inBoard;
+    const norm = (x: string | null | undefined) => (x ?? "").toLocaleLowerCase("tr");
+    const qq = norm(q);
+    return inBoard.filter((s) =>
+      norm(s.name).includes(qq) || norm(s.target).includes(qq) ||
+      norm(s.description).includes(qq) || norm(s.extra).includes(qq));
+  }, [inBoard, q]);
 
-  const visible = active === "all" ? inBoard : inBoard.filter((s) => catOf(s) === active);
+  const counts = useMemo(() => {
+    const c = { all: searched.length, up: 0, slow: 0, down: 0, error: 0 };
+    for (const s of searched) c[catOf(s)]++;
+    return c;
+  }, [searched]);
+
+  const visible = active === "all" ? searched : searched.filter((s) => catOf(s) === active);
   // DB sağlık izlemeleri kendi panelinde (enstans kartları) gösterilir, genel ızgarada tekrarlanmaz
   const dbVisible = visible.filter((s) => isDbHealthType(s.type));
   const gridVisible = visible.filter((s) => !isDbHealthType(s.type));
@@ -132,6 +145,19 @@ export function Dashboard() {
         </div>
       </div>
 
+      {q && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-2.5 py-1 font-medium text-primary">
+            "{q}"
+            <button onClick={() => setParams({}, { replace: true })} title="Temizle" className="rounded p-0.5 hover:bg-primary/20">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+          <span className="text-xs text-muted-foreground">{searched.length} sonuç</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cats.map((c, i) => {
           const val = counts[c.key as keyof typeof counts] ?? 0;
@@ -162,8 +188,8 @@ export function Dashboard() {
       <DbHealthPanel services={dbVisible} onOpen={setDetailId} />
 
       {visible.length === 0 ? (
-        <EmptyState title={inBoard.length === 0 ? "Bu panoda servis yok" : "Bu kategoride servis yok"}
-          hint={inBoard.length === 0 ? "Servisler ekranından ekle veya başka pano seç." : "Başka bir kategori seç."} />
+        <EmptyState title={q && searched.length === 0 ? "Aramayla eşleşen servis yok" : inBoard.length === 0 ? "Bu panoda servis yok" : "Bu kategoride servis yok"}
+          hint={q && searched.length === 0 ? "Farklı bir arama dene veya aramayı temizle." : inBoard.length === 0 ? "Servisler ekranından ekle veya başka pano seç." : "Başka bir kategori seç."} />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {gridVisible.map((s) => {
@@ -175,6 +201,9 @@ export function Dashboard() {
                   <div className="min-w-0">
                     <div className="truncate font-semibold">{s.name}</div>
                     <div className="truncate font-mono text-xs text-muted-foreground">{s.target}{s.port ? `:${s.port}` : ""}</div>
+                    {s.description && (
+                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground/90" title={s.description}>{s.description}</div>
+                    )}
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </div>

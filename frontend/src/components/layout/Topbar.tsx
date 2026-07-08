@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Moon, Sun, Search, ChevronDown, LogOut, UserCircle, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/useMe";
@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 export function Topbar({ title, subtitle, onMenu }: { title: string; subtitle?: string; onMenu?: () => void }) {
   const { me } = useMe();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Dashboard'dayken arama oraya uygulanır (yerinde filtre); diğer ekranlarda İzlemeler'e gider
+  const onDashboard = location.pathname.startsWith("/app/dashboard");
   const [search, setSearch] = useState("");
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [menuOpen, setMenuOpen] = useState(false);
@@ -55,11 +58,12 @@ export function Topbar({ title, subtitle, onMenu }: { title: string; subtitle?: 
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && search.trim()) {
-              navigate(`/app/services?q=${encodeURIComponent(search.trim())}`);
+              const q = encodeURIComponent(search.trim());
+              navigate(onDashboard ? `/app/dashboard?q=${q}` : `/app/services?q=${q}`);
               setSearch("");
             }
           }}
-          placeholder="İzleme ara… (Enter)"
+          placeholder={onDashboard ? "Dashboard'da ara… (Enter)" : "İzleme ara… (Enter)"}
           className="h-9 w-64 rounded-lg border border-input bg-card/60 pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/40"
         />
       </div>

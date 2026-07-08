@@ -77,6 +77,10 @@
         "Servisi başlat": "Start service", "Servisi durdur": "Stop service", "Servisi yeniden başlat": "Restart service",
         "Toplam Servis": "Total Services", "KAPALI": "DOWN", "HATA": "ERROR", "YAVAŞ": "SLOW",
         "Atanan kaynaklar:": "Allocated resources:",
+        "Açıklama:": "Description:",
+        "Dashboard'da ara… (Enter)": "Search dashboard… (Enter)",
+        "Aramayla eşleşen servis yok": "No services match the search",
+        "Farklı bir arama dene veya aramayı temizle.": "Try a different search or clear it.",
         "Yanıt Süresi": "Response Time", "Kesinti geçmişi": "Outage history",
         "Bu aralıkta kontrol yok": "No checks in this range",
         "3 saat": "3 hours", "24 saat": "24 hours", "7 gün": "7 days", "1 ay": "1 month",
@@ -718,6 +722,7 @@
         " servis)": " services)",
         " izleme": " monitors",
         " yetki": " permissions",
+        " sonuç": " results",
         " kayıt (en yeni 500)": " records (newest 500)",
         // DB İzleme Fazı — metrik değer birimleri ("34 adet" → "34", "12 sn" → "12 s")
         " adet": "",
