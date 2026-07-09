@@ -71,20 +71,24 @@
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
                         @if (en)
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.1 — Redesigned Settings page</p>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.2 — Chart & statistics polish, security hardening</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Single-column Settings:</strong> every settings card is now full width in a single column — no more mixed card sizes or layout shifts. Fields spread across the row and adapt to narrow screens automatically.</li>
-                                <li><strong>New order:</strong> cards are arranged top-down as Update, General, Login Logo, License, Email (SMTP), Notification Channels, Sign-in (LDAP/AD), Two-Step Verification (OTP), Local Password Policy, Global Monitoring Settings, SIEM/Syslog, Backup, Backups, Status Page, End-of-Life (EOL) and Reconciliation — the Update card sits at the very top.</li>
-                                <li><strong>Renamed cards:</strong> "Security &amp; Compliance" is now <b>Local Password Policy</b>; "Monitoring" is now <b>Global Monitoring Settings</b>. All settings and functions are unchanged.</li>
+                                <li><strong>Permission feedback:</strong> unauthorized service start/stop/restart attempts now show a clear red notification right under the buttons ("You do not have permission…"); successful actions show green confirmation.</li>
+                                <li><strong>Dashboard charts:</strong> the "Select Services" list has a search box again; legend names are clickable — click to hide a series (struck through), click again to bring it back. Selection and hiding apply to the response-time chart AND the CPU/RAM/Disk charts together (linked by target server).</li>
+                                <li><strong>Targeted statistics details:</strong> clicking a server in "Approaching Disk Full" opens only that server's disk trend; a "DB Connection Usage" row opens that monitor's usage trend; a "Database Health" instance opens its own monitors' data as metric charts; a DB alert opens that alert's data; a certificate row opens its days-left trend. CPU/RAM/Disk columns no longer appear where those metrics are not tracked.</li>
+                                <li><strong>Clickability cues:</strong> rows in statistics boxes now highlight on hover with an arrow indicator.</li>
+                                <li><strong>Security hardening (CodeQL):</strong> parameterized audit queries, log output sanitization, backup path containment checks, safer connection-string building, Secure flag on cookies over HTTPS and explicit CSRF validation attributes. No behavior changes.</li>
                             </ul>
                         }
                         else
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.1 — Yenilenen Ayarlar sayfası</p>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.2 — Grafik & istatistik rötuşları, güvenlik sıkılaştırması</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Tek sütun Ayarlar:</strong> tüm ayar kartları artık tek sütunda tam genişlik — küçük/büyük kutu farkları ve kaymalar bitti. Alanlar satır boyunca yayılır, dar ekranda otomatik alt alta iner.</li>
-                                <li><strong>Yeni sıralama:</strong> kartlar yukarıdan aşağı Güncelleme, Genel, Giriş Ekranı Logosu, Lisans, E-posta (SMTP), Bildirim Kanalları, Oturum Açma (LDAP/AD), İki Adımlı Doğrulama (OTP), Local Parola Politikası, Global İzleme Ayarları, SIEM/Syslog, Yedekleme, Yedekler, Durum Sayfası, Destek Sonu (EOL) ve Mutabakat düzenindedir — Güncelleme kartı en tepededir.</li>
-                                <li><strong>Yeniden adlandırma:</strong> "Güvenlik ve Uyumluluk" artık <b>Local Parola Politikası</b>; "İzleme" artık <b>Global İzleme Ayarları</b>. Tüm ayarlar ve işlevler aynen korundu.</li>
+                                <li><strong>Yetki geri bildirimi:</strong> yetkisiz servis başlat/durdur/yeniden başlat denemeleri artık butonların hemen altında net kırmızı bildirim gösterir ("Bu işlem için yetkiniz yok…"); başarılı işlemler yeşil onayla görünür.</li>
+                                <li><strong>Dashboard grafikleri:</strong> "Servis Seç" listesine arama kutusu geri geldi; grafik altındaki isimler tıklanabilir — tıklayınca seri gizlenir (üstü çizilir), tekrar tıklayınca döner. Seçim ve gizleme, yanıt süresi grafiği İLE CPU/RAM/Disk grafiklerine birlikte uygulanır (hedef sunucu üzerinden eşlenir).</li>
+                                <li><strong>Hedefli istatistik detayları:</strong> "Yaklaşan Disk Dolumları"nda bir sunucuya tıklayınca yalnız o sunucunun disk trendi açılır; "DB Bağlantı Doluluğu" satırı o izlemenin doluluk trendini, "Veritabanı Sağlığı" enstansı kendi izlemelerinin verilerini metrik grafikleriyle, DB uyarısı o uyarının verisini, sertifika satırı kalan-gün trendini açar. Takip edilmeyen yerlerde CPU/RAM/Disk kolonları artık gösterilmez.</li>
+                                <li><strong>Tıklanabilirlik ipuçları:</strong> istatistik kutularındaki satırlar üzerine gelince vurgulanır ve ok işareti belirir.</li>
+                                <li><strong>Güvenlik sıkılaştırması (CodeQL):</strong> parametreli denetim sorguları, log çıktısı arındırma, yedek yolu kapsama kontrolü, daha güvenli bağlantı dizesi kurulumu, HTTPS'te çerezlere Secure bayrağı ve açık CSRF doğrulama nitelikleri. Davranış değişikliği yoktur.</li>
                             </ul>
                         }
                     </div>
