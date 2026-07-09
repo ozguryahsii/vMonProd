@@ -71,24 +71,20 @@
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
                         @if (en)
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.2 — Chart & statistics polish, security hardening</p>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.3 — Dependency security updates</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Permission feedback:</strong> unauthorized service start/stop/restart attempts now show a clear red notification right under the buttons ("You do not have permission…"); successful actions show green confirmation.</li>
-                                <li><strong>Dashboard charts:</strong> the "Select Services" list has a search box again; legend names are clickable — click to hide a series (struck through), click again to bring it back. Selection and hiding apply to the response-time chart AND the CPU/RAM/Disk charts together (linked by target server).</li>
-                                <li><strong>Targeted statistics details:</strong> clicking a server in "Approaching Disk Full" opens only that server's disk trend; a "DB Connection Usage" row opens that monitor's usage trend; a "Database Health" instance opens its own monitors' data as metric charts; a DB alert opens that alert's data; a certificate row opens its days-left trend. CPU/RAM/Disk columns no longer appear where those metrics are not tracked.</li>
-                                <li><strong>Clickability cues:</strong> rows in statistics boxes now highlight on hover with an arrow indicator.</li>
-                                <li><strong>Security hardening (CodeQL):</strong> parameterized audit queries, log output sanitization, backup path containment checks, safer connection-string building, Secure flag on cookies over HTTPS and explicit CSRF validation attributes. No behavior changes.</li>
+                                <li><strong>Mail library updated:</strong> the SMTP component (MailKit) was upgraded to close a known STARTTLS response-injection vulnerability. Email sending works exactly as before.</li>
+                                <li><strong>Build tooling updated:</strong> the interface build tools (vite/esbuild) were upgraded to their patched versions, resolving all reported dependency vulnerabilities (1 high, 4 moderate). These tools never run on your server — no runtime impact.</li>
+                                <li>Following v2.26.2's CodeQL hardening, both security dashboards (code scanning and dependencies) are now clean.</li>
                             </ul>
                         }
                         else
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.2 — Grafik & istatistik rötuşları, güvenlik sıkılaştırması</p>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.3 — Bağımlılık güvenlik güncellemeleri</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Yetki geri bildirimi:</strong> yetkisiz servis başlat/durdur/yeniden başlat denemeleri artık butonların hemen altında net kırmızı bildirim gösterir ("Bu işlem için yetkiniz yok…"); başarılı işlemler yeşil onayla görünür.</li>
-                                <li><strong>Dashboard grafikleri:</strong> "Servis Seç" listesine arama kutusu geri geldi; grafik altındaki isimler tıklanabilir — tıklayınca seri gizlenir (üstü çizilir), tekrar tıklayınca döner. Seçim ve gizleme, yanıt süresi grafiği İLE CPU/RAM/Disk grafiklerine birlikte uygulanır (hedef sunucu üzerinden eşlenir).</li>
-                                <li><strong>Hedefli istatistik detayları:</strong> "Yaklaşan Disk Dolumları"nda bir sunucuya tıklayınca yalnız o sunucunun disk trendi açılır; "DB Bağlantı Doluluğu" satırı o izlemenin doluluk trendini, "Veritabanı Sağlığı" enstansı kendi izlemelerinin verilerini metrik grafikleriyle, DB uyarısı o uyarının verisini, sertifika satırı kalan-gün trendini açar. Takip edilmeyen yerlerde CPU/RAM/Disk kolonları artık gösterilmez.</li>
-                                <li><strong>Tıklanabilirlik ipuçları:</strong> istatistik kutularındaki satırlar üzerine gelince vurgulanır ve ok işareti belirir.</li>
-                                <li><strong>Güvenlik sıkılaştırması (CodeQL):</strong> parametreli denetim sorguları, log çıktısı arındırma, yedek yolu kapsama kontrolü, daha güvenli bağlantı dizesi kurulumu, HTTPS'te çerezlere Secure bayrağı ve açık CSRF doğrulama nitelikleri. Davranış değişikliği yoktur.</li>
+                                <li><strong>Posta kütüphanesi güncellendi:</strong> SMTP bileşeni (MailKit), bilinen bir STARTTLS yanıt-enjeksiyonu açığını kapatmak için yükseltildi. E-posta gönderimi aynen eskisi gibi çalışır.</li>
+                                <li><strong>Derleme araçları güncellendi:</strong> arayüz derleme araçları (vite/esbuild) yamalı sürümlerine yükseltilerek raporlanan tüm bağımlılık açıkları (1 yüksek, 4 orta) giderildi. Bu araçlar sunucunuzda hiç çalışmaz — çalışma zamanına etkisi yoktur.</li>
+                                <li>v2.26.2'deki CodeQL sıkılaştırmasının ardından her iki güvenlik panosu da (kod taraması ve bağımlılıklar) artık temizdir.</li>
                             </ul>
                         }
                     </div>
