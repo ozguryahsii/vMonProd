@@ -410,6 +410,44 @@ public class StatisticsController : Controller
                 else
                     dbs = dbs.Where(s => string.Equals(DbPlatform(s.Type), value, StringComparison.OrdinalIgnoreCase)).ToList();
             }
+
+            // ENSTANS/TEK-İZLEME drilli: CPU/RAM/Disk tablosu yerine izlemelerin KENDİ VERİLERİ —
+            // her metrik için son değer + seçilen aralıkta kovalı zaman serisi (görselleştirilir).
+            var detailed = !string.IsNullOrWhiteSpace(value)
+                && (value.Contains('|') || value.StartsWith("name:", StringComparison.OrdinalIgnoreCase));
+            if (detailed)
+            {
+                var dids = dbs.Select(s => s.Id).ToHashSet();
+                var dsince = DateTime.UtcNow.AddDays(-days);
+                var drows = await _db.CheckResults.AsNoTracking()
+                    .Where(r => r.CheckedAt >= dsince && dids.Contains(r.ServiceId) && r.IsUp)
+                    .Select(r => new { r.ServiceId, r.CheckedAt, r.ResponseTimeMs })
+                    .ToListAsync();
+                DateTime DBk(DateTime d) => days <= 30 ? d.Date
+                    : days <= 180 ? d.Date.AddDays(-(((int)d.DayOfWeek + 6) % 7))
+                    : new DateTime(d.Year, d.Month, 1);
+                string DLb(DateTime d) => days <= 180 ? d.ToString("dd.MM") : d.ToString("MM.yyyy");
+                var byId = drows.ToLookup(r => r.ServiceId);
+                return Json(new
+                {
+                    count = dbs.Count,
+                    kind = "db",
+                    servers = Array.Empty<object>(),
+                    trend = (object?)null,
+                    series = dbs.Select(s => new
+                    {
+                        name = s.Name,
+                        type = s.Type.ToString(),
+                        status = s.LastStatus,
+                        error = s.LastError,
+                        value = s.LastResponseTimeMs,
+                        lastChecked = s.LastCheckedAt,
+                        points = byId[s.Id].GroupBy(r => DBk(r.CheckedAt.ToLocalTime())).OrderBy(g => g.Key)
+                            .Select(g => new { day = DLb(g.Key), value = Math.Round(g.Average(x => (double)x.ResponseTimeMs), 1) })
+                            .ToList()
+                    }).ToList()
+                });
+            }
             string Unit(ServiceType t) => t is ServiceType.OracleSysdate or ServiceType.MsSqlGetDate or ServiceType.MySqlNow ? "ms"
                 : t is ServiceType.OracleConnectionUsage or ServiceType.MsSqlConnectionUsage or ServiceType.MySqlConnectionUsage ? "%"
                 : t == ServiceType.MySqlReplication ? "sn" : "adet";
@@ -453,18 +491,17 @@ public class StatisticsController : Controller
                 .Select(g => new { day = CLabel(g.Key), value = Math.Round(g.Average(x => (double)x.ResponseTimeMs), 1) })
                 .ToList();
 
-            var cStatusText = new[] { "Up", "Down", "Hata" };
+            // CPU/RAM/Disk tablosu YOK (sertifikada anlamsız): kalan gün trendi + sade sertifika bilgisi
             return Json(new
             {
                 count = certs.Count,
-                servers = certs.Select(s => new
+                kind = "cert",
+                servers = Array.Empty<object>(),
+                certInfo = certs.Select(s => new
                 {
                     name = s.Name, target = s.Target,
-                    os = "SSL",
-                    status = s.LastStatus is >= 0 and < 3 ? cStatusText[s.LastStatus] : "?",
-                    cpu = (double?)null, ram = (double?)null, disk = (double?)null,
-                    capacity = s.LastResponseTimeMs.HasValue ? $"{s.LastResponseTimeMs} gün kaldı" : null,
-                    lastChecked = s.LastCheckedAt
+                    daysLeft = s.LastResponseTimeMs,
+                    status = s.LastStatus, error = s.LastError, lastChecked = s.LastCheckedAt
                 }).ToList(),
                 trend = cpoints.Count > 0 ? new { metric = "kalan gün", days, points = cpoints } : (object?)null
             });

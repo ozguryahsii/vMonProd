@@ -89,8 +89,19 @@ export interface StatDetailServer {
 }
 export interface StatDetail {
   count: number;
+  /** "db" = DB izlemelerinin kendi veri serileri; "cert" = sertifika kalan-gün bilgisi; yoksa sunucu tablosu */
+  kind?: "db" | "cert";
   servers: StatDetailServer[];
   trend: { metric: string; days: number; points: { day: string; value: number }[] } | null;
+  series?: {
+    name: string; type: string; status: number; error: string | null;
+    value: number | null; lastChecked: string | null;
+    points: { day: string; value: number }[];
+  }[];
+  certInfo?: {
+    name: string; target: string; daysLeft: number | null;
+    status: number; error: string | null; lastChecked: string | null;
+  }[];
 }
 
 export async function getStatDetail(source: string, value?: string | null, days = 7, signal?: AbortSignal): Promise<StatDetail> {

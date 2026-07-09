@@ -5,6 +5,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { getStatDetail, type StatDetail } from "@/lib/stats";
+import { DB_METRIC_META, fmtDbValue } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 export interface Drill { source: string; value?: string | null; title: string }
@@ -77,7 +78,7 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
   return (
     <Drawer open={!!drill} onClose={onClose}
       title={drill?.title ?? ""}
-      description={data ? `${data.count} sunucu` : ""}>
+      description={data ? `${data.count}${data.kind === "db" ? " izleme" : data.kind === "cert" ? " sertifika" : " sunucu"}` : ""}>
       {error ? <ErrorState message={error} /> :
         !data ? <div className="space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-64 w-full" /></div> : (
           <div className="space-y-5">
@@ -114,7 +115,85 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
               </div>
             )}
 
-            {data.servers.length === 0 ? <EmptyState title="Eşleşen sunucu yok" /> : (
+            {/* DB drilli: izlemelerin KENDİ verileri metrik kartlarıyla (CPU/RAM/Disk tablosu yok) */}
+            {data.kind === "db" && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">İzleme verileri</h3>
+                  <div className="flex gap-1">
+                    {RANGES.map((r) => (
+                      <Button key={r.d} variant={days === r.d ? "default" : "ghost"} size="sm"
+                        className="h-7 px-2 text-xs" onClick={() => setDays(r.d)}>{r.label}</Button>
+                    ))}
+                  </div>
+                </div>
+                {(data.series?.length ?? 0) === 0 ? <EmptyState title="Eşleşen izleme yok" /> : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {data.series!.map((s, idx) => {
+                      const meta = DB_METRIC_META[s.type];
+                      const st = s.status === 1 ? "Down" : s.status === 2 ? "Hata" : "Up";
+                      return (
+                        <div key={s.name} className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-semibold" title={s.name}>{meta?.short ?? s.name}</span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusCls[st])}>{st}</span>
+                              <span className="text-xs font-semibold tabular-nums">{s.value != null ? fmtDbValue(s.type, s.value) : "—"}</span>
+                            </span>
+                          </div>
+                          {s.error && <p className="mb-1 truncate text-[10px] text-rose-400" title={s.error}>{s.error}</p>}
+                          {s.points.length === 0 ? (
+                            <div className="py-6 text-center text-xs text-muted-foreground">Veri yok</div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height={120}>
+                              <AreaChart data={s.points} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                                <defs><linearGradient id={`gDb${idx}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(217 91% 60%)" stopOpacity={0.4} /><stop offset="100%" stopColor="hsl(217 91% 60%)" stopOpacity={0} /></linearGradient></defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                                <XAxis dataKey="day" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={24} />
+                                <YAxis domain={meta?.metric === "usage" ? [0, 100] : [0, "auto"]} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" }}
+                                  formatter={(v: number) => [fmtDbValue(s.type, v), meta?.short ?? s.name]} />
+                                <Area type="monotone" dataKey="value" stroke="hsl(217 91% 60%)" strokeWidth={2} fill={`url(#gDb${idx})`} animationDuration={600} />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sertifika drilli: kalan-gün trendi (yukarıda) + sade sertifika bilgisi — CPU/RAM/Disk yok */}
+            {data.kind === "cert" && (
+              <div className="space-y-1.5">
+                {(data.certInfo ?? []).map((c) => {
+                  const days2 = c.daysLeft;
+                  const expired = days2 != null && days2 < 0;
+                  const chip = expired ? "bg-rose-500/15 text-rose-400"
+                    : days2 != null && days2 <= 7 ? "bg-rose-500/15 text-rose-400"
+                    : days2 != null && days2 <= 30 ? "bg-amber-500/15 text-amber-400"
+                    : "bg-emerald-500/15 text-emerald-400";
+                  return (
+                    <div key={c.name} className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{c.name}</span>
+                          <span className="block truncate font-mono text-[10px] text-muted-foreground">{c.target}</span>
+                        </span>
+                        <span className={cn("shrink-0 rounded px-2 py-0.5 text-xs font-semibold tabular-nums", chip)}>
+                          {days2 == null ? "—" : expired ? "SÜRESİ DOLDU" : `${days2} gün kaldı`}
+                        </span>
+                      </div>
+                      {c.error && <p className="mt-1 text-xs text-rose-400">{c.error}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!data.kind && (data.servers.length === 0 ? <EmptyState title="Eşleşen sunucu yok" /> : (
               <div className="overflow-x-auto rounded-lg border border-border/60">
                 <table className="w-full text-sm">
                   {/* Başlık scroll'da sabit; başlığa tıkla → sırala (A-Z/Z-A, büyük-küçük) */}
@@ -147,7 +226,7 @@ export function StatDetailDrawer({ drill, onClose }: { drill: Drill | null; onCl
                   </tbody>
                 </table>
               </div>
-            )}
+            ))}
           </div>
         )}
     </Drawer>

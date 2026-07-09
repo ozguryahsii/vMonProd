@@ -92,6 +92,8 @@
         "Doluluk": "Usage",
         "Kalan gün trendi": "Days-left trend",
         "Kalan": "Left",
+        "İzleme verileri": "Monitor data",
+        "Eşleşen izleme yok": "No matching monitors",
         "Farklı bir arama dene veya aramayı temizle.": "Try a different search or clear it.",
         "Yanıt Süresi": "Response Time", "Kesinti geçmişi": "Outage history",
         "Bu aralıkta kontrol yok": "No checks in this range",
@@ -742,6 +744,7 @@
         " — detay": " — details",
         " gün kaldı": " days left",
         " doluluk": " usage",
+        " sertifika": " certificates",
         " kayıt (en yeni 500)": " records (newest 500)",
         // DB İzleme Fazı — metrik değer birimleri ("34 adet" → "34", "12 sn" → "12 s")
         " adet": "",
