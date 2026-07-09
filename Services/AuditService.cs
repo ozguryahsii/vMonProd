@@ -102,7 +102,7 @@ public class AuditService
         catch (Exception ex)
         {
             // Denetim kaydı yazılamazsa uygulamayı kilitlemeyiz; sunucu loguna + dosyaya düşürürüz.
-            _logger.LogError(ex, "Denetim kaydı yazılamadı: {Action} {Target}", action, target);
+            _logger.LogError(ex, "Denetim kaydı yazılamadı: {Action} {Target}", LogSan.S(action), LogSan.S(target));
             try
             {
                 var dir = Path.Combine(_env.ContentRootPath, "Data");

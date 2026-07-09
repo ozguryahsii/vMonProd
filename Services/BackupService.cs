@@ -94,7 +94,10 @@ public class BackupService
         var safe = Path.GetFileName(fileName);
         if (string.IsNullOrEmpty(safe) || !safe.StartsWith(Prefix)
             || !(safe.EndsWith(".db", StringComparison.OrdinalIgnoreCase) || safe.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase))) return null;
-        var full = Path.Combine(targetDir, safe);
+        // Kanonikleştir + kapsama testi (CodeQL cs/path-injection): sonuç mutlaka hedef klasörün İÇİNDE kalmalı
+        var root = Path.GetFullPath(targetDir);
+        var full = Path.GetFullPath(Path.Combine(root, safe));
+        if (!full.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return null;
         return File.Exists(full) ? full : null;
     }
 
@@ -104,7 +107,9 @@ public class BackupService
         error = "";
         try
         {
-            using var c = new SqliteConnection($"Data Source={dbFile};Mode=ReadOnly");
+            // Bağlantı dizesi BUILDER ile kurulur (CodeQL cs/resource-injection): yol, dizeye gömülmez
+            var cs = new SqliteConnectionStringBuilder { DataSource = dbFile, Mode = SqliteOpenMode.ReadOnly }.ToString();
+            using var c = new SqliteConnection(cs);
             c.Open();
             using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('Services','Settings')";
@@ -145,13 +150,15 @@ public class BackupService
             if (!Validate(actualSource, out var verr)) return (false, verr);
             await Task.Run(() =>
             {
-                using var src = new SqliteConnection($"Data Source={actualSource};Mode=ReadOnly");
+                var srcCs = new SqliteConnectionStringBuilder { DataSource = actualSource, Mode = SqliteOpenMode.ReadOnly }.ToString();
+                using var src = new SqliteConnection(srcCs);
                 src.Open();
-                using var dst = new SqliteConnection($"Data Source={LivePath};Mode=ReadWrite");
+                var dstCs = new SqliteConnectionStringBuilder { DataSource = LivePath, Mode = SqliteOpenMode.ReadWrite }.ToString();
+                using var dst = new SqliteConnection(dstCs);
                 dst.Open();
                 src.BackupDatabase(dst);          // kaynağı aktif DB'nin üzerine yaz
             }, ct);
-            _logger.LogWarning("Veritabanı geri yüklendi: {Src} -> {Live}", sourceDbFile, LivePath);
+            _logger.LogWarning("Veritabanı geri yüklendi: {Src} -> {Live}", LogSan.S(sourceDbFile), LivePath);
             return (true, null);
         }
         catch (Exception ex)

@@ -322,7 +322,7 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api"),
         errApp.Run(async ctx =>
         {
             var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-            app.Logger.LogError(feature?.Error, "API hatası: {Path}", ctx.Request.Path);
+            app.Logger.LogError(feature?.Error, "API hatası: {Path}", LogSan.S(ctx.Request.Path.Value));
             ctx.Response.StatusCode = 500;
             ctx.Response.ContentType = "text/plain; charset=utf-8";
             await ctx.Response.WriteAsync("İşlem sırasında bir hata oluştu.");

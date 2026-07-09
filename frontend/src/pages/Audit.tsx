@@ -61,7 +61,7 @@ export function Audit() {
     setExporting(true);
     try {
       const all = await fetchAll();
-      const escH = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const escH = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
       const rowsHtml = all.map((r) =>
         `<tr><td>${dtTr(r.at)}</td><td>${escH(r.user)}</td><td>${escH(r.ip)}</td><td>${escH(r.action)}</td><td>${escH(r.target)}</td><td>${escH(r.detail)}</td><td>${r.success ? "✓" : "✗"}</td></tr>`).join("");
       const w = window.open("", "_blank");
@@ -75,7 +75,7 @@ export function Audit() {
           @media print { @page { size: A4 landscape; margin: 12mm } }
         </style></head><body>
         <h1>vMon — Denetim Kaydı</h1>
-        <div class="sub">Aralık: ${from || "başlangıç"} → ${to || "bugün"} · ${all.length} kayıt · Oluşturma: ${new Date().toLocaleString()}</div>
+        <div class="sub">Aralık: ${escH(from) || "başlangıç"} → ${escH(to) || "bugün"} · ${all.length} kayıt · Oluşturma: ${escH(new Date().toLocaleString())}</div>
         <table><thead><tr><th>Zaman</th><th>Kullanıcı</th><th>IP</th><th>Eylem</th><th>Hedef</th><th>Detay</th><th>Sonuç</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>
         <script>window.onload=function(){window.print()}</script></body></html>`);

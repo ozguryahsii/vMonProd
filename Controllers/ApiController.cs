@@ -8,6 +8,9 @@ namespace vMonitor.Controllers;
 
 [Route("api")]
 [ApiController]
+// CSRF: Program.cs'te GLOBAL AutoValidateAntiforgeryToken filtresi zaten kayıtlı (SPA her istekte
+// X-CSRF-TOKEN gönderir). Buradaki açık nitelik davranışı DEĞİŞTİRMEZ — statik analiz (CodeQL) için görünür kılar.
+[AutoValidateAntiforgeryToken]
 public class ApiController : ControllerBase
 {
     private readonly AppDbContext _db;

@@ -35,19 +35,23 @@ public class AuditController : MvcBase
             (string.IsNullOrWhiteSpace(q) && string.IsNullOrWhiteSpace(act) && days <= 0)
                 ? "Denetim kaydı görüntülendi" : $"Denetim kaydı görüntülendi (filtre: q='{q}', act='{act}', gün={days})");
 
-        static string Esc(string s) => s.Replace("'", "''");
+        // PARAMETRELİ sorgu (CodeQL cs/sql-injection): kullanıcı girdisi asla SQL'e gömülmez
         var where = new List<string>();
+        var pars = new List<SqliteParameter>();
         if (days > 0)
         {
-            var since = DateTime.UtcNow.AddDays(-Math.Min(days, 3650)).ToString("yyyy-MM-dd HH:mm:ss");
-            where.Add($"At >= '{since}'");
+            where.Add("At >= @since");
+            pars.Add(new SqliteParameter("@since", DateTime.UtcNow.AddDays(-Math.Min(days, 3650)).ToString("yyyy-MM-dd HH:mm:ss")));
         }
         if (!string.IsNullOrWhiteSpace(act))
-            where.Add($"Action = '{Esc(act.Trim())}'");
+        {
+            where.Add("Action = @act");
+            pars.Add(new SqliteParameter("@act", act.Trim()));
+        }
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var t = Esc(q.Trim());
-            where.Add($"(User LIKE '%{t}%' OR IFNULL(Target,'') LIKE '%{t}%' OR IFNULL(Detail,'') LIKE '%{t}%' OR IFNULL(Ip,'') LIKE '%{t}%')");
+            where.Add("(User LIKE @q OR IFNULL(Target,'') LIKE @q OR IFNULL(Detail,'') LIKE @q OR IFNULL(Ip,'') LIKE @q)");
+            pars.Add(new SqliteParameter("@q", "%" + q.Trim() + "%"));
         }
         var whereSql = where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "";
 
@@ -59,7 +63,9 @@ public class AuditController : MvcBase
             conn.Open();
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = $"SELECT Id, At, User, Ip, Action, Target, Detail, Success FROM AuditLogs{whereSql} ORDER BY Id DESC LIMIT {take}";
+                cmd.CommandText = $"SELECT Id, At, User, Ip, Action, Target, Detail, Success FROM AuditLogs{whereSql} ORDER BY Id DESC LIMIT @take";
+                foreach (var p in pars) cmd.Parameters.Add(p);
+                cmd.Parameters.Add(new SqliteParameter("@take", take));
                 using var rd = cmd.ExecuteReader();
                 while (rd.Read())
                 {

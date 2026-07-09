@@ -49,7 +49,7 @@ public class EmailService
     {
         var recipients = settings.MailRecipients
             .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        _logger.LogInformation("Email gönderiliyor: {Subject} -> {Recipients}", subject, settings.MailRecipients);
+        _logger.LogInformation("Email gönderiliyor: {Subject} -> {Recipients}", LogSan.S(subject), LogSan.S(settings.MailRecipients));
         return SendCoreAsync(settings, recipients, subject, body, ct);
     }
 

@@ -203,7 +203,7 @@ public class AccountController : Controller
             ViewBag.ReturnUrl = returnUrl; return View("Login");
         }
         Response.Cookies.Append("vmon_otp", token, new CookieOptions
-        { HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true, MaxAge = TimeSpan.FromMinutes(6), Path = "/" });
+        { HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true, MaxAge = TimeSpan.FromMinutes(6), Path = "/", Secure = Request.IsHttps });
         await _audit.LogAsync("login.otp.sent", appUser.Sam, $"Kanal: {settings.OtpChannel}", true);
         return RedirectToAction(nameof(Otp));
     }
@@ -247,7 +247,7 @@ public class AccountController : Controller
         var (token, code) = _otp.Create(user, p.IsAdmin, p.DisplayName, p.ReturnUrl);
         var (ok, err) = await _otp.SendAsync(settings, user, code);
         Response.Cookies.Append("vmon_otp", token, new CookieOptions
-        { HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true, MaxAge = TimeSpan.FromMinutes(6), Path = "/" });
+        { HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true, MaxAge = TimeSpan.FromMinutes(6), Path = "/", Secure = Request.IsHttps });
         ViewBag.Channel = settings.OtpChannel;
         ViewBag.Error = ok ? null : ("Kod gönderilemedi: " + err);
         ViewBag.Info = ok ? "Yeni kod gönderildi." : null;
@@ -284,7 +284,9 @@ public class AccountController : Controller
 
     private void WritePrefCookies(string? theme, string? lang)
     {
-        var opt = new CookieOptions { Expires = DateTimeOffset.Now.AddYears(1), IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/" };
+        // Secure = isteğin şeması (CodeQL cookie-secure-not-set): HTTPS'te Secure basılır,
+        // düz-HTTP kurulumlarda (ters proxy arkası) çerezler çalışmaya devam eder.
+        var opt = new CookieOptions { Expires = DateTimeOffset.Now.AddYears(1), IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Secure = Request.IsHttps };
         Response.Cookies.Append("vmon_theme", theme == "dark" ? "dark" : "light", opt);
         Response.Cookies.Append("vmon_lang", lang == "en" ? "en" : "tr", opt);
     }

@@ -92,7 +92,7 @@ function serviceCardHtml(s, now) {
             ${serviceControlButtons(s)}
             <div class="flex gap-2 mt-3">
                 ${window.vPerms && window.vPerms.check ? `<button class="btn btn-outline btn-sm" onclick="checkNow(${s.id}, this)"><i class="bi bi-arrow-repeat"></i> Kontrol Et</button>` : ""}
-                <button class="btn btn-ghost btn-sm" onclick="showHistory(${s.id}, '${esc(s.name).replace(/'/g, "\\'")}')"><i class="bi bi-clock-history"></i> Geçmiş</button>
+                <button class="btn btn-ghost btn-sm" onclick="showHistory(${s.id}, '${esc(s.name).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}')"><i class="bi bi-clock-history"></i> Geçmiş</button>
             </div>
         </div>
     </div>`;
