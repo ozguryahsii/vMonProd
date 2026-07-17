@@ -241,6 +241,23 @@ using (var scope = app.Services.CreateScope())
             // Performans: zaman-serisi tablolarına indeks (yoksa) — İstatistik/Rapor sorguları hızlansın.
             SchemaSync.EnsureIndexesAsync(db, bcfg.Provider, logger).GetAwaiter().GetResult();
 
+            // Zamanlanmış Görevler: JobName kolonu v2.27.0-pre.1'de 300 karakter oluşturuldu; çoklu görev
+            // listesi (';' ayraçlı) için GENİŞLETİLİR (SchemaSync yalnız ekler, değiştirmez — best-effort ALTER).
+            // SQLite'ta gerek yok (uzunluk zorlanmaz); Oracle NVARCHAR2 üst sınırı 2000 karakterdir.
+            try
+            {
+                var widen = bcfg.Provider switch
+                {
+                    DbProviderKind.SqlServer => "ALTER TABLE [Services] ALTER COLUMN [JobName] nvarchar(4000) NULL",
+                    DbProviderKind.Oracle => "ALTER TABLE \"Services\" MODIFY (\"JobName\" NVARCHAR2(2000))",
+                    DbProviderKind.MySql => "ALTER TABLE `Services` MODIFY COLUMN `JobName` TEXT NULL",
+                    DbProviderKind.PostgreSql => "ALTER TABLE \"Services\" ALTER COLUMN \"JobName\" TYPE varchar(4000)",
+                    _ => null
+                };
+                if (widen != null) db.Database.ExecuteSqlRaw(widen);
+            }
+            catch (Exception ex) { logger.LogDebug(ex, "JobName kolonu genişletme atlandı (zaten geniş olabilir)."); }
+
             if (bcfg.Provider == DbProviderKind.Sqlite)
                 DbSchemaHelper.EnsureSchema(db, logger);   // mevcut SQLite kurulumları: legacy CREATE/ALTER + veri-fix (idempotent)
 

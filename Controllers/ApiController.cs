@@ -302,6 +302,9 @@ public class ApiController : ControllerBase
                 return "En az bir görev seçin (listeden işaretleyebilir veya ';' ile ayırarak elle girebilirsiniz).";
             if (jobList.Count > 100)
                 return "Bir izlemeye en fazla 100 görev eklenebilir.";
+            // Oracle NVARCHAR2(2000) üst sınırına sığmalı — aşarsa NET hata ver (500 yerine)
+            if (string.Join(";", jobList).Length > 1900)
+                return "Görev listesi çok uzun (yaklaşık 1900 karakter sınırı) — izlemeyi ikiye bölerek iki set oluşturun.";
             if (type == ServiceType.SystemdTimerJob && jobList.Any(j => SystemdTools.NormalizeTimer(j) == null))
                 return "Timer adları yalnızca harf, rakam ve @ . _ - içerebilir.";
         }
