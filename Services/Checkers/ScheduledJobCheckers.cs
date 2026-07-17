@@ -126,7 +126,9 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             cmd.Parameters.Add($"o{i}", (object?)ow ?? DBNull.Value);
         }
         cmd.CommandText =
-            "SELECT j.owner, j.job_name, j.enabled, (SYSDATE - CAST(j.last_start_date AS DATE)) * 1440 AS age_min, " +
+            // ROUND şart: SYSDATE-tarih farkı yüksek hassasiyetli NUMBER üretir; ODP.NET decimal'e
+            // çeviremeyip "Specified cast is not valid / Arithmetic overflow" fırlatır (v2.27.0-pre.4 hatası)
+            "SELECT j.owner, j.job_name, j.enabled, ROUND((SYSDATE - CAST(j.last_start_date AS DATE)) * 1440, 1) AS age_min, " +
             "d.status, d.dur_sec " +
             $"FROM {prefix}_scheduler_jobs j LEFT JOIN (" +
             "  SELECT owner, job_name, status, " +
