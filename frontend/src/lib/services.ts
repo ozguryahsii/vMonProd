@@ -132,6 +132,29 @@ export const JOB_META: Record<string, JobMeta> = {
 };
 export const isJobType = (t: string) => t in JOB_META;
 
+/** LastJobStates çözümü: "ad|durum|değer" ';' ayraçlı → mini kutu listesi. */
+export interface JobBoxState { name: string; st: "ok" | "fail" | "dis" | "sil" | "nf"; val: number | null }
+export function parseJobStates(raw: string | null | undefined): JobBoxState[] {
+  if (!raw) return [];
+  const out: JobBoxState[] = [];
+  for (const part of raw.split(";")) {
+    const f = part.split("|");
+    if (f.length < 3 || !f[0]) continue;
+    const st = (["ok", "fail", "dis", "sil", "nf"].includes(f[1]) ? f[1] : "ok") as JobBoxState["st"];
+    const v = Number(f[2]);
+    out.push({ name: f[0], st, val: Number.isFinite(v) && v >= 0 ? v : null });
+  }
+  return out;
+}
+
+/** Mini kutu kısa etiketi: Oracle "OWNER.JOB" → JOB, Windows "\Klasör\Ad" → Ad. Tam ad tooltip'te. */
+export function jobShortName(name: string): string {
+  const bySlash = name.split("\\").filter(Boolean);
+  const last = bySlash[bySlash.length - 1] ?? name;
+  const i = last.indexOf(".");
+  return i > 0 && !last.toLowerCase().endsWith(".timer") ? last.slice(i + 1) : last;
+}
+
 /** Metrik kutusuna tıklayınca yan panelde canlı liste (kim/hangisi/ne kadar) gösterilebilen tipler:
  *  aktif/bloklu oturum, uzun sorgu, (Oracle tablespace / MSSQL DB durumu), bağlantı doluluğu. */
 export const hasDbDetail = (t: string) => {

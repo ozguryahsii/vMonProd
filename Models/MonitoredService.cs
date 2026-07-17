@@ -152,6 +152,12 @@ public class MonitoredService
     /// Boş = kontrol yok. Süre eşiğinden (ResponseTimeThresholdMs) BAĞIMSIZDIR.</summary>
     public int? MaxSilenceHours { get; set; }
 
+    /// <summary>Son kontroldeki GÖREV-BAŞINA durumlar (dashboard job kartı mini kutuları):
+    /// "ad|durum|değer" girişleri ';' ile ayrılır. durum: ok/fail/dis/sil/nf;
+    /// değer: süre tiplerinde sn, diğerlerinde son koşudan bu yana dk (-1 = bilinmiyor).
+    /// MaxLength YOK — her sağlayıcıda sınırsız metin kolonu (TEXT/nvarchar(max)/NCLOB) oluşur.</summary>
+    public string? LastJobStates { get; set; }
+
     /// <summary>Dakika cinsinden servis bazlı kontrol aralığı. Boşsa global ayar geçerli.</summary>
     public int? IntervalMinutesOverride { get; set; }
 

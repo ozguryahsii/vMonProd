@@ -27,6 +27,9 @@ export interface StatusService {
   lastSelfHealAttempts: number | null;
   lastSelfHealOk: boolean | null;
   lastDiskInfo: string | null;   // "mount|kullanılanGb|toplamGb|yüzde" ';' ayraçlı
+  jobName: string | null;
+  maxSilenceHours: number | null;
+  lastJobStates: string | null;  // "ad|durum|değer" ';' ayraçlı (durum: ok/fail/dis/sil/nf)
   isError: boolean;
   slow: boolean;
   downSince: string | null;
@@ -106,4 +109,5 @@ export interface DbDetailData {
   note?: string | null;
   error?: string;
 }
-export const getDbDetail = (id: number, signal?: AbortSignal) => apiGet<DbDetailData>(`/db-detail/${id}`, signal);
+export const getDbDetail = (id: number, signal?: AbortSignal, job?: string | null) =>
+  apiGet<DbDetailData>(`/db-detail/${id}${job ? `?job=${encodeURIComponent(job)}` : ""}`, signal);

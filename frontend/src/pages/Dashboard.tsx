@@ -9,12 +9,13 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ServiceDetailDrawer } from "@/components/monitor/ServiceDetailDrawer";
 import { DashboardCharts } from "@/components/monitor/DashboardCharts";
 import { DbHealthPanel } from "@/components/monitor/DbHealthPanel";
+import { JobPanel } from "@/components/monitor/JobPanel";
 import { BoardForm } from "@/components/monitor/BoardForm";
 import { useAsync } from "@/hooks/useAsync";
 import {
   type StatusService, type Board, type Cat, catOf, getStatus, getBoards, deleteBoard,
 } from "@/lib/monitor";
-import { checkIds, isDbHealthType, fmtDbValue } from "@/lib/services";
+import { checkIds, isDbHealthType, isJobType, fmtDbValue } from "@/lib/services";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,9 @@ export function Dashboard() {
   const [boardId, setBoardId] = useState<number | "all">("all");
   const [active, setActive] = useState<Cat>("all");
   const [detailId, setDetailId] = useState<number | null>(null);
+  // Job kartı mini kutusundan gelen görev filtresi: drawer yalnız o görevin geçmişini çeker
+  const [detailJob, setDetailJob] = useState<string | null>(null);
+  const openDetail = (id: number, job: string | null = null) => { setDetailJob(job); setDetailId(id); };
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Board | null>(null);
   const [toDelete, setToDelete] = useState<Board | null>(null);
@@ -82,9 +86,10 @@ export function Dashboard() {
   }, [searched]);
 
   const visible = active === "all" ? searched : searched.filter((s) => catOf(s) === active);
-  // DB sağlık izlemeleri kendi panelinde (enstans kartları) gösterilir, genel ızgarada tekrarlanmaz
+  // DB sağlık ve Zamanlanmış Görev izlemeleri kendi panellerinde gösterilir, genel ızgarada tekrarlanmaz
   const dbVisible = visible.filter((s) => isDbHealthType(s.type));
-  const gridVisible = visible.filter((s) => !isDbHealthType(s.type));
+  const jobVisible = visible.filter((s) => isJobType(s.type));
+  const gridVisible = visible.filter((s) => !isDbHealthType(s.type) && !isJobType(s.type));
   // Drawer id ile takip eder → 20sn oto-yenilemede içerik CANLI güncellenir (bayat snapshot yok)
   const detail = detailId != null ? all.find((s) => s.id === detailId) ?? null : null;
 
@@ -185,7 +190,10 @@ export function Dashboard() {
       <DashboardCharts services={visible} />
 
       {/* DB izlemeleri enstans (platform+host) kartlarında toplanır */}
-      <DbHealthPanel services={dbVisible} onOpen={setDetailId} />
+      <DbHealthPanel services={dbVisible} onOpen={(id) => openDetail(id)} />
+
+      {/* Zamanlanmış Görev setleri: kart başına görev mini kutuları (8+ → Tümünü göster popup'ı) */}
+      <JobPanel services={jobVisible} onOpen={(id, job) => openDetail(id, job ?? null)} />
 
       {visible.length === 0 ? (
         <EmptyState title={q && searched.length === 0 ? "Aramayla eşleşen servis yok" : inBoard.length === 0 ? "Bu panoda servis yok" : "Bu kategoride servis yok"}
@@ -195,7 +203,7 @@ export function Dashboard() {
           {gridVisible.map((s) => {
             const c = catOf(s);
             return (
-              <button key={s.id} onClick={() => setDetailId(s.id)}
+              <button key={s.id} onClick={() => openDetail(s.id)}
                 className={cn(cardCls, "border-l-4 p-4 text-left transition-all hover:-translate-y-0.5", borderOf[c], !s.enabled && "opacity-50")}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -240,7 +248,8 @@ export function Dashboard() {
         </div>
       )}
 
-      <ServiceDetailDrawer service={detail} onClose={() => setDetailId(null)} onChanged={reload} />
+      <ServiceDetailDrawer service={detail} jobFilter={detailJob}
+        onClose={() => { setDetailId(null); setDetailJob(null); }} onChanged={reload} />
       <BoardForm open={formOpen} board={editing} onClose={() => setFormOpen(false)} onSaved={loadBoards} />
       <ConfirmDialog
         open={!!toDelete}

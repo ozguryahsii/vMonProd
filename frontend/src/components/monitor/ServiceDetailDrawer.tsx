@@ -31,10 +31,12 @@ function duration(startIso: string, endIso: string | null): string {
 }
 const tip = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "0.75rem", fontSize: "12px", color: "hsl(var(--foreground))" };
 
-export function ServiceDetailDrawer({ service, onClose, onChanged }: {
+export function ServiceDetailDrawer({ service, onClose, onChanged, jobFilter = null }: {
   service: StatusService | null;
   onClose: () => void;
   onChanged: () => void;
+  /** Job kartı mini kutusundan gelindiyse: yalnız bu görevin geçmişi gösterilir */
+  jobFilter?: string | null;
 }) {
   const [hist, setHist] = useState<HistoryData | null>(null);
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
@@ -65,12 +67,12 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
   const loadDbDetail = () => {
     if (!service || !hasDbDetail(service.type)) { setDbDetail(null); return; }
     setDbLoading(true);
-    getDbDetail(service.id)
+    getDbDetail(service.id, undefined, jobFilter)
       .then(setDbDetail)
       .catch((e) => setDbDetail({ supported: true, error: (e as Error).message }))
       .finally(() => setDbLoading(false));
   };
-  useEffect(() => { setDbDetail(null); loadDbDetail(); /* eslint-disable-next-line */ }, [service?.id]);
+  useEffect(() => { setDbDetail(null); loadDbDetail(); /* eslint-disable-next-line */ }, [service?.id, jobFilter]);
 
   const load = () => {
     if (!service) return;
@@ -241,6 +243,12 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
 
               {showDbDetail && (
                 <div>
+                  {jobFilter && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+                      <span className="font-semibold text-primary">Görev: </span>
+                      <span className="truncate font-mono">{jobFilter}</span>
+                    </div>
+                  )}
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-sm font-semibold">
                       {dbDetail?.title ?? "Detay"}

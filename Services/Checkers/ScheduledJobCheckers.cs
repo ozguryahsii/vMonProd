@@ -32,12 +32,29 @@ public static class JobCommon
     /// <summary>Tek görevin son durumu (çoklu izleme değerlendirmesine girer).</summary>
     public sealed record JobState(string Name, bool Found, bool Enabled, string? FailText, double? AgeMin, long? DurSec);
 
-    /// <summary>Görev setini tek izleme sonucuna indirger: (grafik değeri, eşik-hatası mı, mesaj).</summary>
-    public static (long Value, bool IsThresholdError, string? Error) Evaluate(MonitoredService svc, List<JobState> jobs, bool durationBased)
+    /// <summary>Görev setini tek izleme sonucuna indirger: (grafik değeri, eşik-hatası mı, mesaj).
+    /// Ayrıca görev-başına durumları LastJobStates biçiminde serileştirir (dashboard mini kutuları).</summary>
+    public static (long Value, bool IsThresholdError, string? Error, string States) Evaluate(MonitoredService svc, List<JobState> jobs, bool durationBased)
     {
         long value = 0;
         foreach (var j in jobs)
             value = Math.Max(value, durationBased ? (j.DurSec ?? 0) : (long)Math.Max(0, Math.Round(j.AgeMin ?? 0)));
+
+        // Görev-başına durum kodu: nf (bulunamadı) / fail / dis (devre dışı) / sil (sessizlik aşımı) / ok
+        string StOf(JobState j)
+        {
+            if (!j.Found) return "nf";
+            if (j.FailText != null) return "fail";
+            if (!j.Enabled) return "dis";
+            if (svc.MaxSilenceHours is > 0 && (j.AgeMin == null || j.AgeMin < 0 || j.AgeMin.Value / 60.0 > svc.MaxSilenceHours.Value)) return "sil";
+            return "ok";
+        }
+        var states = string.Join(";", jobs.Select(j =>
+        {
+            var val = durationBased ? (j.DurSec ?? -1) : (j.AgeMin.HasValue ? (long)Math.Max(0, Math.Round(j.AgeMin.Value)) : -1);
+            var safeName = j.Name.Replace(";", "_").Replace("|", "_");
+            return $"{safeName}|{StOf(j)}|{val}";
+        }));
 
         static string Names(IEnumerable<string> l)
         {
@@ -46,25 +63,25 @@ public static class JobCommon
         }
 
         var notFound = jobs.Where(j => !j.Found).Select(j => j.Name).ToList();
-        if (notFound.Count > 0) return (value, false, $"Görev bulunamadı: {Names(notFound)}");
+        if (notFound.Count > 0) return (value, false, $"Görev bulunamadı: {Names(notFound)}", states);
 
         var failed = jobs.Where(j => j.Found && j.FailText != null).ToList();
         if (failed.Count > 0)
             return (value, false, $"{failed.Count}/{jobs.Count} görev başarısız — " +
-                string.Join(" | ", failed.Take(2).Select(f => $"{f.Name}: {f.FailText}")) + (failed.Count > 2 ? " | …" : ""));
+                string.Join(" | ", failed.Take(2).Select(f => $"{f.Name}: {f.FailText}")) + (failed.Count > 2 ? " | …" : ""), states);
 
         var disabled = jobs.Where(j => j.Found && !j.Enabled).Select(j => j.Name).ToList();
-        if (disabled.Count > 0) return (value, true, $"{disabled.Count} görev devre dışı: {Names(disabled)}");
+        if (disabled.Count > 0) return (value, true, $"{disabled.Count} görev devre dışı: {Names(disabled)}", states);
 
         if (svc.MaxSilenceHours is > 0)
         {
-            var silent = jobs.Where(j => j.Found && j.Enabled &&
+            var silent = jobs.Where(j => j.Found && j.Enabled && j.FailText == null &&
                 (j.AgeMin == null || j.AgeMin < 0 || j.AgeMin.Value / 60.0 > svc.MaxSilenceHours!.Value))
                 .Select(j => j.Name).ToList();
             if (silent.Count > 0)
-                return (value, true, $"Sessizlik eşiği ({svc.MaxSilenceHours} sa) aşıldı: {Names(silent)}");
+                return (value, true, $"Sessizlik eşiği ({svc.MaxSilenceHours} sa) aşıldı: {Names(silent)}", states);
         }
-        return (value, false, null);
+        return (value, false, null, states);
     }
 }
 
@@ -85,9 +102,10 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             try
             {
                 var states = await QueryAsync(conn, prefix, wanted, ct);
-                var (val, thr, err) = JobCommon.Evaluate(service, states, durationBased: true);
+                var (val, thr, err, ser) = JobCommon.Evaluate(service, states, durationBased: true);
                 OverrideResponseValue = val;
                 IsThresholdError = thr;
+                service.LastJobStates = ser;
                 return err;
             }
             catch (OracleException ex) when (ex.Number == 942 && prefix == "dba") { /* dba görünümü yok → all_ dene */ }
@@ -197,9 +215,10 @@ public class MsSqlAgentJobChecker : MsSqlDbCheckerBase
         foreach (var w in wanted)
             if (!found.Contains(w)) states.Add(new(w, false, false, null, null, null));
 
-        var (val, thr, err) = JobCommon.Evaluate(service, states, durationBased: true);
+        var (val, thr, err, ser) = JobCommon.Evaluate(service, states, durationBased: true);
         OverrideResponseValue = val;
         IsThresholdError = thr;
+        service.LastJobStates = ser;
         return err;
     }
 }
@@ -249,9 +268,10 @@ public class MySqlEventJobChecker : MySqlDbCheckerBase
                     r.Status.StartsWith("ENABLED", StringComparison.OrdinalIgnoreCase), null, r.AgeMin, null));
         }
 
-        var (val, thr, err) = JobCommon.Evaluate(service, states, durationBased: false);
+        var (val, thr, err, ser) = JobCommon.Evaluate(service, states, durationBased: false);
         OverrideResponseValue = val;
         IsThresholdError = thr;
+        service.LastJobStates = ser;
         return err;
     }
 }
@@ -276,9 +296,10 @@ public class WindowsTaskJobChecker : CheckerBase
                 var states = new List<JobCommon.JobState>();
                 foreach (var path in wanted)
                     states.Add(WindowsTaskTools.ReadTaskState(ts!, path));
-                var (val, thr, err) = JobCommon.Evaluate(service, states, durationBased: false);
+                var (val, thr, err, ser) = JobCommon.Evaluate(service, states, durationBased: false);
                 OverrideResponseValue = val;
                 IsThresholdError = thr;
+                service.LastJobStates = ser;
                 return err;
             }
             finally
@@ -347,9 +368,10 @@ public class SystemdTimerJobChecker : CheckerBase
                 if (u != null && !seen.Contains(u)) states.Add(new(u, false, false, null, null, null));
 
             if (states.Count == 0) return "systemctl çıktısı okunamadı";
-            var (val, thr, err) = JobCommon.Evaluate(service, states, durationBased: true);
+            var (val, thr, err, ser) = JobCommon.Evaluate(service, states, durationBased: true);
             OverrideResponseValue = val;
             IsThresholdError = thr;
+            service.LastJobStates = ser;
             return err;
         }, ct);
     }

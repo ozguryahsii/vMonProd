@@ -67,7 +67,8 @@ public class ApiController : ControllerBase
                 s.LastSelfHealOk,
                 s.LastDiskInfo,
                 s.JobName,
-                s.MaxSilenceHours
+                s.MaxSilenceHours,
+                s.LastJobStates
             })
             .ToListAsync(ct);
 
@@ -87,7 +88,7 @@ public class ApiController : ControllerBase
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
                 s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt,
-                s.LastSelfHealAttempts, s.LastSelfHealOk, s.LastDiskInfo, s.JobName, s.MaxSilenceHours,
+                s.LastSelfHealAttempts, s.LastSelfHealOk, s.LastDiskInfo, s.JobName, s.MaxSilenceHours, s.LastJobStates,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue
                        && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,
@@ -99,11 +100,22 @@ public class ApiController : ControllerBase
     /// <summary>DB İzleme detay çekmecesi: bir DB sağlık metriğinin (aktif/bloklu oturum, uzun sorgu,
     /// offline tablespace) CANLI ayrıntı listesi. İstek üzerine çalışır — dashboard yenilemesine bağlı değil.</summary>
     [HttpGet("db-detail/{id:int}")]
-    public async Task<IActionResult> DbDetail(int id, [FromServices] DbDetailService detail, CancellationToken ct)
+    public async Task<IActionResult> DbDetail(int id, [FromServices] DbDetailService detail,
+        [FromQuery] string? job, CancellationToken ct)
     {
         if (!Can(Perms.DashboardsView)) return Forbid403();
         var svc = await _db.Services.Include(s => s.Credential).AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (svc == null) return NotFound("İzleme bulunamadı");
+
+        // Job kartı mini kutusu: yalnız SEÇİLEN görevin geçmişi istenir — izlemenin listesinde
+        // olduğu doğrulanır (AsNoTracking → JobName'i daraltmak güvenlidir, kayda yazılmaz).
+        if (!string.IsNullOrWhiteSpace(job) && IsJobType(svc.Type))
+        {
+            var listed = JobCommon.SplitList(svc.JobName)
+                .Any(j => string.Equals(j, job.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!listed) return NotFound("Görev bu izlemede tanımlı değil");
+            svc.JobName = job.Trim();
+        }
         try
         {
             var r = await detail.GetAsync(svc, svc.Credential, ct);
