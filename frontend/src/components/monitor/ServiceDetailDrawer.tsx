@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { type StatusService, catOf, getHistory, getMetrics, getDbDetail, type HistoryData, type MetricsData, type DbDetailData } from "@/lib/monitor";
-import { CONTROL_TYPES, DB_METRIC_META, fmtDbValue, hasDbDetail, isCertType, checkService, serviceAction } from "@/lib/services";
+import { CONTROL_TYPES, DB_METRIC_META, JOB_META, fmtDbValue, hasDbDetail, isCertType, isJobType, checkService, serviceAction } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const badge: Record<string, { label: string; cls: string }> = {
@@ -203,7 +203,10 @@ export function ServiceDetailDrawer({ service, onClose, onChanged }: {
             <>
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{dbMeta ? `${dbMeta.short} (${checks.length} kontrol)` : service && isCertType(service.type) ? `Kalan Gün (${checks.length} kontrol)` : `Yanıt Süresi (${checks.length} kontrol)`}</h3>
+                  <h3 className="text-sm font-semibold">{dbMeta ? `${dbMeta.short} (${checks.length} kontrol)`
+                    : service && isCertType(service.type) ? `Kalan Gün (${checks.length} kontrol)`
+                    : service && isJobType(service.type) ? `${JOB_META[service.type].short} (${checks.length} kontrol)`
+                    : `Yanıt Süresi (${checks.length} kontrol)`}</h3>
                   <div className="flex gap-1">
                     {RANGES.map((r) => (
                       <Button key={r.m} variant={rangeMin === r.m ? "default" : "ghost"} size="sm"

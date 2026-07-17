@@ -1,8 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using vMonitor.Data;
 using vMonitor.Models;
 using vMonitor.Services;
+using vMonitor.Services.Checkers;
 
 namespace vMonitor.Controllers;
 
@@ -64,7 +65,9 @@ public class ApiController : ControllerBase
                 s.LastSelfHealAt,
                 s.LastSelfHealAttempts,
                 s.LastSelfHealOk,
-                s.LastDiskInfo
+                s.LastDiskInfo,
+                s.JobName,
+                s.MaxSilenceHours
             })
             .ToListAsync(ct);
 
@@ -84,7 +87,7 @@ public class ApiController : ControllerBase
                 s.LastCpuPercent, s.LastRamPercent, s.LastMaxDiskPercent, s.CapacityInfo,
                 s.LastStatus, s.Description,
                 s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.LastSelfHealAt,
-                s.LastSelfHealAttempts, s.LastSelfHealOk, s.LastDiskInfo,
+                s.LastSelfHealAttempts, s.LastSelfHealOk, s.LastDiskInfo, s.JobName, s.MaxSilenceHours,
                 isError = s.LastStatus == (int)Models.CheckStatus.Error,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue
                        && s.LastResponseTimeMs > s.ResponseTimeThresholdMs,
@@ -203,6 +206,7 @@ public class ApiController : ControllerBase
                 s.CpuThresholdPercent, s.RamThresholdPercent, s.DiskThresholdPercent,
                 s.Keyword, s.Description, s.AlertMail, s.AlertSms, s.AlertWhatsapp, s.AlertCall,
                 s.SelfHealEnabled, s.SelfHealMaxRetries, s.SelfHealAfterFailures, s.ShowOnStatusPage,
+                s.JobName, s.MaxSilenceHours,
                 s.LastCheckedAt, s.LastIsUp, s.LastStatus, s.LastResponseTimeMs, s.LastError,
                 slow = s.LastIsUp == true && s.ResponseTimeThresholdMs.HasValue && s.LastResponseTimeMs > s.ResponseTimeThresholdMs
             })
@@ -220,6 +224,55 @@ public class ApiController : ControllerBase
         return Ok(new { types = Enum.GetNames<ServiceType>(), credentials = creds });
     }
 
+    /// <summary>Zamanlanmış Görev KEŞFİ: tip+hedef+kimlik ile sunucudaki görev listesini canlı çeker
+    /// (formdaki "Görevleri Listele" düğmesi). Kayıt oluşturmaz; yalnız ad listesi döner.</summary>
+    public record JobDiscoveryInput(string Type, string Target, int? Port, string? Extra, int? CredentialId,
+        bool UseSsl = false, bool IgnoreCertErrors = false, int TimeoutSeconds = 15);
+
+    [HttpPost("job-discovery")]
+    public async Task<IActionResult> JobDiscover([FromBody] JobDiscoveryInput m, CancellationToken ct)
+    {
+        if (!Can(Perms.ServicesManage)) return Forbid403();
+        if (!Enum.TryParse<ServiceType>(m.Type, true, out var type) || !IsJobType(type))
+            return BadRequest("Geçersiz görev tipi.");
+        if (string.IsNullOrWhiteSpace(m.Target)) return BadRequest("Hedef sunucu zorunlu.");
+
+        var cred = m.CredentialId.HasValue
+            ? await _db.Credentials.AsNoTracking().FirstOrDefaultAsync(c => c.Id == m.CredentialId.Value, ct)
+            : null;
+        if (cred == null && type is ServiceType.OracleSchedulerJob or ServiceType.MySqlEventJob or ServiceType.SystemdTimerJob)
+            return BadRequest("Bu tip için kimlik bilgisi seçilmelidir.");
+
+        var tmp = new MonitoredService
+        {
+            Type = type, Target = m.Target.Trim(), Port = m.Port,
+            Extra = string.IsNullOrWhiteSpace(m.Extra) ? null : m.Extra.Trim(),
+            UseSsl = m.UseSsl, IgnoreCertErrors = m.IgnoreCertErrors,
+            TimeoutSeconds = Math.Clamp(m.TimeoutSeconds, 5, 60)
+        };
+        try
+        {
+            var jobs = type switch
+            {
+                ServiceType.OracleSchedulerJob => await JobDiscovery.OracleAsync(tmp, cred!, ct),
+                ServiceType.MsSqlAgentJob => await JobDiscovery.MsSqlAsync(tmp, cred, ct),
+                ServiceType.MySqlEventJob => await JobDiscovery.MySqlAsync(tmp, cred!, ct),
+                ServiceType.WindowsTaskJob => await Task.Run(() =>
+                {
+                    dynamic? ts = null;
+                    try { ts = WindowsTaskTools.Connect(tmp.Target, cred, tmp.TimeoutSeconds); return WindowsTaskTools.ListTasks(ts); }
+                    finally { if (ts != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(ts); }
+                }, ct),
+                _ => await Task.Run(() => SystemdTools.ListTimers(tmp, cred!), ct)
+            };
+            return Ok(new { ok = true, jobs });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { ok = false, message = ex.GetBaseException().Message, jobs = Array.Empty<string>() });
+        }
+    }
+
     public record ServiceInput(
         string Name, string Type, string Target, int? Port, string? Extra,
         bool UseSsl, bool IgnoreCertErrors, int? CredentialId, bool Enabled,
@@ -228,7 +281,8 @@ public class ApiController : ControllerBase
         string? Keyword, string? Description,
         bool AlertMail, bool AlertSms, bool AlertWhatsapp, bool AlertCall,
         bool SelfHealEnabled = false, int? SelfHealMaxRetries = null, int? SelfHealAfterFailures = null,
-        bool ShowOnStatusPage = false);
+        bool ShowOnStatusPage = false,
+        string? JobName = null, int? MaxSilenceHours = null);
 
     private static string? ValidateInput(ServiceInput m, out ServiceType type)
     {
@@ -239,8 +293,18 @@ public class ApiController : ControllerBase
             && !string.IsNullOrWhiteSpace(m.Extra)
             && !System.Text.RegularExpressions.Regex.IsMatch(m.Extra, @"^[A-Za-z0-9._@\-]+$"))
             return "Servis adı yalnızca harf, rakam, nokta, tire ve alt çizgi içerebilir.";
+        // Zamanlanmış Görevler: görev adı zorunlu; systemd birimi shell-güvenli karakter kümesiyle sınırlı
+        if (IsJobType(type) && string.IsNullOrWhiteSpace(m.JobName))
+            return "Görev adı zorunlu (listeden seçebilir veya elle girebilirsiniz).";
+        if (type == ServiceType.SystemdTimerJob
+            && SystemdTools.NormalizeTimer(m.JobName) == null)
+            return "Timer adı yalnızca harf, rakam ve @ . _ - içerebilir.";
         return null;
     }
+
+    private static bool IsJobType(ServiceType t) =>
+        t is ServiceType.OracleSchedulerJob or ServiceType.MsSqlAgentJob or ServiceType.MySqlEventJob
+          or ServiceType.WindowsTaskJob or ServiceType.SystemdTimerJob;
 
     private static void Apply(MonitoredService s, ServiceInput m, ServiceType type)
     {
@@ -260,6 +324,9 @@ public class ApiController : ControllerBase
         s.SelfHealAfterFailures = Math.Clamp(m.SelfHealAfterFailures ?? s.SelfHealAfterFailures, 1, 10);
         if (!s.SelfHealEnabled) s.SelfHealAttemptsUsed = 0;
         s.ShowOnStatusPage = m.ShowOnStatusPage;
+        // Zamanlanmış Görevler alanları (yalnız job tiplerinde anlamlı; diğer tiplerde temizlenir)
+        s.JobName = IsJobType(type) && !string.IsNullOrWhiteSpace(m.JobName) ? m.JobName.Trim() : null;
+        s.MaxSilenceHours = IsJobType(type) && m.MaxSilenceHours is > 0 ? Math.Min(m.MaxSilenceHours.Value, 8760) : null;
     }
 
     [HttpPost("services")]

@@ -28,6 +28,8 @@ export interface ServiceItem {
   selfHealMaxRetries: number;
   selfHealAfterFailures: number;
   showOnStatusPage: boolean;
+  jobName: string | null;
+  maxSilenceHours: number | null;
   lastCheckedAt: string | null;
   lastIsUp: boolean | null;
   lastStatus: number;
@@ -71,6 +73,8 @@ export interface ServiceInput {
   selfHealMaxRetries: number | null;
   selfHealAfterFailures: number | null;
   showOnStatusPage: boolean;
+  jobName: string | null;
+  maxSilenceHours: number | null;
 }
 
 export interface ServicesMeta {
@@ -115,10 +119,24 @@ export const isDbHealthType = (t: string) => t in DB_METRIC_META;
 /** SSL sertifika izleme (SLLTracker mirası): değer = KALAN GÜN (ms değil). */
 export const isCertType = (t: string) => t === "SslCertificate";
 
+/* ================= Zamanlanmış Görevler Fazı 1 (PULL) =================
+   Değer: süre bilinen tiplerde son koşu SÜRESİ (sn); süre bilinmeyenlerde
+   (Windows Task, MySQL Event) son koşudan bu yana geçen DAKİKA. */
+export interface JobMeta { unit: "sn" | "dk"; short: string }
+export const JOB_META: Record<string, JobMeta> = {
+  OracleSchedulerJob: { unit: "sn", short: "Son Koşu Süresi" },
+  MsSqlAgentJob:      { unit: "sn", short: "Son Koşu Süresi" },
+  SystemdTimerJob:    { unit: "sn", short: "Son Koşu Süresi" },
+  WindowsTaskJob:     { unit: "dk", short: "Son Koşudan Bu Yana" },
+  MySqlEventJob:      { unit: "dk", short: "Son Koşudan Bu Yana" },
+};
+export const isJobType = (t: string) => t in JOB_META;
+
 /** Metrik kutusuna tıklayınca yan panelde canlı liste (kim/hangisi/ne kadar) gösterilebilen tipler:
  *  aktif/bloklu oturum, uzun sorgu, (Oracle tablespace / MSSQL DB durumu), bağlantı doluluğu. */
 export const hasDbDetail = (t: string) => {
   if (isCertType(t)) return true;   // canlı sertifika detayı (iç/dış CN, veren, bitiş, parmak izi)
+  if (isJobType(t)) return true;    // son koşular / görev bilgisi canlı çekilir
   const m = DB_METRIC_META[t];
   return !!m && (m.metric === "active" || m.metric === "blocked" || m.metric === "long"
     || m.metric === "status" || m.metric === "usage");
@@ -128,6 +146,8 @@ export const hasDbDetail = (t: string) => {
 export function fmtDbValue(type: string, v: number | null | undefined): string {
   if (v == null) return "—";
   if (isCertType(type)) return `${v} gün`;
+  const j = JOB_META[type];
+  if (j) return j.unit === "sn" ? `${v} sn` : `${v} dk önce`;
   const m = DB_METRIC_META[type];
   if (!m) return `${v} ms`;
   if (m.unit === "%") return `%${v}`;
@@ -189,13 +209,19 @@ export const TYPE_META: Record<string, TypeMeta> = {
   Imap: { group: "Mail (Exchange / Exchange Online)", label: "IMAP", hint: "IMAP'a bağlanır, \"* OK\" greeting'i doğrular. Exchange Online: outlook.office365.com:993 + SSL.", target: { label: "Mail Sunucusu (host/IP) *", hint: "örn. mail.firma.local veya outlook.office365.com" }, port: { hint: "Boşsa 143 / 993 (SSL işaretliyse)." }, extra: null, cred: null, ssl: "IMAPS (993)", cert: true },
   WindowsHealth: { group: "Sunucu Sağlığı", label: "Windows Sunucu (CPU/RAM/Disk)", hint: "WMI ile uzak Windows sunucusundan CPU, RAM ve disk doluluk oranları okunur; eşikler aşılırsa alarm üretilir.", target: { label: "Sunucu (host/IP) *" }, port: null, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI okuma yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false, health: true },
   LinuxHealth: { group: "Sunucu Sağlığı", label: "Linux Sunucu (CPU/RAM/Disk, SSH)", hint: "SSH ile bağlanıp /proc/stat, free ve df okunur (root gerekmez); eşikler aşılırsa alarm üretilir.", target: { label: "Sunucu (host/IP) *" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (sıradan kullanıcı yeterli)." }, ssl: null, cert: false, health: true },
+  // ---- Zamanlanmış Görevler Fazı 1 (PULL): son koşu ne zaman / ne kadar sürdü / sonucu ne ----
+  OracleSchedulerJob: { group: "Zamanlanmış Görevler", label: "Oracle Scheduler Job", hint: "DBA_SCHEDULER_JOB_RUN_DETAILS'ten son koşunun durumu ve süresi çekilir; süre (sn) grafiğe yazılır. Son koşu FAILED ise KAPALI (alarm); görev devre dışıysa veya sessizlik eşiği aşılırsa HATA. Görev adını 'Görevleri Listele' ile seçebilirsiniz.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 1521." }, extra: { label: "Service Name *", hint: "örn. ORCLPDB1 — SID için: SID=ORCL" }, cred: { label: "Kimlik Bilgisi *", hint: "Scheduler görünümlerini okuyabilen kullanıcı (SELECT_CATALOG_ROLE veya SELECT ON dba_scheduler_jobs / dba_scheduler_job_run_details)." }, ssl: null, cert: false },
+  MsSqlAgentJob: { group: "Zamanlanmış Görevler", label: "MSSQL Agent Job", hint: "msdb geçmişinden son koşunun durumu ve süresi çekilir; süre (sn) grafiğe yazılır. Son koşu başarısız/iptal ise KAPALI (alarm); job devre dışıysa veya sessizlik eşiği aşılırsa HATA. Görev adını 'Görevleri Listele' ile seçebilirsiniz.", target: { label: "Host / IP *", hint: "Named instance için HOST\\INSTANCE yazın (port boş bırakın)." }, port: { hint: "Boşsa 1433." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel — sorgular msdb üzerinden yapılır." }, cred: { label: "Kimlik Bilgisi", hint: "msdb okuma yetkili kullanıcı (SQLAgentReaderRole önerilir); boşsa Windows auth denenir." }, ssl: "Bağlantıyı şifrele (Encrypt)", cert: true },
+  MySqlEventJob: { group: "Zamanlanmış Görevler", label: "MySQL Event", hint: "information_schema.EVENTS'ten event durumu ve son çalıştırma zamanı çekilir. MySQL koşu sonucunu/süresini TUTMAZ — grafik değeri son koşudan bu yana geçen dakikadır; asıl kontrol sessizlik eşiğidir. Event devre dışıysa HATA.", target: { label: "Host / IP *" }, port: { hint: "Boşsa 3306." }, extra: { label: "Veritabanı adı", hint: "Opsiyonel." }, cred: { label: "Kimlik Bilgisi *", hint: "EVENT tablolarını okuyabilen izleme kullanıcısı." }, ssl: "Bağlantıda SSL zorunlu olsun", cert: false },
+  WindowsTaskJob: { group: "Zamanlanmış Görevler", label: "Windows Görev Zamanlayıcı", hint: "Görev Zamanlayıcı'dan (uzak bağlantı) son çalışma zamanı ve sonuç kodu çekilir. Sonuç kodu ≠ 0 ise KAPALI (alarm); görev devre dışıysa veya sessizlik eşiği aşılırsa HATA. Süre bilgisi olay günlüğüne bağlı olduğundan grafik değeri son koşudan bu yana geçen dakikadır. Görev yolunu 'Görevleri Listele' ile seçebilirsiniz.", target: { label: "Sunucu (host/IP) *" }, port: null, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "Uzak Görev Zamanlayıcı erişimi olan domain hesabı (Domain alanını doldurun) — WMI ile aynı RPC erişimi." }, ssl: null, cert: false },
+  SystemdTimerJob: { group: "Zamanlanmış Görevler", label: "systemd Timer (Linux, SSH)", hint: "SSH ile timer'ın son tetiklenmesi ve tetiklediği servisin sonucu/süresi çekilir; süre (sn) grafiğe yazılır. Result ≠ success ise KAPALI (alarm); timer aktif değilse veya sessizlik eşiği aşılırsa HATA. Timer adını 'Görevleri Listele' ile seçebilirsiniz. Not: saf crontab işleri buradan izlenemez (cron sonuç tutmaz) — Faz 2'de push/heartbeat gelecek.", target: { label: "Sunucu (host/IP) *" }, port: { hint: "Boşsa 22." }, extra: null, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (sıradan kullanıcı yeterli)." }, ssl: null, cert: false },
   WindowsServiceControl: { group: "Servis Durumu (Uzaktan Kontrol)", label: "Windows Servis (start/stop/restart)", hint: "Uzak Windows sunucusunda belirtilen servis çalışıyor mu (WMI) kontrol edilir; dashboard'dan start/stop/restart yapılabilir.", target: { label: "Sunucu (host/IP) *" }, port: null, extra: { label: "Windows Servis Adı *", hint: "örn. W3SVC (IIS), MSSQLSERVER, Spooler" }, cred: { label: "Kimlik Bilgisi *", hint: "Uzak WMI + servis kontrol yetkisi olan domain hesabı (Domain alanını doldurun)." }, ssl: null, cert: false },
   LinuxServiceControl: { group: "Servis Durumu (Uzaktan Kontrol)", label: "Linux Servis (systemd, SSH)", hint: "Uzak Linux sunucusunda systemd servis durumu (SSH) kontrol edilir; dashboard'dan start/stop/restart yapılabilir (sudo gerekir).", target: { label: "Sunucu (host/IP) *" }, port: { hint: "Boşsa 22." }, extra: { label: "systemd Unit Adı *", hint: "örn. nginx, httpd, docker" }, cred: { label: "Kimlik Bilgisi *", hint: "SSH kullanıcısı (start/stop/restart için sudo -n yetkisi gerekir)." }, ssl: null, cert: false },
 };
 
 /** Kategori sırası (eski formdaki optgroup düzeni) */
 export const TYPE_GROUP_ORDER = [
-  "Veritabanı", "Altyapı", "Mail (Exchange / Exchange Online)",
+  "Veritabanı", "Zamanlanmış Görevler", "Altyapı", "Mail (Exchange / Exchange Online)",
   "Sunucu Sağlığı", "Servis Durumu (Uzaktan Kontrol)", "Web / Genel",
 ];
 
@@ -205,6 +231,14 @@ export const createService = (input: ServiceInput) => apiSend<{ id: number }>("P
 export const updateService = (id: number, input: ServiceInput) => apiSend<{ id: number }>("PUT", `/services/${id}`, input);
 export const deleteService = (id: number) => apiSend<{ ok: boolean }>("DELETE", `/services/${id}`);
 export const checkService = (id: number) => apiSend<{ isUp: boolean; responseTimeMs: number; error: string | null }>("POST", `/check/${id}`);
+
+/** Zamanlanmış Görev keşfi: sunucudaki görev adlarını canlı listeler (formdaki "Görevleri Listele"). */
+export interface JobDiscoveryInput {
+  type: string; target: string; port: number | null; extra: string | null; credentialId: number | null;
+  useSsl?: boolean; ignoreCertErrors?: boolean; timeoutSeconds?: number;
+}
+export const discoverJobs = (input: JobDiscoveryInput) =>
+  apiSend<{ ok: boolean; message?: string; jobs: string[] }>("POST", "/job-discovery", input);
 // ---- Toplu işlemler + CSV ----
 export interface BulkEditInput {
   ids: number[];

@@ -195,6 +195,12 @@ builder.Services.AddScoped<IServiceChecker, MySqlReplicationChecker>();
 builder.Services.AddScoped<IServiceChecker, MySqlConnectionUsageChecker>();
 // SSL sertifika izleme (SLLTracker mirası — iç/dış çift kontrol + thumbprint karşılaştırma)
 builder.Services.AddScoped<IServiceChecker, SslCertificateChecker>();
+// Zamanlanmış Görevler Fazı 1 (PULL): OS/DB job'larının son koşu zamanı/süresi/sonucu
+builder.Services.AddScoped<IServiceChecker, OracleSchedulerJobChecker>();
+builder.Services.AddScoped<IServiceChecker, MsSqlAgentJobChecker>();
+builder.Services.AddScoped<IServiceChecker, MySqlEventJobChecker>();
+builder.Services.AddScoped<IServiceChecker, WindowsTaskJobChecker>();
+builder.Services.AddScoped<IServiceChecker, SystemdTimerJobChecker>();
 builder.Services.AddScoped<IServiceChecker, LdapChecker>();
 builder.Services.AddScoped<IServiceChecker, DnsChecker>();
 builder.Services.AddScoped<IServiceChecker, SftpChecker>();

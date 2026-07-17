@@ -42,7 +42,14 @@ public enum ServiceType
     MySqlReplication = 32,       // replika IO/SQL thread durumu + Seconds_Behind (sn)
     MySqlConnectionUsage = 33,   // PROCESSLIST / max_connections yüzdesi
     // Yol haritası (SLLTracker mirası): SSL sertifika izleme — iç/dış çift kontrol + thumbprint karşılaştırma
-    SslCertificate = 34          // kalan gün grafiğe; eşik gün/bitmiş/iç-dış farklı → ERROR
+    SslCertificate = 34,         // kalan gün grafiğe; eşik gün/bitmiş/iç-dış farklı → ERROR
+    // Zamanlanmış Görevler Fazı 1 (PULL): son koşu ne zaman/ne kadar sürdü/sonucu ne?
+    // JobName = görev adı; MaxSilenceHours = "en geç şu aralıkta koşmalı" (yalnız bu tiplerde).
+    OracleSchedulerJob = 35,     // DBA_SCHEDULER_JOB_RUN_DETAILS — süre (sn) grafiğe; FAILED → DOWN
+    MsSqlAgentJob = 36,          // msdb sysjobs/sysjobhistory — süre (sn) grafiğe; başarısız → DOWN
+    MySqlEventJob = 37,          // information_schema.EVENTS — sonuç/süre YOK; son koşudan bu yana (dk) grafiğe
+    WindowsTaskJob = 38,         // Görev Zamanlayıcı (Schedule.Service COM) — son koşudan bu yana (dk) grafiğe; sonuç kodu ≠ 0 → DOWN
+    SystemdTimerJob = 39         // systemd timer (SSH) — süre (sn) grafiğe; Result ≠ success → DOWN
 }
 
 /// <summary>Bir kontrolün sonucu: Up=sorunsuz, Down=ulaşılamıyor/bağlantı hatası,
@@ -133,6 +140,16 @@ public class MonitoredService
             ? new List<string>()
             : keyword.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    // ---- Zamanlanmış Görevler (yalnız job tiplerinde kullanılır; diğer tipleri ETKİLEMEZ) ----
+    /// <summary>İzlenen görevin adı: Oracle "OWNER.JOB_NAME" (veya yalnız ad), MSSQL Agent job adı,
+    /// MySQL "schema.event" (veya yalnız ad), Windows görev yolu "\Klasör\Ad", systemd timer birimi "ad.timer".</summary>
+    [MaxLength(300)]
+    public string? JobName { get; set; }
+
+    /// <summary>Sessizlik eşiği (saat): görev en geç bu aralıkta bir koşmuş olmalı; aşılırsa HATA üretilir.
+    /// Boş = kontrol yok. Süre eşiğinden (ResponseTimeThresholdMs) BAĞIMSIZDIR.</summary>
+    public int? MaxSilenceHours { get; set; }
 
     /// <summary>Dakika cinsinden servis bazlı kontrol aralığı. Boşsa global ayar geçerli.</summary>
     public int? IntervalMinutesOverride { get; set; }

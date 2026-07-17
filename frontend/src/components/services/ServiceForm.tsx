@@ -4,8 +4,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { Input, Select, Textarea, Field, Switch } from "@/components/ui/input";
 import {
   type ServiceItem, type ServiceInput, type ServicesMeta,
-  TYPE_META, TYPE_GROUP_ORDER, CONTROL_TYPES,
-  createService, updateService,
+  TYPE_META, TYPE_GROUP_ORDER, CONTROL_TYPES, JOB_META, isJobType,
+  createService, updateService, discoverJobs,
 } from "@/lib/services";
 import { useMe } from "@/hooks/useMe";
 import { createCredential } from "@/lib/admin";
@@ -19,6 +19,7 @@ const empty: ServiceInput = {
   alertMail: true, alertSms: false, alertWhatsapp: false, alertCall: false,
   selfHealEnabled: false, selfHealMaxRetries: 1, selfHealAfterFailures: 1,
   showOnStatusPage: false,
+  jobName: null, maxSilenceHours: null,
 };
 
 function toInput(s: ServiceItem): ServiceInput {
@@ -72,9 +73,29 @@ export function ServiceForm({
   const emailOnly = me?.license?.emailOnly === true;
   const cnLock = emailOnly ? "pointer-events-none opacity-50" : "";
 
+  // Zamanlanmış Görev keşfi ("Görevleri Listele") — tip değişince eski liste temizlenir
+  const [jobs, setJobs] = useState<string[] | null>(null);
+  const [jobBusy, setJobBusy] = useState(false);
+  const [jobErr, setJobErr] = useState<string | null>(null);
+
   useEffect(() => {
-    if (open) { setForm(service ? toInput(service) : empty); setErr(null); }
+    if (open) { setForm(service ? toInput(service) : empty); setErr(null); setJobs(null); setJobErr(null); }
   }, [open, service]);
+  useEffect(() => { setJobs(null); setJobErr(null); }, [form.type]);
+
+  async function listJobs() {
+    setJobBusy(true); setJobErr(null);
+    try {
+      const r = await discoverJobs({
+        type: form.type, target: form.target.trim(), port: form.port, extra: form.extra,
+        credentialId: form.credentialId, useSsl: form.useSsl, ignoreCertErrors: form.ignoreCertErrors,
+        timeoutSeconds: form.timeoutSeconds,
+      });
+      if (r.ok === false) { setJobErr(r.message ?? "Liste alınamadı"); setJobs([]); }
+      else { setJobs(r.jobs); if (r.jobs.length === 0) setJobErr("Sunucuda görev bulunamadı."); }
+    } catch (e) { setJobErr((e as Error).message); setJobs([]); }
+    finally { setJobBusy(false); }
+  }
 
   const set = <K extends keyof ServiceInput>(k: K, v: ServiceInput[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -191,6 +212,31 @@ export function ServiceForm({
           </Field>
         )}
 
+        {isJobType(form.type) && (
+          // Zamanlanmış Görevler: görev adı (+ canlı keşif) ve SESSİZLİK eşiği — yalnız bu tiplerde görünür
+          <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+            <Field label="Görev adı *" hint='elle yazabilir veya "Görevleri Listele" ile sunucudan seçebilirsiniz'>
+              <div className="flex gap-2">
+                <Input value={form.jobName ?? ""} onChange={(e) => set("jobName", e.target.value || null)} className="font-mono text-xs" />
+                <Button type="button" variant="outline" size="sm" className="shrink-0"
+                  disabled={jobBusy || !form.target.trim()} onClick={listJobs}>
+                  {jobBusy ? "Listeleniyor…" : "Görevleri Listele"}
+                </Button>
+              </div>
+              {jobs && jobs.length > 0 && (
+                <Select className="mt-2" value="" onChange={(e) => { if (e.target.value) set("jobName", e.target.value); }}>
+                  <option value="">— Listeden seç ({jobs.length} görev) —</option>
+                  {jobs.map((j) => <option key={j} value={j}>{j}</option>)}
+                </Select>
+              )}
+              {jobErr && <p className="mt-1 text-xs text-rose-400">{jobErr}</p>}
+            </Field>
+            <Field label="Sessizlik eşiği (saat)" hint="görev en geç bu aralıkta bir koşmuş olmalı; aşılırsa HATA üretilir — boş = kontrol yok">
+              <Input type="number" value={form.maxSilenceHours ?? ""} onChange={(e) => set("maxSilenceHours", numOrNull(e.target.value))} placeholder="örn. 25" />
+            </Field>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-6 rounded-lg border border-border/60 bg-muted/30 p-4">
           <Switch checked={form.enabled} onChange={(v) => set("enabled", v)} label="Aktif" />
           <Switch checked={form.showOnStatusPage} onChange={(v) => set("showOnStatusPage", v)} label="Durum sayfasında göster" />
@@ -203,8 +249,12 @@ export function ServiceForm({
           <Field label="Zaman aşımı (sn)"><Input type="number" value={form.timeoutSeconds} onChange={(e) => set("timeoutSeconds", Number(e.target.value) || 15)} /></Field>
           <Field
             label={form.type === "OracleActiveSessions" ? "Session eşiği (adet)"
-              : form.type === "SslCertificate" ? "Uyarı eşiği (gün)" : "Yavaşlık eşiği (ms)"}
-            hint={form.type === "SslCertificate" ? "boş = 30 gün" : "boş = kapalı"}>
+              : form.type === "SslCertificate" ? "Uyarı eşiği (gün)"
+              : JOB_META[form.type]?.unit === "sn" ? "Maks süre eşiği (sn)"
+              : JOB_META[form.type]?.unit === "dk" ? "Eşik (kullanılmaz)" : "Yavaşlık eşiği (ms)"}
+            hint={form.type === "SslCertificate" ? "boş = 30 gün"
+              : JOB_META[form.type]?.unit === "sn" ? "koşu bundan uzun sürerse YAVAŞ — boş = kapalı"
+              : JOB_META[form.type]?.unit === "dk" ? "bu tipte sessizlik eşiğini kullanın" : "boş = kapalı"}>
             <Input type="number" value={form.responseTimeThresholdMs ?? ""} onChange={(e) => set("responseTimeThresholdMs", numOrNull(e.target.value))} />
           </Field>
         </div>
