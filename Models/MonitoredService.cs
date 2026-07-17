@@ -142,9 +142,10 @@ public class MonitoredService
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     // ---- Zamanlanmış Görevler (yalnız job tiplerinde kullanılır; diğer tipleri ETKİLEMEZ) ----
-    /// <summary>İzlenen görevin adı: Oracle "OWNER.JOB_NAME" (veya yalnız ad), MSSQL Agent job adı,
-    /// MySQL "schema.event" (veya yalnız ad), Windows görev yolu "\Klasör\Ad", systemd timer birimi "ad.timer".</summary>
-    [MaxLength(300)]
+    /// <summary>İzlenen görev(ler): ';' ile ayrılmış BİRDEN ÇOK görev olabilir — tek izleme bir ortamın
+    /// job setini topluca izler (örn. "HR.JOB1;HR.JOB2"). Biçimler: Oracle "OWNER.JOB_NAME", MSSQL Agent
+    /// job adı, MySQL "schema.event", Windows görev yolu "\Klasör\Ad", systemd timer birimi "ad.timer".</summary>
+    [MaxLength(4000)]
     public string? JobName { get; set; }
 
     /// <summary>Sessizlik eşiği (saat): görev en geç bu aralıkta bir koşmuş olmalı; aşılırsa HATA üretilir.

@@ -293,12 +293,18 @@ public class ApiController : ControllerBase
             && !string.IsNullOrWhiteSpace(m.Extra)
             && !System.Text.RegularExpressions.Regex.IsMatch(m.Extra, @"^[A-Za-z0-9._@\-]+$"))
             return "Servis adı yalnızca harf, rakam, nokta, tire ve alt çizgi içerebilir.";
-        // Zamanlanmış Görevler: görev adı zorunlu; systemd birimi shell-güvenli karakter kümesiyle sınırlı
-        if (IsJobType(type) && string.IsNullOrWhiteSpace(m.JobName))
-            return "Görev adı zorunlu (listeden seçebilir veya elle girebilirsiniz).";
-        if (type == ServiceType.SystemdTimerJob
-            && SystemdTools.NormalizeTimer(m.JobName) == null)
-            return "Timer adı yalnızca harf, rakam ve @ . _ - içerebilir.";
+        // Zamanlanmış Görevler: en az bir görev zorunlu (';' ile birden çok olabilir);
+        // systemd birimleri shell-güvenli karakter kümesiyle sınırlı, tümü doğrulanır
+        if (IsJobType(type))
+        {
+            var jobList = JobCommon.SplitList(m.JobName);
+            if (jobList.Count == 0)
+                return "En az bir görev seçin (listeden işaretleyebilir veya ';' ile ayırarak elle girebilirsiniz).";
+            if (jobList.Count > 100)
+                return "Bir izlemeye en fazla 100 görev eklenebilir.";
+            if (type == ServiceType.SystemdTimerJob && jobList.Any(j => SystemdTools.NormalizeTimer(j) == null))
+                return "Timer adları yalnızca harf, rakam ve @ . _ - içerebilir.";
+        }
         return null;
     }
 
@@ -324,8 +330,16 @@ public class ApiController : ControllerBase
         s.SelfHealAfterFailures = Math.Clamp(m.SelfHealAfterFailures ?? s.SelfHealAfterFailures, 1, 10);
         if (!s.SelfHealEnabled) s.SelfHealAttemptsUsed = 0;
         s.ShowOnStatusPage = m.ShowOnStatusPage;
-        // Zamanlanmış Görevler alanları (yalnız job tiplerinde anlamlı; diğer tiplerde temizlenir)
-        s.JobName = IsJobType(type) && !string.IsNullOrWhiteSpace(m.JobName) ? m.JobName.Trim() : null;
+        // Zamanlanmış Görevler alanları (yalnız job tiplerinde anlamlı; diğer tiplerde temizlenir).
+        // systemd: her birime ".timer" tamamlanır; liste normalize edilip ';' ile saklanır.
+        if (IsJobType(type) && !string.IsNullOrWhiteSpace(m.JobName))
+        {
+            var jobList = JobCommon.SplitList(m.JobName);
+            if (type == ServiceType.SystemdTimerJob)
+                jobList = jobList.Select(j => SystemdTools.NormalizeTimer(j)!).ToList();
+            s.JobName = string.Join(";", jobList);
+        }
+        else s.JobName = null;
         s.MaxSilenceHours = IsJobType(type) && m.MaxSilenceHours is > 0 ? Math.Min(m.MaxSilenceHours.Value, 8760) : null;
     }
 

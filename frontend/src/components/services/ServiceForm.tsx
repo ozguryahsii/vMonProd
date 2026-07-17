@@ -73,15 +73,36 @@ export function ServiceForm({
   const emailOnly = me?.license?.emailOnly === true;
   const cnLock = emailOnly ? "pointer-events-none opacity-50" : "";
 
-  // Zamanlanmış Görev keşfi ("Görevleri Listele") — tip değişince eski liste temizlenir
+  // Zamanlanmış Görev keşfi ("Görevleri Listele") — tip değişince eski liste temizlenir.
+  // BİRDEN ÇOK görev seçilebilir: seçim ';' ayraçlı olarak jobName alanında tutulur.
   const [jobs, setJobs] = useState<string[] | null>(null);
   const [jobBusy, setJobBusy] = useState(false);
   const [jobErr, setJobErr] = useState<string | null>(null);
+  const [jobFilter, setJobFilter] = useState("");
+
+  const selJobs = useMemo(
+    () => (form.jobName ?? "").split(";").map((s) => s.trim()).filter(Boolean),
+    [form.jobName]);
+  const selSet = useMemo(
+    () => new Set(selJobs.map((s) => s.toLocaleLowerCase("tr"))),
+    [selJobs]);
+  const toggleJob = (j: string) => {
+    const key = j.toLocaleLowerCase("tr");
+    const next = selSet.has(key)
+      ? selJobs.filter((x) => x.toLocaleLowerCase("tr") !== key)
+      : [...selJobs, j];
+    set("jobName", next.join(";") || null);
+  };
+  const filteredJobs = useMemo(() => {
+    if (!jobs) return [];
+    const q = jobFilter.trim().toLocaleLowerCase("tr");
+    return q ? jobs.filter((j) => j.toLocaleLowerCase("tr").includes(q)) : jobs;
+  }, [jobs, jobFilter]);
 
   useEffect(() => {
-    if (open) { setForm(service ? toInput(service) : empty); setErr(null); setJobs(null); setJobErr(null); }
+    if (open) { setForm(service ? toInput(service) : empty); setErr(null); setJobs(null); setJobErr(null); setJobFilter(""); }
   }, [open, service]);
-  useEffect(() => { setJobs(null); setJobErr(null); }, [form.type]);
+  useEffect(() => { setJobs(null); setJobErr(null); setJobFilter(""); }, [form.type]);
 
   async function listJobs() {
     setJobBusy(true); setJobErr(null);
@@ -215,7 +236,7 @@ export function ServiceForm({
         {isJobType(form.type) && (
           // Zamanlanmış Görevler: görev adı (+ canlı keşif) ve SESSİZLİK eşiği — yalnız bu tiplerde görünür
           <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
-            <Field label="Görev adı *" hint='elle yazabilir veya "Görevleri Listele" ile sunucudan seçebilirsiniz'>
+            <Field label="Görev(ler) *" hint='birden çok görev ";" ile ayrılır — "Görevleri Listele" ile işaretleyerek seçebilirsiniz (tek izleme, seçilen tüm görevleri topluca izler)'>
               <div className="flex gap-2">
                 <Input value={form.jobName ?? ""} onChange={(e) => set("jobName", e.target.value || null)} className="font-mono text-xs" />
                 <Button type="button" variant="outline" size="sm" className="shrink-0"
@@ -224,10 +245,29 @@ export function ServiceForm({
                 </Button>
               </div>
               {jobs && jobs.length > 0 && (
-                <Select className="mt-2" value="" onChange={(e) => { if (e.target.value) set("jobName", e.target.value); }}>
-                  <option value="">— Listeden seç ({jobs.length} görev) —</option>
-                  {jobs.map((j) => <option key={j} value={j}>{j}</option>)}
-                </Select>
+                <div className="mt-2 rounded-lg border border-border/60 bg-card">
+                  <div className="border-b border-border/60 p-2">
+                    <Input value={jobFilter} onChange={(e) => setJobFilter(e.target.value)}
+                      placeholder="Görev ara…" className="h-8 text-xs" />
+                  </div>
+                  <div className="max-h-56 overflow-y-auto p-1">
+                    {filteredJobs.length === 0 ? (
+                      <p className="px-2 py-3 text-center text-xs text-muted-foreground">Eşleşen görev yok</p>
+                    ) : filteredJobs.slice(0, 500).map((j) => (
+                      <label key={j} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-accent/60">
+                        <input type="checkbox" checked={selSet.has(j.toLocaleLowerCase("tr"))} onChange={() => toggleJob(j)}
+                          className="h-3.5 w-3.5 shrink-0 rounded border-border accent-[hsl(var(--primary))]" />
+                        <span className="truncate font-mono">{j}</span>
+                      </label>
+                    ))}
+                    {filteredJobs.length > 500 && (
+                      <p className="px-2 py-1.5 text-center text-[10px] text-muted-foreground">İlk 500 gösteriliyor — daraltmak için arayın</p>
+                    )}
+                  </div>
+                  <div className="border-t border-border/60 px-2 py-1.5 text-xs text-muted-foreground">
+                    {selJobs.length}{" görev seçili"}{jobs ? ` · listede ${jobs.length}` : ""}
+                  </div>
+                </div>
               )}
               {jobErr && <p className="mt-1 text-xs text-rose-400">{jobErr}</p>}
             </Field>

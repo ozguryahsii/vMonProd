@@ -124,11 +124,11 @@ export const isCertType = (t: string) => t === "SslCertificate";
    (Windows Task, MySQL Event) son koşudan bu yana geçen DAKİKA. */
 export interface JobMeta { unit: "sn" | "dk"; short: string }
 export const JOB_META: Record<string, JobMeta> = {
-  OracleSchedulerJob: { unit: "sn", short: "Son Koşu Süresi" },
-  MsSqlAgentJob:      { unit: "sn", short: "Son Koşu Süresi" },
-  SystemdTimerJob:    { unit: "sn", short: "Son Koşu Süresi" },
-  WindowsTaskJob:     { unit: "dk", short: "Son Koşudan Bu Yana" },
-  MySqlEventJob:      { unit: "dk", short: "Son Koşudan Bu Yana" },
+  OracleSchedulerJob: { unit: "sn", short: "En Uzun Koşu Süresi" },
+  MsSqlAgentJob:      { unit: "sn", short: "En Uzun Koşu Süresi" },
+  SystemdTimerJob:    { unit: "sn", short: "En Uzun Koşu Süresi" },
+  WindowsTaskJob:     { unit: "dk", short: "En Eski Son Koşu" },
+  MySqlEventJob:      { unit: "dk", short: "En Eski Son Koşu" },
 };
 export const isJobType = (t: string) => t in JOB_META;
 

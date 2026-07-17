@@ -148,9 +148,9 @@ public sealed class DbDetailService
 
     private async Task<Result> OracleJobRunsAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
     {
-        var (owner, name) = Checkers.JobCommon.SplitOwned(svc.JobName ?? "");
+        var wanted = Checkers.JobCommon.SplitList(svc.JobName);
         await using var conn = await OpenOracleAsync(svc, cred, ct);
-        var cols = new[] { "Başlangıç", "Süre (sn)", "Durum", "Bilgi" };
+        var cols = new[] { "Görev", "Başlangıç", "Süre (sn)", "Durum", "Bilgi" };
         foreach (var prefix in new[] { "dba", "all" })
         {
             try
@@ -158,66 +158,81 @@ public sealed class DbDetailService
                 await using var cmd = conn.CreateCommand();
                 cmd.BindByName = true;
                 cmd.CommandTimeout = CommandTimeoutSec;
+                var conds = new List<string>();
+                for (int i = 0; i < wanted.Count; i++)
+                {
+                    var (ow, nm) = Checkers.JobCommon.SplitOwned(wanted[i]);
+                    conds.Add($"(UPPER(job_name) = UPPER(:n{i}) AND (:o{i} IS NULL OR UPPER(owner) = UPPER(:o{i})))");
+                    cmd.Parameters.Add($"n{i}", nm);
+                    cmd.Parameters.Add($"o{i}", (object?)ow ?? DBNull.Value);
+                }
                 cmd.CommandText =
-                    "SELECT * FROM (SELECT TO_CHAR(actual_start_date, 'DD.MM.YYYY HH24:MI:SS') st, " +
+                    "SELECT * FROM (SELECT owner || '.' || job_name jn, TO_CHAR(actual_start_date, 'DD.MM.YYYY HH24:MI:SS') st, " +
                     "EXTRACT(DAY FROM run_duration)*86400 + EXTRACT(HOUR FROM run_duration)*3600 + " +
                     "EXTRACT(MINUTE FROM run_duration)*60 + ROUND(EXTRACT(SECOND FROM run_duration)) dur_sec, " +
-                    "status, SUBSTR(additional_info, 1, 200) info " +
+                    "status, SUBSTR(additional_info, 1, 160) info " +
                     $"FROM {prefix}_scheduler_job_run_details " +
-                    "WHERE UPPER(job_name) = UPPER(:jn) AND (:ow IS NULL OR UPPER(owner) = UPPER(:ow)) " +
-                    "ORDER BY actual_start_date DESC) WHERE ROWNUM <= 20";
-                cmd.Parameters.Add("jn", name);
-                cmd.Parameters.Add("ow", (object?)owner ?? DBNull.Value);
-                var rows = new List<IReadOnlyList<string>>();
-                await using var rd = await cmd.ExecuteReaderAsync(ct);
-                while (await rd.ReadAsync(ct))
-                {
-                    var vals = new string[rd.FieldCount];
-                    for (int i = 0; i < rd.FieldCount; i++) vals[i] = rd.IsDBNull(i) ? "" : (Convert.ToString(rd.GetValue(i)) ?? "").Trim();
-                    rows.Add(vals);
-                }
-                return new Result($"Son Koşular — {svc.JobName}", cols, rows);
+                    "WHERE " + string.Join(" OR ", conds) + " " +
+                    "ORDER BY actual_start_date DESC) WHERE ROWNUM <= 50";
+                var rows = await RowsAsync(cmd, ct);
+                return new Result($"Son Koşular ({wanted.Count} görev)", cols, rows);
             }
             catch (OracleException ex) when (ex.Number == 942 && prefix == "dba") { /* all_ ile dene */ }
         }
-        return new Result($"Son Koşular — {svc.JobName}", cols, new List<IReadOnlyList<string>>(), "Scheduler görünümlerine erişilemedi.");
+        return new Result($"Son Koşular ({wanted.Count} görev)", cols, new List<IReadOnlyList<string>>(), "Scheduler görünümlerine erişilemedi.");
     }
 
     private async Task<Result> MsSqlJobRunsAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
     {
+        var wanted = Checkers.JobCommon.SplitList(svc.JobName);
         await using var conn = await OpenMsSqlAsync(svc, cred, ct);
-        await using var cmd = new SqlCommand(
-            "SELECT TOP 20 CONVERT(varchar(19), msdb.dbo.agent_datetime(h.run_date, h.run_time), 120), " +
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandTimeout = CommandTimeoutSec;
+        var pars = new List<string>();
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            pars.Add($"@n{i}");
+            cmd.Parameters.Add(new SqlParameter($"@n{i}", wanted[i]));
+        }
+        cmd.CommandText =
+            "SELECT TOP 50 j.name, CONVERT(varchar(19), msdb.dbo.agent_datetime(h.run_date, h.run_time), 120), " +
             "(h.run_duration/10000)*3600 + ((h.run_duration/100)%100)*60 + (h.run_duration%100), " +
             "CASE h.run_status WHEN 1 THEN 'Başarılı' WHEN 0 THEN 'BAŞARISIZ' WHEN 2 THEN 'Yeniden deneme' " +
             "WHEN 3 THEN 'İptal' WHEN 4 THEN 'Çalışıyor' ELSE CONVERT(varchar(8), h.run_status) END, " +
-            "SUBSTRING(h.message, 1, 200) " +
+            "SUBSTRING(h.message, 1, 160) " +
             "FROM msdb.dbo.sysjobs j JOIN msdb.dbo.sysjobhistory h ON h.job_id = j.job_id AND h.step_id = 0 " +
-            "WHERE j.name = @n ORDER BY h.instance_id DESC", conn) { CommandTimeout = CommandTimeoutSec };
-        cmd.Parameters.AddWithValue("@n", (svc.JobName ?? "").Trim());
-        var rows = new List<IReadOnlyList<string>>();
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        while (await rd.ReadAsync(ct))
-        {
-            var vals = new string[rd.FieldCount];
-            for (int i = 0; i < rd.FieldCount; i++) vals[i] = rd.IsDBNull(i) ? "" : (Convert.ToString(rd.GetValue(i)) ?? "").Trim();
-            rows.Add(vals);
-        }
-        return new Result($"Son Koşular — {svc.JobName}",
-            new[] { "Başlangıç", "Süre (sn)", "Durum", "Mesaj" }, rows);
+            $"WHERE j.name IN ({string.Join(", ", pars)}) ORDER BY h.instance_id DESC";
+        var rows = await RowsAsync(cmd, ct);
+        return new Result($"Son Koşular ({wanted.Count} görev)",
+            new[] { "Görev", "Başlangıç", "Süre (sn)", "Durum", "Mesaj" }, rows);
     }
 
     private async Task<Result> MySqlEventInfoAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
     {
-        var (schema, name) = Checkers.JobCommon.SplitOwned(svc.JobName ?? "");
+        var wanted = Checkers.JobCommon.SplitList(svc.JobName);
         await using var conn = await OpenMySqlAsync(svc, cred, ct);
-        await using var cmd = new MySqlCommand(
-            "SELECT EVENT_SCHEMA, EVENT_NAME, STATUS, IFNULL(DATE_FORMAT(LAST_EXECUTED, '%d.%m.%Y %H:%i:%s'), '—'), " +
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandTimeout = CommandTimeoutSec;
+        var conds = new List<string>();
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            var (sc, nm) = Checkers.JobCommon.SplitOwned(wanted[i]);
+            conds.Add($"(EVENT_NAME = @n{i} AND (@s{i} IS NULL OR EVENT_SCHEMA = @s{i}))");
+            cmd.Parameters.Add(new MySqlParameter($"@n{i}", nm));
+            cmd.Parameters.Add(new MySqlParameter($"@s{i}", (object?)sc ?? DBNull.Value));
+        }
+        cmd.CommandText =
+            "SELECT CONCAT(EVENT_SCHEMA, '.', EVENT_NAME), STATUS, IFNULL(DATE_FORMAT(LAST_EXECUTED, '%d.%m.%Y %H:%i:%s'), '—'), " +
             "IFNULL(CONCAT('HER ', INTERVAL_VALUE, ' ', INTERVAL_FIELD), IFNULL(DATE_FORMAT(EXECUTE_AT, '%d.%m.%Y %H:%i'), '—')) " +
-            "FROM information_schema.EVENTS WHERE EVENT_NAME = @n AND (@s IS NULL OR EVENT_SCHEMA = @s) LIMIT 20", conn)
-        { CommandTimeout = CommandTimeoutSec };
-        cmd.Parameters.AddWithValue("@n", name);
-        cmd.Parameters.AddWithValue("@s", (object?)schema ?? DBNull.Value);
+            "FROM information_schema.EVENTS WHERE " + string.Join(" OR ", conds) + " LIMIT 50";
+        var rows = await RowsAsync(cmd, ct);
+        return new Result($"Event Bilgisi ({wanted.Count} görev)",
+            new[] { "Event", "Durum", "Son Çalıştırma", "Zamanlama" }, rows,
+            "MySQL, event koşularının sonucunu ve süresini tutmaz — yalnız son çalıştırma zamanı izlenebilir.");
+    }
+
+    private static async Task<List<IReadOnlyList<string>>> RowsAsync(DbCommand cmd, CancellationToken ct)
+    {
         var rows = new List<IReadOnlyList<string>>();
         await using var rd = await cmd.ExecuteReaderAsync(ct);
         while (await rd.ReadAsync(ct))
@@ -226,37 +241,45 @@ public sealed class DbDetailService
             for (int i = 0; i < rd.FieldCount; i++) vals[i] = rd.IsDBNull(i) ? "" : (Convert.ToString(rd.GetValue(i)) ?? "").Trim();
             rows.Add(vals);
         }
-        return new Result($"Event Bilgisi — {svc.JobName}",
-            new[] { "Şema", "Event", "Durum", "Son Çalıştırma", "Zamanlama" }, rows,
-            "MySQL, event koşularının sonucunu ve süresini tutmaz — yalnız son çalıştırma zamanı izlenebilir.");
+        return rows;
     }
 
     private static Result WindowsTaskInfo(MonitoredService svc, Credential? cred)
     {
-        dynamic? ts = null; dynamic? task = null;
+        var wanted = Checkers.JobCommon.SplitList(svc.JobName);
+        dynamic? ts = null;
         try
         {
             ts = Checkers.WindowsTaskTools.Connect(svc.Target, cred, svc.TimeoutSeconds);
-            var (folder, name) = Checkers.WindowsTaskTools.SplitPath(svc.JobName ?? "");
-            task = ts!.GetFolder(folder).GetTask(name);
-            int state = task.State;
-            var stateText = state switch { 1 => "Devre dışı", 2 => "Kuyrukta", 3 => "Hazır", 4 => "Çalışıyor", _ => state.ToString() };
-            DateTime lastRun = task.LastRunTime; DateTime nextRun = task.NextRunTime;
-            int lastResult = task.LastTaskResult;
-            var rows = new List<IReadOnlyList<string>>
+            var rows = new List<IReadOnlyList<string>>();
+            foreach (var path in wanted)
             {
-                new[] { "Durum", stateText },
-                new[] { "Etkin", (bool)task.Enabled ? "Evet" : "Hayır" },
-                new[] { "Son çalışma", lastRun.Year < 2000 ? "Hiç koşmadı" : lastRun.ToString("dd.MM.yyyy HH:mm:ss") },
-                new[] { "Son sonuç kodu", $"0x{lastResult:X} ({lastResult})" + (lastResult == 0 ? " — Başarılı" : lastResult == 0x41301 ? " — Şu an çalışıyor" : "") },
-                new[] { "Sonraki çalışma", nextRun.Year < 2000 ? "—" : nextRun.ToString("dd.MM.yyyy HH:mm:ss") }
-            };
-            return new Result($"Görev Bilgisi — {svc.JobName}", new[] { "Alan", "Değer" }, rows,
+                dynamic? task = null;
+                try
+                {
+                    var (folder, name) = Checkers.WindowsTaskTools.SplitPath(path);
+                    task = ts!.GetFolder(folder).GetTask(name);
+                    int state = task.State;
+                    var stateText = state switch { 1 => "Devre dışı", 2 => "Kuyrukta", 3 => "Hazır", 4 => "Çalışıyor", _ => state.ToString() };
+                    DateTime lastRun = task.LastRunTime; DateTime nextRun = task.NextRunTime;
+                    int lastResult = task.LastTaskResult;
+                    rows.Add(new[]
+                    {
+                        path, stateText,
+                        lastRun.Year < 2000 ? "Hiç koşmadı" : lastRun.ToString("dd.MM.yyyy HH:mm:ss"),
+                        $"0x{lastResult:X}" + (lastResult == 0 ? " ✓" : lastResult == 0x41301 ? " (çalışıyor)" : ""),
+                        nextRun.Year < 2000 ? "—" : nextRun.ToString("dd.MM.yyyy HH:mm:ss")
+                    });
+                }
+                catch { rows.Add(new[] { path, "BULUNAMADI", "—", "—", "—" }); }
+                finally { if (task != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(task); }
+            }
+            return new Result($"Görev Bilgisi ({wanted.Count} görev)",
+                new[] { "Görev", "Durum", "Son çalışma", "Sonuç", "Sonraki çalışma" }, rows,
                 "Koşu geçmişi/süresi Görev Zamanlayıcı olay günlüğüne bağlıdır (çoğu sunucuda kapalı) — bu tipte grafik değeri 'son koşudan bu yana geçen dakika'dır.");
         }
         finally
         {
-            if (task != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(task);
             if (ts != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(ts);
         }
     }
@@ -264,31 +287,29 @@ public sealed class DbDetailService
     private static Result SystemdTimerInfo(MonitoredService svc, Credential? cred)
     {
         if (cred == null) throw new InvalidOperationException("Kimlik bilgisi tanımlı değil");
-        var unit = Checkers.SystemdTools.NormalizeTimer(svc.JobName)
-            ?? throw new InvalidOperationException("Geçersiz timer adı");
+        var units = Checkers.JobCommon.SplitList(svc.JobName)
+            .Select(Checkers.SystemdTools.NormalizeTimer).Where(u => u != null).Cast<string>().ToList();
         using var ssh = Checkers.SystemdTools.Connect(svc, cred);
         string Show(string target, string prop)
         {
             using var c = ssh.CreateCommand($"systemctl show -p {prop} --value \"{target}\" 2>/dev/null");
             return (c.Execute() ?? "").Trim();
         }
-        string Enabled(string target)
+        var rows = new List<IReadOnlyList<string>>();
+        foreach (var unit in units)
         {
-            using var c = ssh.CreateCommand($"systemctl is-enabled \"{target}\" 2>/dev/null");
-            return (c.Execute() ?? "").Trim();
+            var service = Show(unit, "Unit");
+            rows.Add(new[]
+            {
+                unit,
+                Show(unit, "LastTriggerUSec"),
+                Show(unit, "NextElapseUSecRealtime"),
+                Show(service, "Result"),
+                Show(service, "ExecMainExitTimestamp")
+            });
         }
-        var service = Show(unit, "Unit");
-        var rows = new List<IReadOnlyList<string>>
-        {
-            new[] { "Timer", unit + " (" + Enabled(unit) + ")" },
-            new[] { "Son tetikleme", Show(unit, "LastTriggerUSec") },
-            new[] { "Sonraki tetikleme", Show(unit, "NextElapseUSecRealtime") },
-            new[] { "Tetiklenen birim", service },
-            new[] { "Son sonuç", Show(service, "Result") },
-            new[] { "Son başlangıç", Show(service, "ExecMainStartTimestamp") },
-            new[] { "Son bitiş", Show(service, "ExecMainExitTimestamp") }
-        };
-        return new Result($"Timer Bilgisi — {unit}", new[] { "Alan", "Değer" }, rows);
+        return new Result($"Timer Bilgisi ({units.Count} görev)",
+            new[] { "Timer", "Son tetikleme", "Sonraki tetikleme", "Son sonuç", "Son bitiş" }, rows);
     }
 
     // ---- Bağlantı doluluğu detayları (kim tutuyor + limit) ----
