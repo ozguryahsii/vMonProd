@@ -88,9 +88,10 @@ function JobBox({ j, onClick }: { j: JobBoxState; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} title={j.name}
       className={cn("cursor-pointer rounded-md border px-2 py-1.5 text-left transition-colors", m.box)}>
-      <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">{jobShortName(j.name)}</span>
+      {/* Kullanıcı isteği: görev adı KALIN, tarih/süre satırı İNCE — okunabilirlik */}
+      <span className="block truncate text-[11px] font-bold uppercase tracking-wide">{jobShortName(j.name)}</span>
       {m.label && <span className={cn("block truncate text-xs font-semibold", m.cls)}>{m.label}</span>}
-      <span className={cn("block truncate tabular-nums", m.label ? "text-[10px] text-muted-foreground" : "text-xs font-semibold")}>
+      <span className="block truncate text-[10px] font-normal tabular-nums text-muted-foreground">
         {fmtJobRun(j.lastRun)}{j.durSec != null ? ` · ${j.durSec} sn` : ""}
       </span>
     </button>
