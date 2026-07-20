@@ -29,8 +29,9 @@ public static class JobCommon
         return i > 0 ? (jobName[..i].Trim(), jobName[(i + 1)..].Trim()) : (null, jobName.Trim());
     }
 
-    /// <summary>Tek görevin son durumu (çoklu izleme değerlendirmesine girer).</summary>
-    public sealed record JobState(string Name, bool Found, bool Enabled, string? FailText, double? AgeMin, long? DurSec);
+    /// <summary>Tek görevin son durumu (çoklu izleme değerlendirmesine girer).
+    /// AgeSec = son koşunun üzerinden geçen SANİYE (sunucu tarafında hesaplanır — TZ sapması olmaz).</summary>
+    public sealed record JobState(string Name, bool Found, bool Enabled, string? FailText, long? AgeSec, long? DurSec);
 
     /// <summary>Görev setini tek izleme sonucuna indirger: (grafik değeri, eşik-hatası mı, mesaj).
     /// Ayrıca görev-başına durumları LastJobStates biçiminde serileştirir (dashboard mini kutuları).</summary>
@@ -38,7 +39,7 @@ public static class JobCommon
     {
         long value = 0;
         foreach (var j in jobs)
-            value = Math.Max(value, durationBased ? (j.DurSec ?? 0) : (long)Math.Max(0, Math.Round(j.AgeMin ?? 0)));
+            value = Math.Max(value, durationBased ? (j.DurSec ?? 0) : Math.Max(0, (j.AgeSec ?? 0) / 60));
 
         // Görev-başına durum kodu: nf (bulunamadı) / fail / dis (devre dışı) / sil (sessizlik aşımı) / ok
         string StOf(JobState j)
@@ -46,14 +47,17 @@ public static class JobCommon
             if (!j.Found) return "nf";
             if (j.FailText != null) return "fail";
             if (!j.Enabled) return "dis";
-            if (svc.MaxSilenceHours is > 0 && (j.AgeMin == null || j.AgeMin < 0 || j.AgeMin.Value / 60.0 > svc.MaxSilenceHours.Value)) return "sil";
+            if (svc.MaxSilenceHours is > 0 && (j.AgeSec == null || j.AgeSec < 0 || j.AgeSec.Value / 3600.0 > svc.MaxSilenceHours.Value)) return "sil";
             return "ok";
         }
+        // Biçim: ad|durum|süre_sn|son_koşu_epoch (UTC sn; -1 = bilinmiyor) — mini kutular
+        // her tipte AYNI bilgiyi gösterir: tarih-saat + süre (süre bilinmeyen tiplerde yalnız tarih).
+        var nowEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var states = string.Join(";", jobs.Select(j =>
         {
-            var val = durationBased ? (j.DurSec ?? -1) : (j.AgeMin.HasValue ? (long)Math.Max(0, Math.Round(j.AgeMin.Value)) : -1);
+            var last = j.AgeSec is >= 0 ? nowEpoch - j.AgeSec.Value : -1;
             var safeName = j.Name.Replace(";", "_").Replace("|", "_");
-            return $"{safeName}|{StOf(j)}|{val}";
+            return $"{safeName}|{StOf(j)}|{j.DurSec ?? -1}|{last}";
         }));
 
         static string Names(IEnumerable<string> l)
@@ -76,7 +80,7 @@ public static class JobCommon
         if (svc.MaxSilenceHours is > 0)
         {
             var silent = jobs.Where(j => j.Found && j.Enabled && j.FailText == null &&
-                (j.AgeMin == null || j.AgeMin < 0 || j.AgeMin.Value / 60.0 > svc.MaxSilenceHours!.Value))
+                (j.AgeSec == null || j.AgeSec < 0 || j.AgeSec.Value / 3600.0 > svc.MaxSilenceHours!.Value))
                 .Select(j => j.Name).ToList();
             if (silent.Count > 0)
                 return (value, true, $"Sessizlik eşiği ({svc.MaxSilenceHours} sa) aşıldı: {Names(silent)}", states);
@@ -127,8 +131,9 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
         }
         cmd.CommandText =
             // ROUND şart: SYSDATE-tarih farkı yüksek hassasiyetli NUMBER üretir; ODP.NET decimal'e
-            // çeviremeyip "Specified cast is not valid / Arithmetic overflow" fırlatır (v2.27.0-pre.4 hatası)
-            "SELECT j.owner, j.job_name, j.enabled, ROUND((SYSDATE - CAST(j.last_start_date AS DATE)) * 1440, 1) AS age_min, " +
+            // çeviremeyip "Specified cast is not valid / Arithmetic overflow" fırlatır (v2.27.0-pre.4 hatası).
+            // Yaş SANİYE cinsinden tam sayıya yuvarlanır (mini kutuda tarih-saat sn hassasiyetiyle türetilir).
+            "SELECT j.owner, j.job_name, j.enabled, ROUND((SYSDATE - CAST(j.last_start_date AS DATE)) * 86400) AS age_sec, " +
             "d.status, d.dur_sec " +
             $"FROM {prefix}_scheduler_jobs j LEFT JOIN (" +
             "  SELECT owner, job_name, status, " +
@@ -139,14 +144,14 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             "ON d.owner = j.owner AND d.job_name = j.job_name AND d.rn = 1 " +
             "WHERE " + string.Join(" OR ", conds);
 
-        var rows = new List<(string Owner, string Name, bool Enabled, double? AgeMin, string? Status, long? DurSec)>();
+        var rows = new List<(string Owner, string Name, bool Enabled, long? AgeSec, string? Status, long? DurSec)>();
         await using (var rd = await cmd.ExecuteReaderAsync(ct))
             while (await rd.ReadAsync(ct))
                 rows.Add((
                     rd.IsDBNull(0) ? "" : rd.GetString(0),
                     rd.IsDBNull(1) ? "" : rd.GetString(1),
                     !rd.IsDBNull(2) && string.Equals(rd.GetString(2), "TRUE", StringComparison.OrdinalIgnoreCase),
-                    rd.IsDBNull(3) ? null : Convert.ToDouble(rd.GetValue(3)),
+                    rd.IsDBNull(3) ? null : Convert.ToInt64(rd.GetValue(3)),
                     rd.IsDBNull(4) ? null : rd.GetString(4),
                     rd.IsDBNull(5) ? null : Convert.ToInt64(rd.GetValue(5))));
 
@@ -160,7 +165,7 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             foreach (var r in matches)
             {
                 var fail = r.Status != null && !string.Equals(r.Status, "SUCCEEDED", StringComparison.OrdinalIgnoreCase) ? r.Status : null;
-                states.Add(new($"{r.Owner}.{r.Name}", true, r.Enabled, fail, r.AgeMin, r.DurSec));
+                states.Add(new($"{r.Owner}.{r.Name}", true, r.Enabled, fail, r.AgeSec, r.DurSec));
             }
         }
         return states;
@@ -188,7 +193,7 @@ public class MsSqlAgentJobChecker : MsSqlDbCheckerBase
         }
         cmd.CommandText =
             "SELECT j.name, j.enabled, h.run_status, " +
-            "DATEDIFF(MINUTE, msdb.dbo.agent_datetime(h.run_date, h.run_time), GETDATE()) AS age_min, " +
+            "DATEDIFF(SECOND, msdb.dbo.agent_datetime(h.run_date, h.run_time), GETDATE()) AS age_sec, " +
             "(h.run_duration/10000)*3600 + ((h.run_duration/100)%100)*60 + (h.run_duration%100) AS dur_sec, " +
             "SUBSTRING(h.message, 1, 120) " +
             "FROM msdb.dbo.sysjobs j " +
@@ -205,14 +210,14 @@ public class MsSqlAgentJobChecker : MsSqlDbCheckerBase
                 found.Add(name);
                 var enabled = !rd.IsDBNull(1) && Convert.ToInt32(rd.GetValue(1)) == 1;
                 int? runStatus = rd.IsDBNull(2) ? null : Convert.ToInt32(rd.GetValue(2));
-                double? ageMin = rd.IsDBNull(3) ? null : Convert.ToDouble(rd.GetValue(3));
+                long? ageSec = rd.IsDBNull(3) ? null : Convert.ToInt64(rd.GetValue(3));
                 long? durSec = rd.IsDBNull(4) ? null : Convert.ToInt64(rd.GetValue(4));
                 var msg = rd.IsDBNull(5) ? null : rd.GetString(5);
                 // run_status: 0=Failed 1=Succeeded 2=Retry 3=Canceled 4=InProgress
                 var fail = runStatus is 0 or 3
                     ? (runStatus == 0 ? "BAŞARISIZ" : "İPTAL") + (string.IsNullOrWhiteSpace(msg) ? "" : $" ({msg})")
                     : null;
-                states.Add(new(name, true, enabled, fail, ageMin, durSec));
+                states.Add(new(name, true, enabled, fail, ageSec, durSec));
             }
         foreach (var w in wanted)
             if (!found.Contains(w)) states.Add(new(w, false, false, null, null, null));
@@ -248,15 +253,15 @@ public class MySqlEventJobChecker : MySqlDbCheckerBase
             cmd.Parameters.Add(new MySqlParameter($"@s{i}", (object?)sc ?? DBNull.Value));
         }
         cmd.CommandText =
-            "SELECT EVENT_SCHEMA, EVENT_NAME, STATUS, TIMESTAMPDIFF(MINUTE, LAST_EXECUTED, NOW()) " +
+            "SELECT EVENT_SCHEMA, EVENT_NAME, STATUS, TIMESTAMPDIFF(SECOND, LAST_EXECUTED, NOW()) " +
             "FROM information_schema.EVENTS WHERE " + string.Join(" OR ", conds);
 
-        var rows = new List<(string Schema, string Name, string Status, double? AgeMin)>();
+        var rows = new List<(string Schema, string Name, string Status, long? AgeSec)>();
         await using (var rd = await cmd.ExecuteReaderAsync(ct))
             while (await rd.ReadAsync(ct))
                 rows.Add((rd.GetString(0), rd.GetString(1),
                     rd.IsDBNull(2) ? "" : rd.GetString(2),
-                    rd.IsDBNull(3) ? null : Convert.ToDouble(rd.GetValue(3))));
+                    rd.IsDBNull(3) ? null : Convert.ToInt64(rd.GetValue(3))));
 
         var states = new List<JobCommon.JobState>();
         foreach (var w in wanted)
@@ -267,7 +272,7 @@ public class MySqlEventJobChecker : MySqlDbCheckerBase
             if (matches.Count == 0) { states.Add(new(w, false, false, null, null, null)); continue; }
             foreach (var r in matches)
                 states.Add(new($"{r.Schema}.{r.Name}", true,
-                    r.Status.StartsWith("ENABLED", StringComparison.OrdinalIgnoreCase), null, r.AgeMin, null));
+                    r.Status.StartsWith("ENABLED", StringComparison.OrdinalIgnoreCase), null, r.AgeSec, null));
         }
 
         var (val, thr, err, ser) = JobCommon.Evaluate(service, states, durationBased: false);
@@ -364,7 +369,7 @@ public class SystemdTimerJobChecker : CheckerBase
                 bool enabled = act is "active" or "activating";
                 var fail = !string.IsNullOrEmpty(res) && res != "success" ? $"Result: {res}" : null;
                 states.Add(new(tname, found, enabled, fail,
-                    ageSec >= 0 ? ageSec / 60.0 : null, durSec >= 0 ? durSec : null));
+                    ageSec >= 0 ? ageSec : null, durSec >= 0 ? durSec : null));
             }
             foreach (var u in units)
                 if (u != null && !seen.Contains(u)) states.Add(new(u, false, false, null, null, null));
@@ -484,11 +489,11 @@ public static class WindowsTaskTools
             int lastResult = task.LastTaskResult;
 
             bool neverRan = lastRun.Year < 2000;        // 1899-12-30 = hiç koşmadı
-            double? ageMin = neverRan ? null : (DateTime.Now - lastRun).TotalMinutes;
+            long? ageSec = neverRan ? null : (long)Math.Max(0, (DateTime.Now - lastRun).TotalSeconds);
             // 0 = başarı; 0x41301 = şu an çalışıyor; 0x41303 = henüz hiç koşmadı
             var fail = state != 4 && !neverRan && lastResult != 0 && lastResult != 0x41301 && lastResult != 0x41303
                 ? $"sonuç kodu 0x{lastResult:X}" : null;
-            return new JobCommon.JobState(path, true, enabled && state != 1, fail, ageMin, null);
+            return new JobCommon.JobState(path, true, enabled && state != 1, fail, ageSec, null);
         }
         catch (System.IO.FileNotFoundException) { return new JobCommon.JobState(path, false, false, null, null, null); }
         catch (System.Runtime.InteropServices.COMException ex) when ((uint)ex.HResult == 0x80070002)

@@ -132,8 +132,13 @@ export const JOB_META: Record<string, JobMeta> = {
 };
 export const isJobType = (t: string) => t in JOB_META;
 
-/** LastJobStates çözümü: "ad|durum|değer" ';' ayraçlı → mini kutu listesi. */
-export interface JobBoxState { name: string; st: "ok" | "fail" | "dis" | "sil" | "nf"; val: number | null }
+/** LastJobStates çözümü: "ad|durum|süre_sn|son_koşu_epoch" ';' ayraçlı → mini kutu listesi.
+ *  (Eski 3 alanlı biçim de okunur; bir sonraki kontrolde yeni biçime döner.) */
+export interface JobBoxState {
+  name: string; st: "ok" | "fail" | "dis" | "sil" | "nf";
+  durSec: number | null;       // son koşu süresi (sn) — bilinmiyorsa null
+  lastRun: number | null;      // son koşu (UTC epoch sn) — bilinmiyorsa null
+}
 export function parseJobStates(raw: string | null | undefined): JobBoxState[] {
   if (!raw) return [];
   const out: JobBoxState[] = [];
@@ -141,10 +146,23 @@ export function parseJobStates(raw: string | null | undefined): JobBoxState[] {
     const f = part.split("|");
     if (f.length < 3 || !f[0]) continue;
     const st = (["ok", "fail", "dis", "sil", "nf"].includes(f[1]) ? f[1] : "ok") as JobBoxState["st"];
-    const v = Number(f[2]);
-    out.push({ name: f[0], st, val: Number.isFinite(v) && v >= 0 ? v : null });
+    const num = (x: string | undefined): number | null => {
+      const v = Number(x);
+      return Number.isFinite(v) && v >= 0 ? v : null;
+    };
+    out.push(f.length >= 4
+      ? { name: f[0], st, durSec: num(f[2]), lastRun: num(f[3]) }
+      : { name: f[0], st, durSec: null, lastRun: null });
   }
   return out;
+}
+
+/** Mini kutu tarih biçimi: gg.aa.yyyy ss:dd:ss (tüm job tiplerinde AYNI). */
+export function fmtJobRun(epochSec: number | null): string {
+  if (epochSec == null) return "Hiç koşmadı";
+  const d = new Date(epochSec * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 /** Mini kutu kısa etiketi: Oracle "OWNER.JOB" → JOB, Windows "\Klasör\Ad" → Ad. Tam ad tooltip'te. */

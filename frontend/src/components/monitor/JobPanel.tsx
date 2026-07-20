@@ -3,7 +3,7 @@ import { CalendarClock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { type StatusService, catOf } from "@/lib/monitor";
-import { isJobType, parseJobStates, jobShortName, JOB_META, type JobBoxState } from "@/lib/services";
+import { isJobType, parseJobStates, jobShortName, fmtJobRun, type JobBoxState } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 /** Zamanlanmış Görevler paneli (Veritabanı Sağlığı kartlarıyla aynı dil):
@@ -49,7 +49,7 @@ export function JobPanel({ services, onOpen }: {
                 <>
                   <div className="grid grid-cols-2 gap-1.5">
                     {states.slice(0, 8).map((j) => (
-                      <JobBox key={j.name} j={j} type={s.type} onClick={() => onOpen(s.id, j.name)} />
+                      <JobBox key={j.name} j={j} onClick={() => onOpen(s.id, j.name)} />
                     ))}
                   </div>
                   {states.length > 8 && (
@@ -81,19 +81,17 @@ const ST_META: Record<JobBoxState["st"], { label: string | null; cls: string; bo
   sil:  { label: "SESSİZ",      cls: "text-amber-400",   box: "border-amber-500/40 bg-amber-500/10 hover:border-amber-400" },
 };
 
-function fmtJobBoxVal(type: string, v: number | null): string {
-  if (v == null) return "—";
-  return JOB_META[type]?.unit === "sn" ? `${v} sn` : `${v} dk önce`;
-}
-
-function JobBox({ j, type, onClick }: { j: JobBoxState; type: string; onClick: () => void }) {
+/** Mini kutu — TÜM tiplerde aynı içerik: durum (sorunluysa) + son koşu tarihi (gg.aa.yyyy ss:dd:ss)
+ *  + süre (biliniyorsa "· N sn"; Windows Task/MySQL Event süre tutmaz → yalnız tarih). */
+function JobBox({ j, onClick }: { j: JobBoxState; onClick: () => void }) {
   const m = ST_META[j.st];
   return (
     <button type="button" onClick={onClick} title={j.name}
       className={cn("cursor-pointer rounded-md border px-2 py-1.5 text-left transition-colors", m.box)}>
       <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">{jobShortName(j.name)}</span>
-      <span className={cn("block truncate text-xs font-semibold", m.cls)}>
-        {m.label ?? fmtJobBoxVal(type, j.val)}
+      {m.label && <span className={cn("block truncate text-xs font-semibold", m.cls)}>{m.label}</span>}
+      <span className={cn("block truncate tabular-nums", m.label ? "text-[10px] text-muted-foreground" : "text-xs font-semibold")}>
+        {fmtJobRun(j.lastRun)}{j.durSec != null ? ` · ${j.durSec} sn` : ""}
       </span>
     </button>
   );
@@ -136,7 +134,7 @@ function JobPopup({ svc, onClose, onPick }: {
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {states.map((j) => (
-              <JobBox key={j.name} j={j} type={svc.type} onClick={() => onPick(j.name)} />
+              <JobBox key={j.name} j={j} onClick={() => onPick(j.name)} />
             ))}
           </div>
         </div>
