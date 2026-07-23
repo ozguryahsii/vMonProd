@@ -67,12 +67,13 @@ export function ServiceDetailDrawer({ service, onClose, onChanged, jobFilter = n
   const loadDbDetail = () => {
     if (!service || !hasDbDetail(service.type)) { setDbDetail(null); return; }
     setDbLoading(true);
-    getDbDetail(service.id, undefined, jobFilter)
+    // Job tiplerinde koşu geçmişi üstteki zaman aralığı seçicisini izler (3s/24s/7g/1a)
+    getDbDetail(service.id, undefined, jobFilter, isJobType(service.type) ? rangeMin : undefined)
       .then(setDbDetail)
       .catch((e) => setDbDetail({ supported: true, error: (e as Error).message }))
       .finally(() => setDbLoading(false));
   };
-  useEffect(() => { setDbDetail(null); loadDbDetail(); /* eslint-disable-next-line */ }, [service?.id, jobFilter]);
+  useEffect(() => { setDbDetail(null); loadDbDetail(); /* eslint-disable-next-line */ }, [service?.id, jobFilter, service && isJobType(service.type) ? rangeMin : 0]);
 
   const load = () => {
     if (!service) return;

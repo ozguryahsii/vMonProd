@@ -101,8 +101,9 @@ public class ApiController : ControllerBase
     /// offline tablespace) CANLI ayrıntı listesi. İstek üzerine çalışır — dashboard yenilemesine bağlı değil.</summary>
     [HttpGet("db-detail/{id:int}")]
     public async Task<IActionResult> DbDetail(int id, [FromServices] DbDetailService detail,
-        [FromQuery] string? job, CancellationToken ct)
+        [FromQuery] string? job, [FromQuery] int minutes = 180, CancellationToken ct = default)
     {
+        minutes = Math.Clamp(minutes, 60, 43200);   // 1 saat – 1 ay (drawer aralık seçicisiyle aynı)
         if (!Can(Perms.DashboardsView)) return Forbid403();
         var svc = await _db.Services.Include(s => s.Credential).AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (svc == null) return NotFound("İzleme bulunamadı");
@@ -118,7 +119,7 @@ public class ApiController : ControllerBase
         }
         try
         {
-            var r = await detail.GetAsync(svc, svc.Credential, ct);
+            var r = await detail.GetAsync(svc, svc.Credential, ct, minutes);
             if (r == null) return Ok(new { supported = false });
             return Ok(new { supported = true, title = r.Title, columns = r.Columns, rows = r.Rows, note = r.Note });
         }

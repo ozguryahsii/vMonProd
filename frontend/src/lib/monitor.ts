@@ -109,5 +109,10 @@ export interface DbDetailData {
   note?: string | null;
   error?: string;
 }
-export const getDbDetail = (id: number, signal?: AbortSignal, job?: string | null) =>
-  apiGet<DbDetailData>(`/db-detail/${id}${job ? `?job=${encodeURIComponent(job)}` : ""}`, signal);
+export const getDbDetail = (id: number, signal?: AbortSignal, job?: string | null, minutes?: number) => {
+  const qs = new URLSearchParams();
+  if (job) qs.set("job", job);
+  if (minutes) qs.set("minutes", String(minutes));
+  const q = qs.toString();
+  return apiGet<DbDetailData>(`/db-detail/${id}${q ? `?${q}` : ""}`, signal);
+};

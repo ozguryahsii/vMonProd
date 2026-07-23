@@ -17,8 +17,9 @@ public sealed class DbDetailService
 
     public sealed record Result(string Title, IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<string>> Rows, string? Note = null);
 
-    /// <summary>Tipe göre detay döner; detayı olmayan tiplerde null.</summary>
-    public async Task<Result?> GetAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
+    /// <summary>Tipe göre detay döner; detayı olmayan tiplerde null.
+    /// minutes: Zamanlanmış Görev koşu geçmişinin aralığı (drawer'daki 3s/24s/7g/1a seçicisi).</summary>
+    public async Task<Result?> GetAsync(MonitoredService svc, Credential? cred, CancellationToken ct, int minutes = 180)
     {
         return svc.Type switch
         {
@@ -98,8 +99,8 @@ public sealed class DbDetailService
             ServiceType.MySqlConnectionUsage => await MySqlUsageAsync(svc, cred, ct),
 
             // ---- Zamanlanmış Görevler: son koşular / görev bilgisi ----
-            ServiceType.OracleSchedulerJob => await OracleJobRunsAsync(svc, cred, ct),
-            ServiceType.MsSqlAgentJob => await MsSqlJobRunsAsync(svc, cred, ct),
+            ServiceType.OracleSchedulerJob => await OracleJobRunsAsync(svc, cred, ct, minutes),
+            ServiceType.MsSqlAgentJob => await MsSqlJobRunsAsync(svc, cred, ct, minutes),
             ServiceType.MySqlEventJob => await MySqlEventInfoAsync(svc, cred, ct),
             ServiceType.WindowsTaskJob => await Task.Run(() => WindowsTaskInfo(svc, cred), ct),
             ServiceType.SystemdTimerJob => await Task.Run(() => SystemdTimerInfo(svc, cred), ct),
@@ -146,11 +147,11 @@ public sealed class DbDetailService
 
     // ---- Zamanlanmış Görevler: son koşu listeleri (parametreli sorgular) ----
 
-    private async Task<Result> OracleJobRunsAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
+    private async Task<Result> OracleJobRunsAsync(MonitoredService svc, Credential? cred, CancellationToken ct, int minutes)
     {
         var wanted = Checkers.JobCommon.SplitList(svc.JobName);
         await using var conn = await OpenOracleAsync(svc, cred, ct);
-        var cols = new[] { "Görev", "Başlangıç", "Süre (sn)", "Durum", "Bilgi" };
+        var cols = new[] { "Görev", "Başlangıç", "Bitiş Zamanı", "Süre (sn)", "Durum", "Bilgi" };
         foreach (var prefix in new[] { "dba", "all" })
         {
             try
@@ -166,23 +167,28 @@ public sealed class DbDetailService
                     cmd.Parameters.Add($"n{i}", nm);
                     cmd.Parameters.Add($"o{i}", (object?)ow ?? DBNull.Value);
                 }
+                cmd.Parameters.Add("mins", minutes);
                 cmd.CommandText =
-                    "SELECT * FROM (SELECT owner || '.' || job_name jn, TO_CHAR(actual_start_date, 'DD.MM.YYYY HH24:MI:SS') st, " +
+                    "SELECT * FROM (SELECT owner || '.' || job_name jn, " +
+                    "TO_CHAR(actual_start_date, 'DD.MM.YYYY HH24:MI:SS') st, " +
+                    "TO_CHAR(actual_start_date + run_duration, 'DD.MM.YYYY HH24:MI:SS') en, " +
                     "EXTRACT(DAY FROM run_duration)*86400 + EXTRACT(HOUR FROM run_duration)*3600 + " +
                     "EXTRACT(MINUTE FROM run_duration)*60 + ROUND(EXTRACT(SECOND FROM run_duration)) dur_sec, " +
                     "status, SUBSTR(additional_info, 1, 160) info " +
                     $"FROM {prefix}_scheduler_job_run_details " +
-                    "WHERE " + string.Join(" OR ", conds) + " " +
-                    "ORDER BY actual_start_date DESC) WHERE ROWNUM <= 50";
+                    "WHERE (" + string.Join(" OR ", conds) + ") " +
+                    "AND actual_start_date >= SYSTIMESTAMP - NUMTODSINTERVAL(:mins, 'MINUTE') " +
+                    "ORDER BY actual_start_date DESC) WHERE ROWNUM <= 200";
                 var rows = await RowsAsync(cmd, ct);
-                return new Result($"Son Koşular ({wanted.Count} görev)", cols, rows);
+                return new Result($"Koşu Geçmişi ({wanted.Count} görev)", cols, rows,
+                    rows.Count == 0 ? "Seçili aralıkta koşu yok — üstteki zaman aralığını genişletin." : null);
             }
             catch (OracleException ex) when (ex.Number == 942 && prefix == "dba") { /* all_ ile dene */ }
         }
-        return new Result($"Son Koşular ({wanted.Count} görev)", cols, new List<IReadOnlyList<string>>(), "Scheduler görünümlerine erişilemedi.");
+        return new Result($"Koşu Geçmişi ({wanted.Count} görev)", cols, new List<IReadOnlyList<string>>(), "Scheduler görünümlerine erişilemedi.");
     }
 
-    private async Task<Result> MsSqlJobRunsAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
+    private async Task<Result> MsSqlJobRunsAsync(MonitoredService svc, Credential? cred, CancellationToken ct, int minutes)
     {
         var wanted = Checkers.JobCommon.SplitList(svc.JobName);
         await using var conn = await OpenMsSqlAsync(svc, cred, ct);
@@ -194,17 +200,23 @@ public sealed class DbDetailService
             pars.Add($"@n{i}");
             cmd.Parameters.Add(new SqlParameter($"@n{i}", wanted[i]));
         }
+        cmd.Parameters.Add(new SqlParameter("@mins", minutes));
         cmd.CommandText =
-            "SELECT TOP 50 j.name, CONVERT(varchar(19), msdb.dbo.agent_datetime(h.run_date, h.run_time), 120), " +
+            "SELECT TOP 200 j.name, " +
+            "CONVERT(varchar(19), msdb.dbo.agent_datetime(h.run_date, h.run_time), 120), " +
+            "CONVERT(varchar(19), DATEADD(SECOND, (h.run_duration/10000)*3600 + ((h.run_duration/100)%100)*60 + (h.run_duration%100), msdb.dbo.agent_datetime(h.run_date, h.run_time)), 120), " +
             "(h.run_duration/10000)*3600 + ((h.run_duration/100)%100)*60 + (h.run_duration%100), " +
             "CASE h.run_status WHEN 1 THEN 'Başarılı' WHEN 0 THEN 'BAŞARISIZ' WHEN 2 THEN 'Yeniden deneme' " +
             "WHEN 3 THEN 'İptal' WHEN 4 THEN 'Çalışıyor' ELSE CONVERT(varchar(8), h.run_status) END, " +
             "SUBSTRING(h.message, 1, 160) " +
             "FROM msdb.dbo.sysjobs j JOIN msdb.dbo.sysjobhistory h ON h.job_id = j.job_id AND h.step_id = 0 " +
-            $"WHERE j.name IN ({string.Join(", ", pars)}) ORDER BY h.instance_id DESC";
+            $"WHERE j.name IN ({string.Join(", ", pars)}) " +
+            "AND msdb.dbo.agent_datetime(h.run_date, h.run_time) >= DATEADD(MINUTE, -@mins, GETDATE()) " +
+            "ORDER BY h.instance_id DESC";
         var rows = await RowsAsync(cmd, ct);
-        return new Result($"Son Koşular ({wanted.Count} görev)",
-            new[] { "Görev", "Başlangıç", "Süre (sn)", "Durum", "Mesaj" }, rows);
+        return new Result($"Koşu Geçmişi ({wanted.Count} görev)",
+            new[] { "Görev", "Başlangıç", "Bitiş Zamanı", "Süre (sn)", "Durum", "Mesaj" }, rows,
+            rows.Count == 0 ? "Seçili aralıkta koşu yok — üstteki zaman aralığını genişletin." : null);
     }
 
     private async Task<Result> MySqlEventInfoAsync(MonitoredService svc, Credential? cred, CancellationToken ct)
@@ -276,7 +288,7 @@ public sealed class DbDetailService
             }
             return new Result($"Görev Bilgisi ({wanted.Count} görev)",
                 new[] { "Görev", "Durum", "Son çalışma", "Sonuç", "Sonraki çalışma" }, rows,
-                "Koşu geçmişi/süresi Görev Zamanlayıcı olay günlüğüne bağlıdır (çoğu sunucuda kapalı) — bu tipte grafik değeri 'son koşudan bu yana geçen dakika'dır.");
+                "Windows yalnız SON koşuyu tutar (geçmiş/süre olay günlüğüne bağlıdır, çoğu sunucuda kapalı) — koşu geçmişi bu tipte listelenemez.");
         }
         finally
         {
@@ -295,6 +307,15 @@ public sealed class DbDetailService
             using var c = ssh.CreateCommand($"systemctl show -p {prop} --value \"{target}\" 2>/dev/null");
             return (c.Execute() ?? "").Trim();
         }
+        string DurSec(string service)
+        {
+            // Süre sunucu tarafında hesaplanır (başlangıç/bitiş epoch farkı)
+            using var c = ssh.CreateCommand(
+                $"s1=$(date -d \"$(systemctl show -p ExecMainStartTimestamp --value \"{service}\" 2>/dev/null)\" +%s 2>/dev/null || echo 0); " +
+                $"s2=$(date -d \"$(systemctl show -p ExecMainExitTimestamp --value \"{service}\" 2>/dev/null)\" +%s 2>/dev/null || echo 0); " +
+                "if [ \"$s1\" -gt 0 ] && [ \"$s2\" -ge \"$s1\" ]; then echo $((s2-s1)); else echo -; fi");
+            return (c.Execute() ?? "-").Trim();
+        }
         var rows = new List<IReadOnlyList<string>>();
         foreach (var unit in units)
         {
@@ -303,13 +324,15 @@ public sealed class DbDetailService
             {
                 unit,
                 Show(unit, "LastTriggerUSec"),
-                Show(unit, "NextElapseUSecRealtime"),
+                Show(service, "ExecMainExitTimestamp"),
+                DurSec(service),
                 Show(service, "Result"),
-                Show(service, "ExecMainExitTimestamp")
+                Show(unit, "NextElapseUSecRealtime")
             });
         }
         return new Result($"Timer Bilgisi ({units.Count} görev)",
-            new[] { "Timer", "Son tetikleme", "Sonraki tetikleme", "Son sonuç", "Son bitiş" }, rows);
+            new[] { "Timer", "Son başlangıç", "Son bitiş", "Süre (sn)", "Son sonuç", "Sonraki tetikleme" }, rows,
+            "systemd yalnız SON koşuyu tutar — koşu geçmişi bu tipte listelenemez.");
     }
 
     // ---- Bağlantı doluluğu detayları (kim tutuyor + limit) ----
