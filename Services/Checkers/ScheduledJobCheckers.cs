@@ -60,6 +60,18 @@ public static class JobCommon
             return $"{safeName}|{StOf(j)}|{j.DurSec ?? -1}|{last}";
         }));
 
+        // Koşu GEÇMİŞİ için anlık görüntü: CheckRunner bunlardan JobRunHistory üretir
+        // (kaynak geçmiş tutmasa bile geçmiş vMon DB'sinde birikir).
+        svc.PendingJobRuns = jobs
+            .Where(j => j.Found && j.AgeSec is >= 0)
+            .Select(j => new JobRunSnapshot(
+                j.Name.Replace(";", "_").Replace("|", "_"),
+                DateTimeOffset.FromUnixTimeSeconds(nowEpoch - j.AgeSec!.Value).UtcDateTime,
+                j.DurSec is >= 0 ? (int?)Math.Min(j.DurSec.Value, int.MaxValue) : null,
+                j.FailText != null,
+                j.FailText))
+            .ToList();
+
         static string Names(IEnumerable<string> l)
         {
             var a = l.ToList();

@@ -109,6 +109,7 @@ public class ServicesController : MvcBase
             await _db.CheckResults.Where(r => r.ServiceId == id).ExecuteDeleteAsync();
             await _db.Outages.Where(o => o.ServiceId == id).ExecuteDeleteAsync();
             await _db.HealthMetrics.Where(m => m.ServiceId == id).ExecuteDeleteAsync();
+            await _db.JobRunHistories.Where(h => h.ServiceId == id).ExecuteDeleteAsync();
             _db.Services.Remove(svc);
             await _db.SaveChangesAsync();
             await _audit.LogAsync("service.delete", svc.Name);
@@ -132,6 +133,7 @@ public class ServicesController : MvcBase
         await _db.CheckResults.Where(r => idList.Contains(r.ServiceId)).ExecuteDeleteAsync();
         await _db.Outages.Where(o => idList.Contains(o.ServiceId)).ExecuteDeleteAsync();
         await _db.HealthMetrics.Where(m => idList.Contains(m.ServiceId)).ExecuteDeleteAsync();
+        await _db.JobRunHistories.Where(h => idList.Contains(h.ServiceId)).ExecuteDeleteAsync();
         var deleted = await _db.Services.Where(s => idList.Contains(s.Id)).ExecuteDeleteAsync();
 
         await _audit.LogAsync("service.delete-many", null, $"{deleted} servis toplu silindi.");

@@ -132,10 +132,8 @@
         "msdb okuma yetkili kullanıcı (SQLAgentReaderRole önerilir); boşsa Windows auth denenir.": "A user able to read msdb (SQLAgentReaderRole recommended); Windows auth is tried when empty.",
         "EVENT tablolarını okuyabilen izleme kullanıcısı.": "A monitoring user able to read the EVENT tables.",
         "Uzak Görev Zamanlayıcı erişimi olan domain hesabı (Domain alanını doldurun) — WMI ile aynı RPC erişimi.": "A domain account with remote Task Scheduler access (fill the Domain field) — same RPC access as WMI.",
-        "MySQL, event koşularının sonucunu ve süresini tutmaz — yalnız son çalıştırma zamanı izlenebilir.": "MySQL does not record event run results or durations — only the last execution time can be monitored.",
-        "Windows yalnız SON koşuyu tutar (geçmiş/süre olay günlüğüne bağlıdır, çoğu sunucuda kapalı) — koşu geçmişi bu tipte listelenemez.": "Windows keeps only the LAST run (history/duration depends on the event log, off on most servers) — run history cannot be listed for this type.",
-        "systemd yalnız SON koşuyu tutar — koşu geçmişi bu tipte listelenemez.": "systemd keeps only the LAST run — run history cannot be listed for this type.",
-        "Seçili aralıkta koşu yok — üstteki zaman aralığını genişletin.": "No runs in the selected range — widen the time range above.",
+        "Seçili aralıkta kayıtlı koşu yok — aralığı genişletin. Geçmiş, izleme eklendikten sonra vMon veritabanında birikir.": "No recorded runs in the selected range — widen the range. History accumulates in the vMon database after the monitor is added.",
+        "Geçmiş vMon veritabanında birikir (saklama: Ayarlar → Geçmiş saklama süresi). İzleme eklenmeden önceki koşular listelenemez.": "History accumulates in the vMon database (retention: Settings → History retention). Runs before the monitor was added cannot be listed.",
         "Bitiş Zamanı": "End Time",
         "Şema": "Schema",
         "Zamanlama": "Schedule",
@@ -270,8 +268,7 @@
         // Zaman aralıkları
         "Son 1 saat": "Last 1 hour", "Son 3 saat": "Last 3 hours", "Son 6 saat": "Last 6 hours",
         "Son 12 saat": "Last 12 hours", "Son 24 saat": "Last 24 hours", "Son 7 gün": "Last 7 days",
-        "Son 1 ay": "Last 1 month", "24 saat": "24 hours", "7 gün": "7 days", "30 gün": "30 days",
-        "90 gün": "90 days", "1 yıl": "1 year",
+        "Son 1 ay": "Last 1 month", "30 gün": "30 days", "90 gün": "90 days",
 
         // Dashboard'lar
         "Özel izleme ekranların — sekmeler arası hızlı geçiş": "Your custom monitoring screens — quick tab switching",
@@ -760,9 +757,6 @@
         "Koşu Geçmişi (": "Run History (",
         "Tümünü göster (": "Show all (",
         "Görev: ": "Job: ",
-        "Görev Bilgisi (": "Task Info (",
-        "Timer Bilgisi (": "Timer Info (",
-        "Event Bilgisi (": "Event Info (",
         "· listede ": "· in list ",
         "Diskler (": "Disks (",
         "son: ": "last: ",

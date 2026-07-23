@@ -158,6 +158,11 @@ public class MonitoredService
     /// MaxLength YOK — her sağlayıcıda sınırsız metin kolonu (TEXT/nvarchar(max)/NCLOB) oluşur.</summary>
     public string? LastJobStates { get; set; }
 
+    /// <summary>Kontrol anındaki görev koşuları — DB'ye MAPLENMEZ. Checker (JobCommon.Evaluate) doldurur,
+    /// CheckRunner bunlardan JobRunHistory kayıtlarını üretir (koşu geçmişi vMon DB'sinde birikir).</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public List<JobRunSnapshot>? PendingJobRuns { get; set; }
+
     /// <summary>Dakika cinsinden servis bazlı kontrol aralığı. Boşsa global ayar geçerli.</summary>
     public int? IntervalMinutesOverride { get; set; }
 

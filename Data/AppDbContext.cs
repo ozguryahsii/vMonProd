@@ -38,6 +38,7 @@ public class AppDbContext : DbContext
     public DbSet<SmsProvider> SmsProviders => Set<SmsProvider>();
     public DbSet<AlarmSession> AlarmSessions => Set<AlarmSession>();
     public DbSet<StatWidget> StatWidgets => Set<StatWidget>();
+    public DbSet<JobRunHistory> JobRunHistories => Set<JobRunHistory>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -45,6 +46,7 @@ public class AppDbContext : DbContext
         mb.Entity<OutageRecord>().HasIndex(o => o.ServiceId);
         mb.Entity<HealthMetric>().HasIndex(m => new { m.ServiceId, m.CheckedAt });
         mb.Entity<AuditLog>().HasIndex(a => a.At);
+        mb.Entity<JobRunHistory>().HasIndex(h => new { h.ServiceId, h.JobName, h.StartedAt });
         mb.Entity<MonitoredService>()
           .HasOne(s => s.Credential)
           .WithMany()

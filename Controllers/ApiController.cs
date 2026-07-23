@@ -103,7 +103,7 @@ public class ApiController : ControllerBase
     public async Task<IActionResult> DbDetail(int id, [FromServices] DbDetailService detail,
         [FromQuery] string? job, [FromQuery] int minutes = 180, CancellationToken ct = default)
     {
-        minutes = Math.Clamp(minutes, 60, 43200);   // 1 saat – 1 ay (drawer aralık seçicisiyle aynı)
+        minutes = Math.Clamp(minutes, 60, 60 * 24 * 372);   // 1 saat – ~1 yıl (job koşu geçmişi kendi DB'mizden okunur)
         if (!Can(Perms.DashboardsView)) return Forbid403();
         var svc = await _db.Services.Include(s => s.Credential).AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (svc == null) return NotFound("İzleme bulunamadı");
@@ -407,6 +407,7 @@ public class ApiController : ControllerBase
         await _db.CheckResults.Where(r => r.ServiceId == id).ExecuteDeleteAsync(ct);
         await _db.Outages.Where(o => o.ServiceId == id).ExecuteDeleteAsync(ct);
         await _db.HealthMetrics.Where(x => x.ServiceId == id).ExecuteDeleteAsync(ct);
+        await _db.JobRunHistories.Where(h => h.ServiceId == id).ExecuteDeleteAsync(ct);
         _db.Services.Remove(s);
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync("service.delete", s.Name, ct: ct);
@@ -425,6 +426,7 @@ public class ApiController : ControllerBase
         await _db.CheckResults.Where(r => idList.Contains(r.ServiceId)).ExecuteDeleteAsync(ct);
         await _db.Outages.Where(o => idList.Contains(o.ServiceId)).ExecuteDeleteAsync(ct);
         await _db.HealthMetrics.Where(x => idList.Contains(x.ServiceId)).ExecuteDeleteAsync(ct);
+        await _db.JobRunHistories.Where(h => idList.Contains(h.ServiceId)).ExecuteDeleteAsync(ct);
         var deleted = await _db.Services.Where(s => idList.Contains(s.Id)).ExecuteDeleteAsync(ct);
         await _audit.LogAsync("service.delete-many", null, $"{deleted} servis toplu silindi.", ct: ct);
         return Ok(new { deleted });
@@ -633,7 +635,7 @@ public class ApiController : ControllerBase
         var q = _db.CheckResults.AsNoTracking().Where(r => r.ServiceId == id);
         if (minutes > 0)
         {
-            minutes = Math.Clamp(minutes, 5, 60 * 24 * 62);
+            minutes = Math.Clamp(minutes, 5, 60 * 24 * 372);   // job tiplerinde drawer 1 yıla kadar seçebilir
             var since = DateTime.UtcNow.AddMinutes(-minutes);
             q = q.Where(r => r.CheckedAt >= since);
             take = 10000;

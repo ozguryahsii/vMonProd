@@ -50,9 +50,11 @@ export function ServiceDetailDrawer({ service, onClose, onChanged, jobFilter = n
   const [dbDetail, setDbDetail] = useState<DbDetailData | null>(null);
   const [dbLoading, setDbLoading] = useState(false);
 
+  // Job tiplerinde koşu geçmişi vMon DB'sinde 1 yıla kadar tutulur → daha uzun aralıklar da seçilebilir
   const RANGES = [
     { m: 180, label: "3 saat" }, { m: 1440, label: "24 saat" },
     { m: 10080, label: "7 gün" }, { m: 43200, label: "1 ay" },
+    ...(service && isJobType(service.type) ? [{ m: 129600, label: "3 ay" }, { m: 525600, label: "1 yıl" }] : []),
   ];
 
   const ACTION_LABEL: Record<string, string> = { start: "BAŞLAT", stop: "DURDUR", restart: "YENİDEN BAŞLAT" };

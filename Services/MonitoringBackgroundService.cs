@@ -123,6 +123,7 @@ public class MonitoringBackgroundService : BackgroundService
             var deleted = await db.CheckResults.Where(r => r.CheckedAt < cutoff).ExecuteDeleteAsync(ct);
             deleted += await db.Outages.Where(o => o.EndedAt != null && o.EndedAt < cutoff).ExecuteDeleteAsync(ct);
             deleted += await db.HealthMetrics.Where(m => m.CheckedAt < cutoff).ExecuteDeleteAsync(ct);
+            deleted += await db.JobRunHistories.Where(h => h.StartedAt < cutoff).ExecuteDeleteAsync(ct);
             if (deleted > 0) _logger.LogInformation("{Count} eski kayıt temizlendi", deleted);
 
             // Denetim kaydı saklama (PCI DSS 10.5.1: en az 1 yıl) — ayrı, daha uzun eşik

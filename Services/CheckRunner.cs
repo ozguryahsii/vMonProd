@@ -262,6 +262,48 @@ public class CheckRunner
             }
         }
 
+        // ---- Zamanlanmış Görev koşu GEÇMİŞİ: vMon'un KENDİ veritabanında birikir ----
+        // Checker görev başına SON koşuyu bildirir; başlangıç zamanı değiştiyse YENİ satır eklenir,
+        // aynıysa (koşu sürerken görülmüş olabilir) süre/sonuç netleşince mevcut satır güncellenir.
+        // Böylece kaynak sistem geçmiş tutmasa bile (Windows Task, systemd, MySQL Event) geçmiş oluşur.
+        if (svc.PendingJobRuns is { Count: > 0 })
+        {
+            foreach (var run in svc.PendingJobRuns)
+            {
+                if (run.StartedAt == null) continue;
+                try
+                {
+                    var prev = await _db.JobRunHistories
+                        .Where(h => h.ServiceId == svc.Id && h.JobName == run.JobName)
+                        .OrderByDescending(h => h.StartedAt)
+                        .FirstOrDefaultAsync(ct);
+                    var info = run.FailText == null ? null
+                        : run.FailText.Length > 500 ? run.FailText[..500] : run.FailText;
+
+                    // ±5 sn tolerans: yaş sunucu tarafında her kontrolde yeniden hesaplandığından
+                    // aynı koşunun başlangıcı saniye düzeyinde oynayabilir — mükerrer satır açılmaz.
+                    if (prev != null && Math.Abs((run.StartedAt.Value - prev.StartedAt).TotalSeconds) <= 5)
+                    {
+                        if (run.DurSec != null && prev.DurationSec == null) prev.DurationSec = run.DurSec;
+                        if (run.Failed && prev.Status != "fail") { prev.Status = "fail"; prev.Info = info; }
+                    }
+                    else if (prev == null || run.StartedAt.Value > prev.StartedAt)
+                    {
+                        _db.JobRunHistories.Add(new JobRunHistory
+                        {
+                            ServiceId = svc.Id,
+                            JobName = run.JobName,
+                            StartedAt = run.StartedAt.Value,
+                            DurationSec = run.DurSec,
+                            Status = run.Failed ? "fail" : "ok",
+                            Info = info
+                        });
+                    }
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Görev geçmişi yazılamadı ({Svc}/{Job})", svc.Name, run.JobName); }
+            }
+        }
+
         await _db.SaveChangesAsync(ct);
         return outcome;
     }
