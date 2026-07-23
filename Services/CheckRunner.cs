@@ -42,6 +42,11 @@ public class CheckRunner
         if (!_checkers.TryGetValue(svc.Type, out var checker))
             throw new InvalidOperationException($"Checker yok: {svc.Type}");
 
+        // Kaynağı geçmiş tutan job tiplerinde ilk kontrolde 30 günlük dolgu istenir (tablo boşsa)
+        if (svc.Type is ServiceType.OracleSchedulerJob or ServiceType.MsSqlAgentJob)
+            try { svc.JobHistorySeedWanted = !await _db.JobRunHistories.AnyAsync(h => h.ServiceId == svc.Id, ct); }
+            catch { svc.JobHistorySeedWanted = false; }
+
         var outcome = await checker.CheckAsync(svc, svc.Credential, ct);
 
         // ---- SELF-HEALING (yol haritası #1): yalnız Windows/Linux servis kontrol tiplerinde ----
@@ -268,26 +273,34 @@ public class CheckRunner
         // Böylece kaynak sistem geçmiş tutmasa bile (Windows Task, systemd, MySQL Event) geçmiş oluşur.
         if (svc.PendingJobRuns is { Count: > 0 })
         {
+            // Parti içi tekilleştirme: anlık görüntü + backfill aynı koşuyu iki kez içerebilir
+            // (±5 sn tolerans — yaş sunucu tarafında her seferinde yeniden hesaplandığından
+            // aynı koşunun başlangıcı saniye düzeyinde oynayabilir).
+            var seen = new List<(string Job, DateTime At)>();
             foreach (var run in svc.PendingJobRuns)
             {
                 if (run.StartedAt == null) continue;
+                if (seen.Any(s => s.Job.Equals(run.JobName, StringComparison.OrdinalIgnoreCase)
+                        && Math.Abs((s.At - run.StartedAt.Value).TotalSeconds) <= 5)) continue;
+                seen.Add((run.JobName, run.StartedAt.Value));
                 try
                 {
-                    var prev = await _db.JobRunHistories
-                        .Where(h => h.ServiceId == svc.Id && h.JobName == run.JobName)
-                        .OrderByDescending(h => h.StartedAt)
+                    var lo = run.StartedAt.Value.AddSeconds(-5);
+                    var hi = run.StartedAt.Value.AddSeconds(5);
+                    var near = await _db.JobRunHistories
+                        .Where(h => h.ServiceId == svc.Id && h.JobName == run.JobName
+                                    && h.StartedAt >= lo && h.StartedAt <= hi)
                         .FirstOrDefaultAsync(ct);
                     var info = run.FailText == null ? null
                         : run.FailText.Length > 500 ? run.FailText[..500] : run.FailText;
 
-                    // ±5 sn tolerans: yaş sunucu tarafında her kontrolde yeniden hesaplandığından
-                    // aynı koşunun başlangıcı saniye düzeyinde oynayabilir — mükerrer satır açılmaz.
-                    if (prev != null && Math.Abs((run.StartedAt.Value - prev.StartedAt).TotalSeconds) <= 5)
+                    if (near != null)
                     {
-                        if (run.DurSec != null && prev.DurationSec == null) prev.DurationSec = run.DurSec;
-                        if (run.Failed && prev.Status != "fail") { prev.Status = "fail"; prev.Info = info; }
+                        // Aynı koşu daha önce yazılmış: koşu bitince süre/sonuç netleşir → tamamla
+                        if (run.DurSec != null && near.DurationSec == null) near.DurationSec = run.DurSec;
+                        if (run.Failed && near.Status != "fail") { near.Status = "fail"; near.Info = info; }
                     }
-                    else if (prev == null || run.StartedAt.Value > prev.StartedAt)
+                    else
                     {
                         _db.JobRunHistories.Add(new JobRunHistory
                         {

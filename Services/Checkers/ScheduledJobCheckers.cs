@@ -30,8 +30,9 @@ public static class JobCommon
     }
 
     /// <summary>Tek görevin son durumu (çoklu izleme değerlendirmesine girer).
-    /// AgeSec = son koşunun üzerinden geçen SANİYE (sunucu tarafında hesaplanır — TZ sapması olmaz).</summary>
-    public sealed record JobState(string Name, bool Found, bool Enabled, string? FailText, long? AgeSec, long? DurSec);
+    /// AgeSec = son koşunun üzerinden geçen SANİYE, NextSec = sonraki çalışmaya KALAN saniye
+    /// (ikisi de sunucu tarafında hesaplanır — TZ sapması olmaz; bilinmiyorsa null).</summary>
+    public sealed record JobState(string Name, bool Found, bool Enabled, string? FailText, long? AgeSec, long? DurSec, long? NextSec = null);
 
     /// <summary>Görev setini tek izleme sonucuna indirger: (grafik değeri, eşik-hatası mı, mesaj).
     /// Ayrıca görev-başına durumları LastJobStates biçiminde serileştirir (dashboard mini kutuları).</summary>
@@ -50,14 +51,15 @@ public static class JobCommon
             if (svc.MaxSilenceHours is > 0 && (j.AgeSec == null || j.AgeSec < 0 || j.AgeSec.Value / 3600.0 > svc.MaxSilenceHours.Value)) return "sil";
             return "ok";
         }
-        // Biçim: ad|durum|süre_sn|son_koşu_epoch (UTC sn; -1 = bilinmiyor) — mini kutular
-        // her tipte AYNI bilgiyi gösterir: tarih-saat + süre (süre bilinmeyen tiplerde yalnız tarih).
+        // Biçim: ad|durum|süre_sn|son_koşu_epoch|sonraki_koşu_epoch (UTC sn; -1 = bilinmiyor) —
+        // mini kutular her tipte AYNI bilgiyi gösterir; sonraki koşu drawer'daki Görev Durumu tablosunda.
         var nowEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var states = string.Join(";", jobs.Select(j =>
         {
             var last = j.AgeSec is >= 0 ? nowEpoch - j.AgeSec.Value : -1;
+            var next = j.NextSec is >= 0 ? nowEpoch + j.NextSec.Value : -1;
             var safeName = j.Name.Replace(";", "_").Replace("|", "_");
-            return $"{safeName}|{StOf(j)}|{j.DurSec ?? -1}|{last}";
+            return $"{safeName}|{StOf(j)}|{j.DurSec ?? -1}|{last}|{next}";
         }));
 
         // Koşu GEÇMİŞİ için anlık görüntü: CheckRunner bunlardan JobRunHistory üretir
@@ -122,6 +124,10 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
                 OverrideResponseValue = val;
                 IsThresholdError = thr;
                 service.LastJobStates = ser;
+                // Oracle koşu geçmişini kaynaktan doldur: ilk kez 30 gün, sonra her kontrolde son 24 saat
+                // (kontroller arasında kaçan koşular da yakalanır; CheckRunner ±5 sn ile tekilleştirir).
+                try { await BackfillAsync(conn, prefix, wanted, service, ct); }
+                catch { /* geçmiş dolgusu kontrolü asla düşürmez */ }
                 return err;
             }
             catch (OracleException ex) when (ex.Number == 942 && prefix == "dba") { /* dba görünümü yok → all_ dene */ }
@@ -146,7 +152,7 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             // çeviremeyip "Specified cast is not valid / Arithmetic overflow" fırlatır (v2.27.0-pre.4 hatası).
             // Yaş SANİYE cinsinden tam sayıya yuvarlanır (mini kutuda tarih-saat sn hassasiyetiyle türetilir).
             "SELECT j.owner, j.job_name, j.enabled, ROUND((SYSDATE - CAST(j.last_start_date AS DATE)) * 86400) AS age_sec, " +
-            "d.status, d.dur_sec " +
+            "d.status, d.dur_sec, ROUND((CAST(j.next_run_date AS DATE) - SYSDATE) * 86400) AS next_sec " +
             $"FROM {prefix}_scheduler_jobs j LEFT JOIN (" +
             "  SELECT owner, job_name, status, " +
             "         EXTRACT(DAY FROM run_duration)*86400 + EXTRACT(HOUR FROM run_duration)*3600 + " +
@@ -156,7 +162,7 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             "ON d.owner = j.owner AND d.job_name = j.job_name AND d.rn = 1 " +
             "WHERE " + string.Join(" OR ", conds);
 
-        var rows = new List<(string Owner, string Name, bool Enabled, long? AgeSec, string? Status, long? DurSec)>();
+        var rows = new List<(string Owner, string Name, bool Enabled, long? AgeSec, string? Status, long? DurSec, long? NextSec)>();
         await using (var rd = await cmd.ExecuteReaderAsync(ct))
             while (await rd.ReadAsync(ct))
                 rows.Add((
@@ -165,7 +171,8 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
                     !rd.IsDBNull(2) && string.Equals(rd.GetString(2), "TRUE", StringComparison.OrdinalIgnoreCase),
                     rd.IsDBNull(3) ? null : Convert.ToInt64(rd.GetValue(3)),
                     rd.IsDBNull(4) ? null : rd.GetString(4),
-                    rd.IsDBNull(5) ? null : Convert.ToInt64(rd.GetValue(5))));
+                    rd.IsDBNull(5) ? null : Convert.ToInt64(rd.GetValue(5)),
+                    rd.IsDBNull(6) ? null : Convert.ToInt64(rd.GetValue(6))));
 
         var states = new List<JobCommon.JobState>();
         foreach (var w in wanted)
@@ -177,10 +184,60 @@ public class OracleSchedulerJobChecker : OracleDbCheckerBase
             foreach (var r in matches)
             {
                 var fail = r.Status != null && !string.Equals(r.Status, "SUCCEEDED", StringComparison.OrdinalIgnoreCase) ? r.Status : null;
-                states.Add(new($"{r.Owner}.{r.Name}", true, r.Enabled, fail, r.AgeSec, r.DurSec));
+                states.Add(new($"{r.Owner}.{r.Name}", true, r.Enabled, fail, r.AgeSec, r.DurSec, r.NextSec));
             }
         }
         return states;
+    }
+
+    /// <summary>Kaynağın kendi koşu geçmişinden vMon DB'sine dolgu: run_details satırları
+    /// JobRunSnapshot olarak PendingJobRuns'a eklenir (CheckRunner ±5 sn toleransla tekilleştirir).
+    /// İlk kontrolde (tablo boş) 30 gün, sonrasında 24 saat geriye bakılır.</summary>
+    private static async Task BackfillAsync(OracleConnection conn, string prefix, List<string> wanted, MonitoredService service, CancellationToken ct)
+    {
+        var lookbackMin = service.JobHistorySeedWanted ? 60 * 24 * 30 : 60 * 24;
+        var cap = service.JobHistorySeedWanted ? 500 : 200;
+        await using var cmd = conn.CreateCommand();
+        cmd.BindByName = true;
+        var conds = new List<string>();
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            var (ow, nm) = JobCommon.SplitOwned(wanted[i]);
+            conds.Add($"(UPPER(job_name) = UPPER(:n{i}) AND (:o{i} IS NULL OR UPPER(owner) = UPPER(:o{i})))");
+            cmd.Parameters.Add($"n{i}", nm);
+            cmd.Parameters.Add($"o{i}", (object?)ow ?? DBNull.Value);
+        }
+        cmd.Parameters.Add("mins", lookbackMin);
+        cmd.Parameters.Add("cap", cap);
+        cmd.CommandText =
+            "SELECT * FROM (SELECT owner || '.' || job_name jn, " +
+            "ROUND((SYSDATE - CAST(actual_start_date AS DATE)) * 86400) age_sec, " +
+            "EXTRACT(DAY FROM run_duration)*86400 + EXTRACT(HOUR FROM run_duration)*3600 + " +
+            "EXTRACT(MINUTE FROM run_duration)*60 + ROUND(EXTRACT(SECOND FROM run_duration)) dur_sec, " +
+            "status, SUBSTR(additional_info, 1, 400) info " +
+            $"FROM {prefix}_scheduler_job_run_details " +
+            "WHERE (" + string.Join(" OR ", conds) + ") " +
+            "AND actual_start_date >= SYSTIMESTAMP - NUMTODSINTERVAL(:mins, 'MINUTE') " +
+            "ORDER BY actual_start_date DESC) WHERE ROWNUM <= :cap";
+
+        var nowEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        service.PendingJobRuns ??= new List<JobRunSnapshot>();
+        await using var rd2 = await cmd.ExecuteReaderAsync(ct);
+        while (await rd2.ReadAsync(ct))
+        {
+            if (rd2.IsDBNull(0) || rd2.IsDBNull(1)) continue;
+            var jn = rd2.GetString(0).Replace(";", "_").Replace("|", "_");
+            var ageSec = Convert.ToInt64(rd2.GetValue(1));
+            long? durSec = rd2.IsDBNull(2) ? null : Convert.ToInt64(rd2.GetValue(2));
+            var status = rd2.IsDBNull(3) ? "" : rd2.GetString(3);
+            var info = rd2.IsDBNull(4) ? null : rd2.GetString(4);
+            var failed = status.Length > 0 && !string.Equals(status, "SUCCEEDED", StringComparison.OrdinalIgnoreCase);
+            service.PendingJobRuns.Add(new JobRunSnapshot(jn,
+                DateTimeOffset.FromUnixTimeSeconds(nowEpoch - ageSec).UtcDateTime,
+                durSec is >= 0 ? (int?)durSec : null,
+                failed,
+                failed ? (status + (string.IsNullOrWhiteSpace(info) ? "" : $" — {info}")) : null));
+        }
     }
 }
 
@@ -207,10 +264,13 @@ public class MsSqlAgentJobChecker : MsSqlDbCheckerBase
             "SELECT j.name, j.enabled, h.run_status, " +
             "DATEDIFF(SECOND, msdb.dbo.agent_datetime(h.run_date, h.run_time), GETDATE()) AS age_sec, " +
             "(h.run_duration/10000)*3600 + ((h.run_duration/100)%100)*60 + (h.run_duration%100) AS dur_sec, " +
-            "SUBSTRING(h.message, 1, 120) " +
+            "SUBSTRING(h.message, 1, 120), " +
+            "DATEDIFF(SECOND, GETDATE(), ns.nx) AS next_sec " +
             "FROM msdb.dbo.sysjobs j " +
             "OUTER APPLY (SELECT TOP 1 * FROM msdb.dbo.sysjobhistory x " +
             "  WHERE x.job_id = j.job_id AND x.step_id = 0 ORDER BY x.instance_id DESC) h " +
+            "OUTER APPLY (SELECT MIN(msdb.dbo.agent_datetime(s.next_run_date, s.next_run_time)) nx " +
+            "  FROM msdb.dbo.sysjobschedules s WHERE s.job_id = j.job_id AND s.next_run_date > 0) ns " +
             $"WHERE j.name IN ({string.Join(", ", pars)})";
 
         var states = new List<JobCommon.JobState>();
@@ -225,11 +285,12 @@ public class MsSqlAgentJobChecker : MsSqlDbCheckerBase
                 long? ageSec = rd.IsDBNull(3) ? null : Convert.ToInt64(rd.GetValue(3));
                 long? durSec = rd.IsDBNull(4) ? null : Convert.ToInt64(rd.GetValue(4));
                 var msg = rd.IsDBNull(5) ? null : rd.GetString(5);
+                long? nextSec = rd.IsDBNull(6) ? null : Convert.ToInt64(rd.GetValue(6));
                 // run_status: 0=Failed 1=Succeeded 2=Retry 3=Canceled 4=InProgress
                 var fail = runStatus is 0 or 3
                     ? (runStatus == 0 ? "BAŞARISIZ" : "İPTAL") + (string.IsNullOrWhiteSpace(msg) ? "" : $" ({msg})")
                     : null;
-                states.Add(new(name, true, enabled, fail, ageSec, durSec));
+                states.Add(new(name, true, enabled, fail, ageSec, durSec, nextSec));
             }
         foreach (var w in wanted)
             if (!found.Contains(w)) states.Add(new(w, false, false, null, null, null));
@@ -238,7 +299,57 @@ public class MsSqlAgentJobChecker : MsSqlDbCheckerBase
         OverrideResponseValue = val;
         IsThresholdError = thr;
         service.LastJobStates = ser;
+        // Agent koşu geçmişini kaynaktan doldur: ilk kez 30 gün, sonra her kontrolde son 24 saat
+        try { await BackfillAsync(conn, wanted, service, ct); }
+        catch { /* geçmiş dolgusu kontrolü asla düşürmez */ }
         return err;
+    }
+
+    /// <summary>sysjobhistory'den vMon DB'sine dolgu (CheckRunner ±5 sn toleransla tekilleştirir).</summary>
+    private static async Task BackfillAsync(SqlConnection conn, List<string> wanted, MonitoredService service, CancellationToken ct)
+    {
+        var lookbackMin = service.JobHistorySeedWanted ? 60 * 24 * 30 : 60 * 24;
+        var cap = service.JobHistorySeedWanted ? 500 : 200;
+        await using var cmd = conn.CreateCommand();
+        var pars = new List<string>();
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            pars.Add($"@n{i}");
+            cmd.Parameters.Add(new SqlParameter($"@n{i}", wanted[i]));
+        }
+        cmd.Parameters.Add(new SqlParameter("@mins", lookbackMin));
+        cmd.CommandText =
+            $"SELECT TOP {cap} j.name, " +
+            "DATEDIFF(SECOND, msdb.dbo.agent_datetime(h.run_date, h.run_time), GETDATE()) AS age_sec, " +
+            "(h.run_duration/10000)*3600 + ((h.run_duration/100)%100)*60 + (h.run_duration%100) AS dur_sec, " +
+            "h.run_status, SUBSTRING(h.message, 1, 400) " +
+            "FROM msdb.dbo.sysjobs j JOIN msdb.dbo.sysjobhistory h ON h.job_id = j.job_id AND h.step_id = 0 " +
+            $"WHERE j.name IN ({string.Join(", ", pars)}) " +
+            "AND msdb.dbo.agent_datetime(h.run_date, h.run_time) >= DATEADD(MINUTE, -@mins, GETDATE()) " +
+            "ORDER BY h.instance_id DESC";
+
+        var nowEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        service.PendingJobRuns ??= new List<JobRunSnapshot>();
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        while (await rd.ReadAsync(ct))
+        {
+            if (rd.IsDBNull(0) || rd.IsDBNull(1)) continue;
+            var name = rd.GetString(0).Replace(";", "_").Replace("|", "_");
+            var ageSec = Convert.ToInt64(rd.GetValue(1));
+            long? durSec = rd.IsDBNull(2) ? null : Convert.ToInt64(rd.GetValue(2));
+            int runStatus = rd.IsDBNull(3) ? 1 : Convert.ToInt32(rd.GetValue(3));
+            var msg = rd.IsDBNull(4) ? null : rd.GetString(4);
+            if (runStatus == 4) continue;   // devam eden koşu: bitince tarihçeye girer
+            var failed = runStatus is 0 or 2 or 3;
+            service.PendingJobRuns.Add(new JobRunSnapshot(name,
+                DateTimeOffset.FromUnixTimeSeconds(nowEpoch - ageSec).UtcDateTime,
+                durSec is >= 0 ? (int?)durSec : null,
+                failed,
+                failed
+                    ? (runStatus switch { 0 => "BAŞARISIZ", 2 => "Yeniden deneme", _ => "İPTAL" })
+                      + (string.IsNullOrWhiteSpace(msg) ? "" : $" — {msg}")
+                    : null));
+        }
     }
 }
 
@@ -358,9 +469,11 @@ public class SystemdTimerJobChecker : CheckerBase
                 "res=$(systemctl show -p Result --value \"$u\" 2>/dev/null); " +
                 "s1=$(date -d \"$(systemctl show -p ExecMainStartTimestamp --value \"$u\" 2>/dev/null)\" +%s 2>/dev/null || echo 0); " +
                 "s2=$(date -d \"$(systemctl show -p ExecMainExitTimestamp --value \"$u\" 2>/dev/null)\" +%s 2>/dev/null || echo 0); " +
+                "nx=$(date -d \"$(systemctl show -p NextElapseUSecRealtime --value \"$t\" 2>/dev/null)\" +%s 2>/dev/null || echo 0); " +
                 "if [ \"$lts\" -gt 0 ]; then age=$((now-lts)); else age=-1; fi; " +
                 "if [ \"$s1\" -gt 0 ] && [ \"$s2\" -ge \"$s1\" ]; then dur=$((s2-s1)); else dur=-1; fi; " +
-                "echo \"T=$t|EN=$en|ACT=$act|RES=$res|AGE=$age|DUR=$dur\"; done";
+                "if [ \"$nx\" -gt \"$now\" ]; then nxt=$((nx-now)); else nxt=-1; fi; " +
+                "echo \"T=$t|EN=$en|ACT=$act|RES=$res|AGE=$age|DUR=$dur|NXT=$nxt\"; done";
             using var cmd = ssh.CreateCommand(script);
             var outp = cmd.Execute() ?? "";
 
@@ -376,12 +489,13 @@ public class SystemdTimerJobChecker : CheckerBase
                 var res = map.GetValueOrDefault("RES", "");
                 long ageSec = long.TryParse(map.GetValueOrDefault("AGE"), out var a) ? a : -1;
                 long durSec = long.TryParse(map.GetValueOrDefault("DUR"), out var d) ? d : -1;
+                long nextSec = long.TryParse(map.GetValueOrDefault("NXT"), out var n) ? n : -1;
 
                 bool found = act != "unknown";
                 bool enabled = act is "active" or "activating";
                 var fail = !string.IsNullOrEmpty(res) && res != "success" ? $"Result: {res}" : null;
                 states.Add(new(tname, found, enabled, fail,
-                    ageSec >= 0 ? ageSec : null, durSec >= 0 ? durSec : null));
+                    ageSec >= 0 ? ageSec : null, durSec >= 0 ? durSec : null, nextSec >= 0 ? nextSec : null));
             }
             foreach (var u in units)
                 if (u != null && !seen.Contains(u)) states.Add(new(u, false, false, null, null, null));
@@ -498,14 +612,16 @@ public static class WindowsTaskTools
             bool enabled = task.Enabled;
             int state = task.State;                     // 1=Disabled 2=Queued 3=Ready 4=Running
             DateTime lastRun = task.LastRunTime;
+            DateTime nextRun = task.NextRunTime;
             int lastResult = task.LastTaskResult;
 
             bool neverRan = lastRun.Year < 2000;        // 1899-12-30 = hiç koşmadı
             long? ageSec = neverRan ? null : (long)Math.Max(0, (DateTime.Now - lastRun).TotalSeconds);
+            long? nextSec = nextRun.Year < 2000 ? null : (long?)Math.Max(0, (long)(nextRun - DateTime.Now).TotalSeconds);
             // 0 = başarı; 0x41301 = şu an çalışıyor; 0x41303 = henüz hiç koşmadı
             var fail = state != 4 && !neverRan && lastResult != 0 && lastResult != 0x41301 && lastResult != 0x41303
                 ? $"sonuç kodu 0x{lastResult:X}" : null;
-            return new JobCommon.JobState(path, true, enabled && state != 1, fail, ageSec, null);
+            return new JobCommon.JobState(path, true, enabled && state != 1, fail, ageSec, null, nextSec);
         }
         catch (System.IO.FileNotFoundException) { return new JobCommon.JobState(path, false, false, null, null, null); }
         catch (System.Runtime.InteropServices.COMException ex) when ((uint)ex.HResult == 0x80070002)

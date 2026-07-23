@@ -163,6 +163,11 @@ public class MonitoredService
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public List<JobRunSnapshot>? PendingJobRuns { get; set; }
 
+    /// <summary>DB'ye MAPLENMEZ. CheckRunner kontrol öncesi set eder: bu izlemenin hiç koşu geçmişi yoksa
+    /// Oracle/MSSQL checker'ları kaynağın kendi tarihçesinden 30 günlük dolgu (backfill) yapar.</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool JobHistorySeedWanted { get; set; }
+
     /// <summary>Dakika cinsinden servis bazlı kontrol aralığı. Boşsa global ayar geçerli.</summary>
     public int? IntervalMinutesOverride { get; set; }
 

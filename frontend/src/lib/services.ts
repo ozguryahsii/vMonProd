@@ -132,12 +132,13 @@ export const JOB_META: Record<string, JobMeta> = {
 };
 export const isJobType = (t: string) => t in JOB_META;
 
-/** LastJobStates çözümü: "ad|durum|süre_sn|son_koşu_epoch" ';' ayraçlı → mini kutu listesi.
- *  (Eski 3 alanlı biçim de okunur; bir sonraki kontrolde yeni biçime döner.) */
+/** LastJobStates çözümü: "ad|durum|süre_sn|son_koşu_epoch|sonraki_koşu_epoch" ';' ayraçlı → mini kutu listesi.
+ *  (Eski 3/4 alanlı biçimler de okunur; bir sonraki kontrolde yeni biçime döner.) */
 export interface JobBoxState {
   name: string; st: "ok" | "fail" | "dis" | "sil" | "nf";
   durSec: number | null;       // son koşu süresi (sn) — bilinmiyorsa null
   lastRun: number | null;      // son koşu (UTC epoch sn) — bilinmiyorsa null
+  nextRun: number | null;      // sonraki koşu (UTC epoch sn) — bilinmiyorsa null
 }
 export function parseJobStates(raw: string | null | undefined): JobBoxState[] {
   if (!raw) return [];
@@ -151,8 +152,8 @@ export function parseJobStates(raw: string | null | undefined): JobBoxState[] {
       return Number.isFinite(v) && v >= 0 ? v : null;
     };
     out.push(f.length >= 4
-      ? { name: f[0], st, durSec: num(f[2]), lastRun: num(f[3]) }
-      : { name: f[0], st, durSec: null, lastRun: null });
+      ? { name: f[0], st, durSec: num(f[2]), lastRun: num(f[3]), nextRun: f.length >= 5 ? num(f[4]) : null }
+      : { name: f[0], st, durSec: null, lastRun: null, nextRun: null });
   }
   return out;
 }

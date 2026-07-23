@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton, ErrorState, EmptyState } from "@/components/ui/states";
 import { type StatusService, catOf, getHistory, getMetrics, getDbDetail, type HistoryData, type MetricsData, type DbDetailData } from "@/lib/monitor";
-import { CONTROL_TYPES, DB_METRIC_META, JOB_META, fmtDbValue, hasDbDetail, isCertType, isJobType, checkService, serviceAction } from "@/lib/services";
+import { CONTROL_TYPES, DB_METRIC_META, JOB_META, fmtDbValue, fmtJobRun, hasDbDetail, isCertType, isJobType, parseJobStates, checkService, serviceAction } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
 const badge: Record<string, { label: string; cls: string }> = {
@@ -252,6 +252,51 @@ export function ServiceDetailDrawer({ service, onClose, onChanged, jobFilter = n
                       <span className="truncate font-mono">{jobFilter}</span>
                     </div>
                   )}
+                  {/* Görev Durumu: son kontrol anındaki canlı bilgi — Sonraki Çalışma dahil
+                      (koşu geçmişi tablosu geçmiş satırlarıdır; sonraki çalışma buraya aittir) */}
+                  {service && isJobType(service.type) && (() => {
+                    const jobs = parseJobStates(service.lastJobStates)
+                      .filter((j) => !jobFilter || j.name === jobFilter);
+                    if (jobs.length === 0) return null;
+                    const stLabel: Record<string, { t: string; cls: string }> = {
+                      ok: { t: "Başarılı", cls: "text-emerald-400" },
+                      fail: { t: "BAŞARISIZ", cls: "text-rose-400" },
+                      nf: { t: "BULUNAMADI", cls: "text-rose-400" },
+                      dis: { t: "DEVRE DIŞI", cls: "text-amber-400" },
+                      sil: { t: "SESSİZ", cls: "text-amber-400" },
+                    };
+                    return (
+                      <div className="mb-3">
+                        <h3 className="mb-2 text-sm font-semibold">Görev Durumu
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">({jobs.length})</span>
+                        </h3>
+                        <div className="overflow-x-auto rounded-lg border border-border/60">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-muted/40 text-muted-foreground">
+                              <tr>
+                                <th className="whitespace-nowrap px-2.5 py-1.5 font-medium">Görev</th>
+                                <th className="whitespace-nowrap px-2.5 py-1.5 font-medium">Durum</th>
+                                <th className="whitespace-nowrap px-2.5 py-1.5 font-medium">Son Koşu</th>
+                                <th className="whitespace-nowrap px-2.5 py-1.5 font-medium">Süre (sn)</th>
+                                <th className="whitespace-nowrap px-2.5 py-1.5 font-medium">Sonraki Çalışma</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {jobs.map((j) => (
+                                <tr key={j.name} className="border-t border-border/40">
+                                  <td className="max-w-[240px] truncate px-2.5 py-1.5 align-top" title={j.name}>{j.name}</td>
+                                  <td className={cn("whitespace-nowrap px-2.5 py-1.5 align-top font-semibold", stLabel[j.st].cls)}>{stLabel[j.st].t}</td>
+                                  <td className="whitespace-nowrap px-2.5 py-1.5 align-top tabular-nums">{fmtJobRun(j.lastRun)}</td>
+                                  <td className="whitespace-nowrap px-2.5 py-1.5 align-top tabular-nums">{j.durSec != null ? j.durSec : "—"}</td>
+                                  <td className="whitespace-nowrap px-2.5 py-1.5 align-top tabular-nums">{j.nextRun != null ? fmtJobRun(j.nextRun) : "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-sm font-semibold">
                       {dbDetail?.title ?? "Detay"}
