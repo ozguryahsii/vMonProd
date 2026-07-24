@@ -71,20 +71,26 @@
                     <div x-show="open" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
                         @if (en)
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Version 2.26.3 — Dependency security updates</p>
+                            <p class="font-semibold text-slate-700 mb-2">Version 2.27.0 — Scheduled Job monitoring</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Mail library updated:</strong> the SMTP component (MailKit) was upgraded to close a known STARTTLS response-injection vulnerability. Email sending works exactly as before.</li>
-                                <li><strong>Build tooling updated:</strong> the interface build tools (vite/esbuild) were upgraded to their patched versions, resolving all reported dependency vulnerabilities (1 high, 4 moderate). These tools never run on your server — no runtime impact.</li>
-                                <li>Following v2.26.2's CodeQL hardening, both security dashboards (code scanning and dependencies) are now clean.</li>
+                                <li><strong>5 new monitor types:</strong> Oracle Scheduler jobs, SQL Server Agent jobs, MySQL events, Windows Task Scheduler tasks and Linux systemd timers — when did each job last run, how long did it take, did it succeed?</li>
+                                <li><strong>One monitor, many jobs:</strong> pick any number of jobs from the live discovery list (search + select all) and watch them as a single set — e.g. "PROD Oracle Jobs".</li>
+                                <li><strong>Dashboard job cards:</strong> every job gets its own mini box with last-run date and duration; problem jobs are highlighted. Sets larger than 8 open in a sortable pop-up.</li>
+                                <li><strong>Run history kept by vMon:</strong> every detected run is stored in vMon's own database (up to your history retention setting, default 1 year) — even for sources that keep no history themselves, like Windows tasks and systemd timers. Oracle/SQL Server histories are seeded automatically from the source (last 30 days).</li>
+                                <li><strong>Job detail:</strong> a Task Status table (last run, duration, next run) plus a run-history table with start/end time, duration and result — filterable from 3 hours up to 1 year.</li>
+                                <li><strong>Alerting:</strong> a failed or missing job marks the monitor DOWN; disabled jobs and jobs silent longer than your threshold raise a warning.</li>
                             </ul>
                         }
                         else
                         {
-                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.26.3 — Bağımlılık güvenlik güncellemeleri</p>
+                            <p class="font-semibold text-slate-700 mb-2">Sürüm 2.27.0 — Zamanlanmış Görev izleme</p>
                             <ul class="list-disc ml-5 space-y-1.5">
-                                <li><strong>Posta kütüphanesi güncellendi:</strong> SMTP bileşeni (MailKit), bilinen bir STARTTLS yanıt-enjeksiyonu açığını kapatmak için yükseltildi. E-posta gönderimi aynen eskisi gibi çalışır.</li>
-                                <li><strong>Derleme araçları güncellendi:</strong> arayüz derleme araçları (vite/esbuild) yamalı sürümlerine yükseltilerek raporlanan tüm bağımlılık açıkları (1 yüksek, 4 orta) giderildi. Bu araçlar sunucunuzda hiç çalışmaz — çalışma zamanına etkisi yoktur.</li>
-                                <li>v2.26.2'deki CodeQL sıkılaştırmasının ardından her iki güvenlik panosu da (kod taraması ve bağımlılıklar) artık temizdir.</li>
+                                <li><strong>5 yeni izleme tipi:</strong> Oracle Scheduler job'ları, SQL Server Agent job'ları, MySQL event'leri, Windows Görev Zamanlayıcı görevleri ve Linux systemd timer'ları — her görev en son ne zaman koştu, ne kadar sürdü, başarılı mı?</li>
+                                <li><strong>Tek izleme, çok görev:</strong> canlı keşif listesinden (arama + tümünü seç) istediğin kadar görevi seçip tek set olarak izle — örn. "PROD Oracle Jobs".</li>
+                                <li><strong>Dashboard görev kartları:</strong> her görevin son koşu tarihi ve süresiyle kendi mini kutusu var; sorunlu görevler renkle öne çıkar. 8'den kalabalık setler sıralanabilir pencerede açılır.</li>
+                                <li><strong>Koşu geçmişi vMon'da saklanır:</strong> algılanan her koşu vMon'un kendi veritabanına yazılır (geçmiş saklama ayarına kadar, varsayılan 1 yıl) — Windows görevleri ve systemd timer'ları gibi kaynağında geçmiş tutulmayan tiplerde bile. Oracle/SQL Server geçmişi kaynaktan otomatik doldurulur (son 30 gün).</li>
+                                <li><strong>Görev detayı:</strong> Görev Durumu tablosu (son koşu, süre, sonraki çalışma) ve başlangıç/bitiş zamanı, süre ve sonuç kolonlu koşu geçmişi — 3 saatten 1 yıla kadar süzülebilir.</li>
+                                <li><strong>Alarm:</strong> başarısız veya bulunamayan görev izlemeyi KAPALI sayar; devre dışı görevler ve sessizlik eşiğini aşan görevler uyarı üretir.</li>
                             </ul>
                         }
                     </div>
